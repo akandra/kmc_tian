@@ -1,0 +1,7 @@
+start_traj 1  ! the 1st trajectory number
+ntrajs 1000     ! number of trajectories
+nlat 4        ! size of 2D lattice (nlat x nlat)
+vmax 30       ! highest vibrational level considered
+temperature 22.d0    ! temperature in K
+t_end 1.0d-3  ! length of trajectory in seconds
+n_bins 1000   ! number of time bins the trajectory is devided in
