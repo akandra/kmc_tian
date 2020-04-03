@@ -28,15 +28,23 @@ integer, dimension(:,:), allocatable   :: ads_list,ads_list_new, nn_list
 real(8) :: energy_old, delta_E
 
 integer :: ios, pos1
-character(len=120) buffer, label, inputfname, outputfname
+character(len=120) buffer, label, fname, cfg_fname, outputfname
 
 
 ! Read in simulation parameters
 
-if (iargc() == 0) stop "I need an input file with parameters"
-call getarg(1,inputfname)
+select case (iargc())
 
-call open_for_read(5, inputfname)
+case(1)
+    call getarg(1,fname)
+case(2)
+    call getarg(1,fname)
+    call getarg(2,cfg_fname)
+case default
+    stop "Wrong number of arguments"
+end select
+
+call open_for_read(5, trim(fname)//'.inp' )
 ios = 0
 do while (ios == 0)
 
@@ -69,8 +77,7 @@ end do ! ios
 
 close(5)
 
-outputfname = "occupations.dat"
-call open_for_write(6,outputfname)
+call open_for_write(6,trim(fname)//'.confs')
 
 nads = nint(coverage*nlat*nlat)
 
@@ -98,9 +105,32 @@ nn_list(4,:) = (/ 0,-1/)
 nn_list(5,:) = (/-1, 0/)
 nn_list(6,:) = (/-1, 1/)
 
-temp1D = 0
-temp1D(1:nads) = 1
-occupations = reshape(temp1D,(/nlat,nlat/))
+select case (iargc())
+
+case(1)
+
+    temp1D = 0
+    temp1D(1:nads) = 1
+    occupations = reshape(temp1D,(/nlat,nlat/))
+
+case(2)
+
+call open_for_read(5,trim(cfg_fname))
+
+!    do i=1,nlat
+!    do j=1,nlat
+        read(5,*) occupations(:,:)
+!    enddo
+!    enddo
+
+    close(5)
+print*, occupations(:,:)
+case default
+    stop "Wrong number of arguments"
+
+end select
+
+
 
 !do i=1,nlat
 !do j=1, nlat
@@ -179,6 +209,16 @@ do istep=1, nsteps
 
 enddo
 
+close(6)
+
+call open_for_write(6,trim(fname)//'.out')
+!    do i=1,nlat
+!    do j=1,nlat
+        write(6,*) occupations(i,j)
+!    enddo
+!    enddo
+close(6)
+
 ! rate constants
 
 !kdiff = 5.0d9 ! in s-1
@@ -187,7 +227,6 @@ enddo
 deallocate(occupations_new, ads_list_new)
 deallocate(ads_list,nn_list,temp1D,occupations)
 
-close(6)
 
 end program
 

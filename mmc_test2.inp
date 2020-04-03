@@ -1,0 +1,5 @@
+nlat 16             ! size of 2D lattice (nlat x nlat)
+temperature 500.0 ! temperature in K
+coverage 0.625
+eps -0.050          ! O-O interaction energy
+nsteps 10       ! number of Metropolis MC steps
