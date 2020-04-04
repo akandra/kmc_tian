@@ -13,13 +13,14 @@ real(8) :: temperature  ! temperature in K
 real(8) :: coverage     ! coverage in ML
 real(8) :: eps          ! O-O interaction energy in eV
 integer :: nsteps       ! number of Metropolis MC steps
+integer :: nsave        ! period for for conf. output
 
 real(8) :: energy
 
 integer :: nseed = 8
 integer, parameter :: seed(8) = (/1,6,3,5,7,3,3,7/)
 
-integer :: nads, nnn, nn_counter
+integer :: nads, nnn, nn_counter, nlat_old, nads_old
 integer :: i, j, k, ihop, i_new, j_new, istep
 integer, dimension(:,:), allocatable   :: occupations, occupations_new
 integer, dimension(:),   allocatable   :: temp1D
@@ -28,7 +29,8 @@ integer, dimension(:,:), allocatable   :: ads_list,ads_list_new, nn_list
 real(8) :: energy_old, delta_E
 
 integer :: ios, pos1
-character(len=120) buffer, label, fname, cfg_fname, outputfname
+character(len=120) buffer, label, fname, cfg_fname
+character(len=10) cfg_fmt
 
 
 ! Read in simulation parameters
@@ -68,6 +70,8 @@ do while (ios == 0)
                 eps = eps * eV2K
             case('nsteps')
                 read(buffer,*,iostat=ios) nsteps
+            case('nsave')
+                read(buffer,*,iostat=ios) nsave
             case default
                 print *, 'Skipping invalid label at line', label
             end select
@@ -76,6 +80,10 @@ do while (ios == 0)
 end do ! ios
 
 close(5)
+
+! configuration input/output format
+write(cfg_fmt,'(i6)') nlat
+cfg_fmt = '('//trim(adjustl(cfg_fmt))//'i3)'
 
 call open_for_write(6,trim(fname)//'.confs')
 
@@ -115,28 +123,17 @@ case(1)
 
 case(2)
 
-call open_for_read(5,trim(cfg_fname))
-
-!    do i=1,nlat
-!    do j=1,nlat
-        read(5,*) occupations(:,:)
-!    enddo
-!    enddo
-
+    call open_for_read(5,trim(cfg_fname))
+    read(5,*) nlat_old, nads_old
+    if (nlat_old /= nlat .OR. nads_old /= nads ) &
+        stop 'Error: inconsistent input and configuration files'
+    read(5,cfg_fmt) (occupations(i,:), i=1,nlat)
     close(5)
-print*, occupations(:,:)
+
 case default
     stop "Wrong number of arguments"
 
 end select
-
-
-
-!do i=1,nlat
-!do j=1, nlat
-!occupations(i,j) = j + i*10
-!end do
-!end do
 
 k = 0
 do j=1,nlat
@@ -149,13 +146,10 @@ do i=1,nlat
 end do
 end do
 
-    do i=1,nlat
-    do j=1,nlat
-        write(6,*) occupations(i,j)
-    enddo
-    enddo
+write(6,*) nlat, nads
+write(6,cfg_fmt) (occupations(i,:), i=1,nlat)
 
-do istep=1, nsteps
+do istep=2, nsteps
 
     do i=1, nads
 
@@ -194,11 +188,9 @@ do istep=1, nsteps
 
     enddo
 
-    do i=1,nlat
-    do j=1,nlat
-        write(6,*) occupations(i,j)
-    enddo
-    enddo
+    if (mod(istep, nsave) == 0) then
+        write(6,cfg_fmt) (occupations(i,:), i=1,nlat)
+    end if
 
     if (mod(istep, 1000) == 0) then
         print*, istep
@@ -212,11 +204,10 @@ enddo
 close(6)
 
 call open_for_write(6,trim(fname)//'.out')
-!    do i=1,nlat
-!    do j=1,nlat
-        write(6,*) occupations(i,j)
-!    enddo
-!    enddo
+
+write(6,*) nlat, nads
+write(6,cfg_fmt) (occupations(i,:), i=1,nlat)
+
 close(6)
 
 ! rate constants
