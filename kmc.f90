@@ -15,18 +15,19 @@ real(8) :: eps          ! O-O interaction energy in eV
 integer :: nsteps       ! number of Metropolis MC steps
 integer :: nsave        ! period for for conf. output
 
-real(8) :: energy
+real(8) :: energy, total_energy
 
 integer :: nseed = 8
 integer, parameter :: seed(8) = (/1,6,3,5,7,3,3,7/)
+integer :: icount1, icount2
 
 integer :: nads, nnn, nn_counter, nlat_old, nads_old
-integer :: i, j, k, ihop, i_new, j_new, istep
+integer :: i, j, k, ihop, istep, i_old, j_old, i_new, j_new
 integer, dimension(:,:), allocatable   :: occupations, occupations_new
 integer, dimension(:),   allocatable   :: temp1D
 integer, dimension(:,:), allocatable   :: ads_list,ads_list_new, nn_list
 
-real(8) :: energy_old, delta_E
+real(8) :: energy_old, delta_E, bexp
 
 integer :: ios, pos1
 character(len=120) buffer, label, fname, cfg_fname
@@ -86,6 +87,7 @@ write(cfg_fmt,'(i6)') nlat
 cfg_fmt = '('//trim(adjustl(cfg_fmt))//'i3)'
 
 call open_for_write(6,trim(fname)//'.confs')
+call open_for_write(7,trim(fname)//'.en')
 
 nads = nint(coverage*nlat*nlat)
 
@@ -149,6 +151,10 @@ end do
 write(6,*) nlat, nads
 write(6,cfg_fmt) (occupations(i,:), i=1,nlat)
 
+write(7,*) total_energy(nlat, nads, nnn, occupations, ads_list, nn_list, eps)
+
+
+call system_clock(icount1)
 do istep=2, nsteps
 
     do i=1, nads
@@ -162,25 +168,21 @@ do istep=2, nsteps
 
         if (occupations(i_new, j_new) == 0) then
 
-            occupations_new = occupations
-            occupations_new(ads_list(i,1),ads_list(i,2)) = 0
-            occupations_new(i_new,j_new) = 1
+            i_old = ads_list(i,1)
+            j_old = ads_list(i,2)
 
-            ads_list_new = ads_list
-            ads_list_new(i,:) = (/i_new,j_new/)
+            occupations(i_old,j_old) = 0
+            occupations(i_new,j_new) = 1
+            ads_list(i,:) = (/i_new,j_new/)
 
-            delta_E = energy(i, nlat, nads, nnn, occupations_new,&
-                              ads_list_new, nn_list, eps) - energy_old
+            delta_E = energy(i, nlat, nads, nnn, occupations,&
+                              ads_list, nn_list, eps) - energy_old
 
-            if (delta_E <= 0) then
+            if (exp(- delta_E/temperature) < ran1()) then
 
-                occupations = occupations_new
-                ads_list    = ads_list_new
-
-            else if (ran1() < exp(- delta_E/temperature)) then
-
-                occupations = occupations_new
-                ads_list    = ads_list_new
+                occupations(i_old,j_old) = 1
+                occupations(i_new,j_new) = 0
+                ads_list(i,:) = (/i_old,j_old/)
 
             end if
 
@@ -190,6 +192,7 @@ do istep=2, nsteps
 
     if (mod(istep, nsave) == 0) then
         write(6,cfg_fmt) (occupations(i,:), i=1,nlat)
+        write(7,*) total_energy(nlat, nads, nnn, occupations, ads_list, nn_list, eps)
     end if
 
     if (mod(istep, 1000) == 0) then
@@ -202,6 +205,11 @@ do istep=2, nsteps
 enddo
 
 close(6)
+close(7)
+
+call system_clock(icount2)
+print*
+print*, 'Number of clock ticks = ', icount2-icount1
 
 call open_for_write(6,trim(fname)//'.out')
 
@@ -241,5 +249,30 @@ integer :: i, ic, jc, counter
     end do
 
     energy = eps*counter
+
+end function
+
+real(8) function total_energy(nlat, nads, nnn, occupations, ads_list, nn_list, eps)
+
+integer, intent(in) :: nlat, nads, nnn
+integer, dimension(nlat,nlat), intent(in) :: occupations
+integer, dimension(nads,2), intent(in) :: ads_list
+integer, dimension(nnn,2), intent(in) :: nn_list
+real(8), intent(in) :: eps
+
+integer :: i, ic, jc, counter
+
+    counter = 0
+    do inx=1,nads
+    do i=1, nnn/2 ! count interaction with neighbors once
+
+        ic = modulo(ads_list(inx,1)+nn_list(i,1)-1,nlat) + 1
+        jc = modulo(ads_list(inx,2)+nn_list(i,2)-1,nlat) + 1
+        counter = counter + occupations(ic,jc)
+
+    end do
+    end do
+
+    total_energy = counter*eps
 
 end function
