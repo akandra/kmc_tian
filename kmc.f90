@@ -16,16 +16,20 @@ integer :: nsteps       ! number of Metropolis MC steps
 integer :: nsave        ! period for for conf. output
 
 real(8) :: energy, total_energy
+integer :: lfind
 
 integer :: nseed = 8
 integer, parameter :: seed(8) = (/1,6,3,5,7,3,3,7/)
 integer :: icount1, icount2
 
-integer :: nads, nnn, nn_counter, nlat_old, nads_old
-integer :: i, j, k, ihop, istep, i_old, j_old, i_new, j_new
-integer, dimension(:,:), allocatable   :: occupations, occupations_new
+integer :: nads, nnn, nnn2, nn_counter, nlat_old, nads_old
+integer :: i, j, k, m, n, ihop, istep, i_old, j_old, i_new, j_new
+integer, dimension(:,:), allocatable   :: occupations, ads_list, nn_list
 integer, dimension(:),   allocatable   :: temp1D
-integer, dimension(:,:), allocatable   :: ads_list,ads_list_new, nn_list
+
+integer :: itemp, ip, jp
+integer, dimension(:),   allocatable   :: scanned_nn_occs, i_nn, j_nn, labels
+integer, dimension(:,:), allocatable   :: cluster_label
 
 real(8) :: energy_old, delta_E, bexp
 
@@ -93,20 +97,22 @@ nads = nint(coverage*nlat*nlat)
 
 ! Number of neighbors for the hexagonal structure
 nnn = 6
+nnn2 = nnn/2
 
 ! allocate memory for arrays
-allocate(occupations(nlat,nlat), temp1D(nlat*nlat), ads_list(nads,2))
-allocate(occupations_new(nlat,nlat), ads_list_new(nads,2))
-allocate(nn_list(nnn,2))
+allocate(occupations(nlat,nlat), ads_list(nads,2))
+allocate(nn_list(nnn,2), temp1D(nlat*nlat))
+allocate(scanned_nn_occs(nnn2), cluster_label(nlat,nlat), i_nn(nnn2),&
+         j_nn(nnn2), labels(nads))
 
 ! NN list for the hexagonal structure
-!  11*   12*   13*   14
+!  11    12*   13*   14
 !
 !     21*   22*   23*   24
 !
 !        31*   32*   33    34
 !
-!           41*   42*   43    44
+!           41    42    43    44
 
 nn_list(1,:) = (/ 0, 1/)
 nn_list(2,:) = (/ 1, 0/)
@@ -147,6 +153,129 @@ do i=1,nlat
     end if
 end do
 end do
+
+scanned_nn_occs = 0
+cluster_label   = 0
+do i=1,nads
+    labels(i) = i
+end do
+
+write(*,cfg_fmt) (occupations(m,:), m=1,nlat)
+k = 0
+do i=1,nlat
+do j=1,nlat
+
+    if (occupations(i,j) == 1) then
+
+        do m=1,nnn2
+
+            i_nn(m) = modulo(i + nn_list(nnn2+m,1)-1,nlat) + 1
+            j_nn(m) = modulo(j + nn_list(nnn2+m,2)-1,nlat) + 1
+
+            scanned_nn_occs(m) = occupations(i_nn(m), j_nn(m))
+
+            if (i==1) scanned_nn_occs(2:3) = 0
+            if (j==1) scanned_nn_occs(1) = 0
+            if (j==nlat) scanned_nn_occs(3) = 0
+
+        end do
+
+        select case (sum(scanned_nn_occs))
+
+        case (0)
+
+            k = k + 1
+            cluster_label(i,j) = k
+
+        case (1)
+
+            do m=1,nnn2
+                if (scanned_nn_occs(m) == 1) then
+                    cluster_label(i,j) = &
+                        lfind(cluster_label(i_nn(m),j_nn(m)), labels, nads)
+                end if
+            end do
+
+        case (2)
+
+            do m=1,nnn2-1
+                itemp = cluster_label(i_nn(m),j_nn(m))
+            do n=m+1,nnn2
+                if (scanned_nn_occs(m) == 1 .and. scanned_nn_occs(n) == 1) then
+
+                    call lunion(itemp, cluster_label(i_nn(n),j_nn(n)),&
+                                                        labels, nads )
+                    cluster_label(i,j) = lfind(itemp, labels, nads )
+
+                end if
+            end do
+            end do
+
+        case (3)
+
+            itemp = cluster_label(i_nn(1),j_nn(1))
+            call lunion(itemp, cluster_label(i_nn(2),j_nn(2)),&
+                                                        labels, nads )
+            call lunion(itemp, cluster_label(i_nn(3),j_nn(3)),&
+                                                        labels, nads )
+            cluster_label(i,j) = lfind(itemp, labels, nads )
+
+        case default
+
+            stop 'Hoshen-Kopelman: something wrong'
+
+
+        end select
+
+    end if
+end do
+end do
+
+print*
+write(*,cfg_fmt) (cluster_label(m,:), m=1,nlat)
+print*
+do i=1,k
+    print('(i3,a5,i3)'), i, ' --> ' , labels(i)
+end do
+
+do i=1,nlat
+    ip = cluster_label(i,1)
+    if (ip > 0) then
+        do m=1,nnn2
+            jp = cluster_label( &
+                modulo(i + nn_list(nnn2+m,1)-1,nlat) + 1,&
+                modulo(1 + nn_list(nnn2+m,2)-1,nlat) + 1  )
+            if (jp > 0) call lunion(ip,jp,labels,nads)
+        end do
+    end if
+end do
+
+do i=2,nlat-1
+    ip = cluster_label(1,i)
+    if (ip > 0) then
+        do m=1,nnn2
+            jp = cluster_label( &
+                modulo(1 + nn_list(nnn2+m,1)-1,nlat) + 1,&
+                modulo(i + nn_list(nnn2+m,2)-1,nlat) + 1  )
+            if (jp > 0) call lunion(ip,jp,labels,nads)
+        end do
+    end if
+end do
+
+print*
+do i=1,k
+    print('(i3,a5,i3)'), i, ' --> ' , labels(i)
+end do
+
+do i=1,nlat
+do j=1,nlat
+    if (cluster_label(i,j) > 0) &
+     cluster_label(i,j) = lfind(cluster_label(i,j), labels, nads)
+end do
+end do
+
+print*
+write(*,cfg_fmt) (cluster_label(m,:), m=1,nlat)
 
 write(6,*) nlat, nads
 write(6,cfg_fmt) (occupations(i,:), i=1,nlat)
@@ -195,7 +324,7 @@ do istep=2, nsteps
         write(7,*) total_energy(nlat, nads, nnn, occupations, ads_list, nn_list, eps)
     end if
 
-    if (mod(istep, 1000) == 0) then
+    if (mod(istep, 1000000) == 0) then
         print*, istep
 !        do i=1,nlat
 !        write(*,*) occupations(i,:)
@@ -223,7 +352,7 @@ close(6)
 !kdiff = 5.0d9 ! in s-1
 !Ediff = 0.43*eV2K
 
-deallocate(occupations_new, ads_list_new)
+deallocate(scanned_nn_occs, cluster_label, i_nn, j_nn,labels)
 deallocate(ads_list,nn_list,temp1D,occupations)
 
 
@@ -276,3 +405,38 @@ integer :: i, ic, jc, counter
     total_energy = counter*eps
 
 end function
+
+integer function lfind(x, labels, nads)
+
+integer, intent(inout) :: x
+integer, dimension(nads), intent(inout) :: labels
+
+integer :: y, z
+
+    y = x
+    do while (labels(y) /= y)
+        y = labels(y)
+    end do
+
+!    do while (labels(x) /= x)
+!        z = labels(x)
+!        labels(x) = y
+!        x = z
+!    end do
+
+    lfind = y
+
+end function
+
+subroutine lunion(x, y, labels, nads)
+
+integer, intent(in) :: x, y, nads
+integer, dimension(nads), intent(inout) :: labels
+
+    if (x > y) then
+        labels( lfind(x, labels, nads) ) = lfind(y, labels, nads)
+    else if ( x < y) then
+        labels( lfind(y, labels, nads) ) = lfind(x, labels, nads)
+    endif
+
+end subroutine
