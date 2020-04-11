@@ -35,6 +35,7 @@ real(8) :: energy_old, delta_E, bexp
 integer :: ios, pos1, largest_label, hist_counter
 character(len=120) buffer, label, fname, cfg_fname
 character(len=10) cfg_fmt
+character(len=13) ads_fmt
 
 
 ! Read in simulation parameters
@@ -87,18 +88,20 @@ end do ! ios
 
 close(5)
 
+! Number of adsorbate particles
+nads = nint(coverage*nlat*nlat)
+! Number of neighbors for the hexagonal structure
+nnn = 6
+
 ! configuration input/output format
 write(cfg_fmt,'(i6)') nlat
 cfg_fmt = '('//trim(adjustl(cfg_fmt))//'i3)'
+write(ads_fmt,'(i6)') nads
+ads_fmt = '('//trim(adjustl(ads_fmt))//'i8)'
 
 call open_for_write(6,trim(fname)//'.confs')
 call open_for_write(7,trim(fname)//'.en')
-call open_for_write(8,trim(fname)//'.hist')
-
-nads = nint(coverage*nlat*nlat)
-
-! Number of neighbors for the hexagonal structure
-nnn = 6
+if (hist_period > 0) call open_for_write(8,trim(fname)//'.hist')
 
 ! allocate memory for arrays
 allocate(occupations(nlat,nlat), ads_list(nads,2))
@@ -199,7 +202,7 @@ do istep=2, nsteps
 
     enddo
 
-if (mod(istep, hist_period) == 0) then
+if (hist_period > 0 .and. mod(istep, hist_period) == 0) then
 
     call hoshen_kopelman(cluster_label, largest_label, occupations, ads_list, &
                                         nn_list, nads, nlat, nnn)
@@ -223,24 +226,20 @@ if (mod(istep, hist_period) == 0) then
 end if
 
     if (mod(istep, save_period) == 0) then
+        print*, istep
         write(6,cfg_fmt) (occupations(i,:), i=1,nlat)
         write(7,*) total_energy(nlat, nads, nnn, occupations, ads_list, nn_list, eps)
-        write(8,*) hist_counter
-        write(8,*) hist
+        if (hist_period > 0) then
+            write(8,*) hist_counter
+            write(8,ads_fmt) hist
+        end if
    end if
-
-    if (mod(istep, 1000000) == 0) then
-        print*, istep
-!        do i=1,nlat
-!        write(*,*) occupations(i,:)
-!        enddo
-    end if
 
 enddo
 
 close(6)
 close(7)
-close(8)
+if (hist_period > 0) close(8)
 
 call system_clock(icount2)
 print*
