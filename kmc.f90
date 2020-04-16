@@ -18,7 +18,7 @@ integer :: save_period  ! period for conf. output
 integer :: hist_period  ! period for histogram  calculation
 integer :: nsteps   ! number of Metropolis MC steps
 integer :: ntrajs	! number of kmc trajectories (ignored for mmc)
-real(8) :: time     ! kmc simulation time (s)
+real(8) :: t_end     ! kmc simulation time (s)
 integer :: n_bins  	! number of time intervals in kmc histogram
 
 real(8) :: energy, total_energy
@@ -34,6 +34,12 @@ integer, dimension(:),   allocatable   :: temp1D
 
 integer, dimension(:),   allocatable   :: cluster_sizes, hist
 integer, dimension(:,:), allocatable   :: cluster_label
+
+real(8) :: time, delta_t, time_new, step_bin
+real(8) :: r_hop, rate_acc, u, total_rate
+integer :: i_nn, i_ads, ibin_new, ibin, k_change
+real(8), dimension(:,:),   allocatable :: rates
+integer, dimension(:), allocatable :: change_list
 
 real(8) :: energy_old, delta_E, bexp
 
@@ -108,7 +114,7 @@ nnn = 6
 
 ! configuration input/output format
 write(cfg_fmt,'(i6)') nlat
-cfg_fmt = '('//trim(adjustl(cfg_fmt))//'i3)'
+cfg_fmt = '('//trim(adjustl(cfg_fmt))//'i8)'
 write(ads_fmt,'(i6)') nads
 ads_fmt = '('//trim(adjustl(ads_fmt))//'i8)'
 
@@ -142,7 +148,9 @@ select case (iargc())
 case(1)
 
     temp1D = 0
-    temp1D(1:nads) = 1
+    do i=1,nads
+        temp1D(i) = i
+    end do
     occupations = reshape(temp1D,(/nlat,nlat/))
 
 case(2)
@@ -159,11 +167,10 @@ case default
 
 end select
 
-k = 0
 do j=1,nlat
 do i=1,nlat
-    if (occupations(i,j) == 1) then
-        k = k + 1
+    k = occupations(i,j)
+    if (k > 0) then
         ads_list(k,1) = i
         ads_list(k,2) = j
     end if
@@ -180,7 +187,7 @@ write(7,*) total_energy(nlat, nads, nnn, occupations, ads_list, nn_list, eps)
 
 select case (algorithm)
 
-    case 'mmc'
+    case ('mmc')
 
         !call system_clock(icount1)
         do istep=2, nsteps
@@ -199,8 +206,8 @@ select case (algorithm)
                     i_old = ads_list(i,1)
                     j_old = ads_list(i,2)
 
+                    occupations(i_new,j_new) = i
                     occupations(i_old,j_old) = 0
-                    occupations(i_new,j_new) = 1
                     ads_list(i,:) = (/i_new,j_new/)
 
                     delta_E = energy(i, nlat, nads, nnn, occupations,&
@@ -208,7 +215,7 @@ select case (algorithm)
 
                     if (exp(- delta_E/temperature) < ran1()) then
 
-                        occupations(i_old,j_old) = 1
+                        occupations(i_old,j_old) = i
                         occupations(i_new,j_new) = 0
                         ads_list(i,:) = (/i_old,j_old/)
 
@@ -253,17 +260,12 @@ select case (algorithm)
 
         enddo
 
-    case 'kmc'
+    case ('kmc')
 
 ! Provisional declaration block
 ! Put it later to the beginning
 
-real(8) :: time, delta_t, time_new, step_bin
-real(8) :: r_hop, rate_acc, u
-integer :: i_nn, i_ads, ibin_new, ibin
-real(8), dimension(:,:), allocatable :: rates
-
-allocate(rates(nads,nnn))
+allocate(rates(nads,nnn), change_list(2*nnn))
 
         ! time binning for distributions
         step_bin = t_end/n_bins
@@ -353,198 +355,59 @@ allocate(rates(nads,nnn))
 
 
         ! update the state after hop
-
-        i_new = modulo(ads_list(i_ads,1) + nn_list(i_nn,1)-1,nlat) + 1
-        j_new = modulo(ads_list(i_ads,2) + nn_list(i_nn,2)-1,nlat) + 1
-
-        occupations(ads_list(i_ads,1),ads_list(i_ads,2)) = 0
-        occupations(i_new,j_new) = 1
-
-
-        ! Update rate constants for the new state of the system
-!!!! WE ARE HERE..................................................
+        change_list = 0
+        ! accounting for old neighbors
         do m=1,nnn
-
-                i = modulo(ads_list(i,1) + nn_list(m,1)-1,nlat) + 1
-                j = modulo(ads_list(i,2) + nn_list(m,2)-1,nlat) + 1
-
-                if (occupations(i_new, j_new) == 0) then
-                    rates(i,m) = r_hop
-                else
-                    rates(i,m) = 0.0d0
-                end if
-
-
+            i = modulo(ads_list(i_ads,1) + nn_list(m,1)-1,nlat) + 1
+            j = modulo(ads_list(i_ads,2) + nn_list(m,2)-1,nlat) + 1
+            change_list(m) = occupations(i,j)
         end do
 
-        !   1st order rate processes
-        Rint(i_hop,j_hop,1) = kabs(vib_state(i_hop,j_hop),time)
-        Rint(i_hop,j_hop,2) = kn(vib_state(i_hop,j_hop))
-        Rint(i_hop,j_hop,3) = wn(vib_state(i_hop,j_hop))
+        ! Adsorbate position after hop
+        i_new = modulo(ads_list(i_ads,1) + nn_list(i_nn,1)-1,nlat) + 1
+        j_new = modulo(ads_list(i_ads,2) + nn_list(i_nn,2)-1,nlat) + 1
+        ! Update occupations and ads. list
+        occupations(ads_list(i_ads,1),ads_list(i_ads,2)) = 0
+        occupations(i_new,j_new) = i_ads
+        ads_list(i_ads,:) = (/i_new,j_new/)
 
-        ! Periodic boundary conditions
-        if (i_hop==1) then
-            inlist=(/nlat,i_hop+1/)
-        elseif (i_hop==nlat) then
-            inlist=(/i_hop-1,1/)
-        else
-            inlist=(/i_hop-1,i_hop+1/)
-        end if
-        if (j_hop==1) then
-            jnlist=(/nlat,j_hop+1/)
-        elseif (j_hop==nlat) then
-            jnlist=(/j_hop-1,1/)
-        else
-            jnlist=(/j_hop-1,j_hop+1/)
-        end if
+        ! accounting for new neighbors
+        do m=1,nnn
+            i = modulo(i_new + nn_list(m,1)-1,nlat) + 1
+            j = modulo(j_new + nn_list(m,2)-1,nlat) + 1
+            change_list(m+nnn) = occupations(i,j)
+        end do
 
-        ! 2nd order rate processes
-
-        Rint(i_hop,j_hop,4) = &
-            wnm(vib_state(i_hop,j_hop),vib_state(inlist(2),j_hop))
-        Rint(i_hop,j_hop,5) = &
-            wnm(vib_state(inlist(2),j_hop),vib_state(i_hop,j_hop))
-
-        Rint(inlist(1),j_hop,4) = &
-            wnm(vib_state(inlist(1),j_hop),vib_state(i_hop,j_hop))
-        Rint(inlist(1),j_hop,5) = &
-            wnm(vib_state(i_hop,j_hop),vib_state(inlist(1),j_hop))
-
-
-        Rint(i_hop,j_hop,6) = &
-            wnm(vib_state(i_hop,j_hop),vib_state(i_hop,jnlist(2)))
-        Rint(i_hop,j_hop,7) = &
-            wnm(vib_state(i_hop,jnlist(2)),vib_state(i_hop,j_hop))
-
-        Rint(i_hop,jnlist(1),6) = &
-            wnm(vib_state(i_hop,jnlist(1)),vib_state(i_hop,j_hop))
-        Rint(i_hop,jnlist(1),7) = &
-            wnm(vib_state(i_hop,j_hop),vib_state(i_hop,jnlist(1)))
 
         ! Update rate constants for the new state of the system
-        ! site (i_hop2, j_hop2)
-        if (iproc > 3) then
 
-            !   1st order rate processes
-            Rint(i_hop2,j_hop2,1) = kabs(vib_state(i_hop2,j_hop2),time)
-            Rint(i_hop2,j_hop2,2) = kn(vib_state(i_hop2,j_hop2))
-            Rint(i_hop2,j_hop2,3) = wn(vib_state(i_hop2,j_hop2))
+        do k=1,2*nnn
 
-            !   Periodic boundary conditions
-            if (i_hop2==1) then
-                inlist=(/nlat,i_hop2+1/)
-            elseif (i_hop2==nlat) then
-                inlist=(/i_hop2-1,1/)
-            else
-                inlist=(/i_hop2-1,i_hop2+1/)
-            end if
-            if (j_hop2==1) then
-                jnlist=(/nlat,j_hop2+1/)
-            elseif (j_hop2==nlat) then
-                jnlist=(/j_hop2-1,1/)
-            else
-                jnlist=(/j_hop2-1,j_hop2+1/)
+            i = change_list(k)
+
+            if (i > 0) then
+
+                do m=1,nnn
+
+                    i_new = modulo(ads_list(i,1) + nn_list(m,1)-1,nlat) + 1
+                    j_new = modulo(ads_list(i,2) + nn_list(m,2)-1,nlat) + 1
+
+                    if (occupations(i_new, j_new) == 0) then
+                        rates(i,m) = r_hop
+                    else
+                        rates(i,m) = 0.0d0
+                    end if
+
+                end do
+
             end if
 
-            !   2nd order rate processes
-
-            Rint(i_hop2,j_hop2,4) = &
-                wnm(vib_state(i_hop2,j_hop2),vib_state(inlist(2),j_hop2))
-            Rint(i_hop2,j_hop2,5) = &
-                wnm(vib_state(inlist(2),j_hop2),vib_state(i_hop2,j_hop2))
-
-            Rint(inlist(1),j_hop2,4) = &
-                wnm(vib_state(inlist(1),j_hop2),vib_state(i_hop2,j_hop2))
-            Rint(inlist(1),j_hop2,5) = &
-                wnm(vib_state(i_hop2,j_hop2),vib_state(inlist(1),j_hop2))
-
-
-            Rint(i_hop2,j_hop2,6) = &
-                wnm(vib_state(i_hop2,j_hop2),vib_state(i_hop2,jnlist(2)))
-            Rint(i_hop2,j_hop2,7) = &
-                wnm(vib_state(i_hop2,jnlist(2)),vib_state(i_hop2,j_hop2))
-
-            Rint(i_hop2,jnlist(1),6) = &
-                wnm(vib_state(i_hop2,jnlist(1)),vib_state(i_hop2,j_hop2))
-            Rint(i_hop2,jnlist(1),7) = &
-                wnm(vib_state(i_hop2,j_hop2),vib_state(i_hop2,jnlist(1)))
-
-        end if
+        end do
 
     end do ! over time
 !-------------------------------------------------------------
 
-            do i=1, nads
-
-                energy_old = energy(i, nlat, nads, nnn, occupations, ads_list, nn_list, eps)
-
-                ihop = floor(nnn*ran1()) + 1
-
-                i_new = modulo(ads_list(i,1) + nn_list(ihop,1)-1,nlat) + 1
-                j_new = modulo(ads_list(i,2) + nn_list(ihop,2)-1,nlat) + 1
-
-                if (occupations(i_new, j_new) == 0) then
-
-                    i_old = ads_list(i,1)
-                    j_old = ads_list(i,2)
-
-                    occupations(i_old,j_old) = 0
-                    occupations(i_new,j_new) = 1
-                    ads_list(i,:) = (/i_new,j_new/)
-
-                    delta_E = energy(i, nlat, nads, nnn, occupations,&
-                                      ads_list, nn_list, eps) - energy_old
-
-                    if (exp(- delta_E/temperature) < ran1()) then
-
-                        occupations(i_old,j_old) = 1
-                        occupations(i_new,j_new) = 0
-                        ads_list(i,:) = (/i_old,j_old/)
-
-                    end if
-
-                end if
-
-            enddo
-
-        if (hist_period > 0 .and. mod(istep, hist_period) == 0) then
-
-            call hoshen_kopelman(cluster_label, largest_label, occupations, ads_list, &
-                                                nn_list, nads, nlat, nnn)
-            call count_cluster_sizes(cluster_sizes, cluster_label,&
-                                                                ads_list, nads, nlat)
-
-            hist_counter = hist_counter + 1
-            do i=1,largest_label
-                if (cluster_sizes(i) > 0) &
-                    hist(cluster_sizes(i)) = hist(cluster_sizes(i)) + 1
-            end do
-
-        !print*,largest_label
-        !print*,cluster_sizes
-        !print*
-        !write(*,cfg_fmt) (cluster_label(m,:), m=1,nlat)
-        !print*
-        !write(*,cfg_fmt) hist
-        !
-
-        end if
-
-            if (mod(istep, save_period) == 0) then
-                print*, istep
-                write(6,cfg_fmt) (occupations(i,:), i=1,nlat)
-                write(7,*) total_energy(nlat, nads, nnn, occupations, ads_list, nn_list, eps)
-                if (hist_period > 0) then
-                    write(8,*) hist_counter
-                    write(8,ads_fmt) hist
-                end if
-           end if
-
-        enddo
-
-! MOVE later to the end
-
-        deallocate(rates)
+    enddo ! over trajectories
 
     case default
         stop 'Error: mc algorithm not defined'
@@ -571,6 +434,7 @@ close(6)
 !kdiff = 5.0d9 ! in s-1
 !Ediff = 0.43*eV2K
 
+deallocate(rates,change_list)
 deallocate(cluster_label, cluster_sizes, hist)
 deallocate(ads_list,nn_list,temp1D,occupations)
 
@@ -592,7 +456,7 @@ integer :: i, ic, jc, counter
 
         ic = modulo(ads_list(inx,1)+nn_list(i,1)-1,nlat) + 1
         jc = modulo(ads_list(inx,2)+nn_list(i,2)-1,nlat) + 1
-        counter = counter + occupations(ic,jc)
+        if (occupations(ic,jc) > 0) counter = counter + 1
 
     end do
 
@@ -616,7 +480,7 @@ integer :: i, ic, jc, counter
 
         ic = modulo(ads_list(inx,1)+nn_list(i,1)-1,nlat) + 1
         jc = modulo(ads_list(inx,2)+nn_list(i,2)-1,nlat) + 1
-        counter = counter + occupations(ic,jc)
+        if (occupations(ic,jc) > 0) counter = counter + 1
 
     end do
     end do
@@ -688,14 +552,14 @@ largest_label = 0
 do i=1,nlat
 do j=1,nlat
 
-    if (occupations(i,j) == 1) then
+    if (occupations(i,j) > 0) then
 
         do m=1,nnn2
 
             i_nn(m) = modulo(i + nn_list(nnn2+m,1)-1,nlat) + 1
             j_nn(m) = modulo(j + nn_list(nnn2+m,2)-1,nlat) + 1
 
-            scanned_nn_occs(m) = occupations(i_nn(m), j_nn(m))
+            if (occupations(i_nn(m), j_nn(m)) > 0) scanned_nn_occs(m) = 1
 
             if (i==1) scanned_nn_occs(2:3) = 0
             if (j==1) scanned_nn_occs(1) = 0
