@@ -20,8 +20,9 @@ integer :: nsteps   ! number of Metropolis MC steps
 integer :: ntrajs	! number of kmc trajectories (ignored for mmc)
 real(8) :: t_end     ! kmc simulation time (s)
 integer :: n_bins  	! number of time intervals in kmc histogram
+character(len=120) :: rate_file ! file name with rate parameters
 
-real(8) :: energy, total_energy
+real(8) :: energy, total_energy, arrhenius
 
 integer :: nseed = 8
 integer, parameter :: seed(8) = (/1,6,3,5,7,3,3,7/)
@@ -30,7 +31,7 @@ integer :: icount1, icount2
 integer :: nads, nnn, nn_counter, nlat_old, nads_old
 integer :: i, j, k, m, n, ihop, istep, i_old, j_old, i_new, j_new, itraj
 integer, dimension(:,:), allocatable   :: occupations, ads_list, nn_list
-integer, dimension(:),   allocatable   :: temp1D
+integer, dimension(:),   allocatable   :: nn_opps, temp1D
 
 integer, dimension(:),   allocatable   :: cluster_sizes, hist
 integer, dimension(:,:), allocatable   :: cluster_label
@@ -39,12 +40,15 @@ real(8) :: time, delta_t, time_new, step_bin
 real(8) :: r_hop, rate_acc, u, total_rate
 integer :: i_nn, i_ads, ibin_new, ibin, k_change
 real(8), dimension(:,:),   allocatable :: rates
-integer, dimension(:), allocatable :: change_list
 
 real(8) :: energy_old, delta_E, bexp
 
 integer :: ios, pos1, largest_label, hist_counter
 character(len=120) buffer, label, fname, cfg_fname
+
+character(len=120) :: rate_key
+real(8) :: rate_par1, rate_par2
+
 character(len=10) cfg_fmt
 character(len=13) ads_fmt
 
@@ -98,6 +102,9 @@ do while (ios == 0)
                 read(buffer,*,iostat=ios) t_end
             case('kmc_nbins')
                 read(buffer,*,iostat=ios) n_bins
+            case('kmc_rates')
+                read(buffer,*,iostat=ios) rate_file
+                rate_file = trim(rate_file)
             case default
                 print *, 'Skipping invalid label at line', label
             end select
@@ -106,6 +113,13 @@ do while (ios == 0)
 end do ! ios
 
 close(5)
+
+call open_for_read(6,rate_file)
+
+read(6,*) rate_key, rate_par1, rate_par2
+rate_par2 = rate_par2 * eV2K
+
+close(6)
 
 ! Number of adsorbate particles
 nads = nint(coverage*nlat*nlat)
@@ -124,7 +138,7 @@ if (hist_period > 0) call open_for_write(8,trim(fname)//'.hist')
 
 ! allocate memory for arrays
 allocate(occupations(nlat,nlat), ads_list(nads,2))
-allocate(nn_list(nnn,2), temp1D(nlat*nlat))
+allocate(nn_list(nnn,2), nn_opps(nnn), temp1D(nlat*nlat))
 allocate(cluster_label(nlat,nlat), cluster_sizes(nads), hist(nads))
 
 ! NN list for the hexagonal structure
@@ -142,6 +156,10 @@ nn_list(3,:) = (/ 1,-1/)
 nn_list(4,:) = (/ 0,-1/)
 nn_list(5,:) = (/-1, 0/)
 nn_list(6,:) = (/-1, 1/)
+
+do m=1,nnn
+    nn_opps(m) = modulo(m-1+nnn/2,nnn)+1
+end do
 
 select case (iargc())
 
@@ -265,22 +283,33 @@ select case (algorithm)
 ! Provisional declaration block
 ! Put it later to the beginning
 
-allocate(rates(nads,nnn), change_list(2*nnn))
+allocate(rates(nads,nnn))
+
+
+occupations = 0
+occupations(nlat/2,nlat/2) = 1
+ads_list(1,:) = (/ nlat/2,nlat/2 /)
 
         ! time binning for distributions
         step_bin = t_end/n_bins
 
         ! Provisional definition of rates
-        r_hop = 1
+        r_hop = arrhenius(temperature, rate_par1, rate_par2)
 
         do itraj=1, ntrajs
+
+            print*,itraj
 
             ! initialize random number generator
             call random_seed(size=nseed)
             call random_seed(put=itraj*seed)
 
+            write(buffer,'(i6.6)') itraj
+            call open_for_write(10,trim(fname)//trim(buffer)//'.pos')
+
             ibin = 0
 
+            ! Construct rate array
             do i=1,nads
             do m=1,nnn
 
@@ -292,7 +321,6 @@ allocate(rates(nads,nnn), change_list(2*nnn))
                 else
                     rates(i,m) = 0.0d0
                 end if
-
 
             end do
             end do
@@ -351,19 +379,27 @@ allocate(rates(nads,nnn), change_list(2*nnn))
 !
 !            endif
 
+    write(10,*) time, ads_list(:,:)
+
+!stop
+
     time = time_new ! time shift
 
 
-        ! update the state after hop
-        change_list = 0
-        ! accounting for old neighbors
+        ! Update rate constants
+        ! Particle i_ads is going to hop in direction i_nn
+
+        ! scan over old neighbors
         do m=1,nnn
+            ! (i,j) is a position of neighbor m
             i = modulo(ads_list(i_ads,1) + nn_list(m,1)-1,nlat) + 1
             j = modulo(ads_list(i_ads,2) + nn_list(m,2)-1,nlat) + 1
-            change_list(m) = occupations(i,j)
+            ! update rate for neighbor m in direction nn_opps(m)
+            if (occupations(i,j) > 0) rates(occupations(i,j),nn_opps(m)) = r_hop
+
         end do
 
-        ! Adsorbate position after hop
+        ! Update adsorbate position after hop
         i_new = modulo(ads_list(i_ads,1) + nn_list(i_nn,1)-1,nlat) + 1
         j_new = modulo(ads_list(i_ads,2) + nn_list(i_nn,2)-1,nlat) + 1
         ! Update occupations and ads. list
@@ -371,35 +407,18 @@ allocate(rates(nads,nnn), change_list(2*nnn))
         occupations(i_new,j_new) = i_ads
         ads_list(i_ads,:) = (/i_new,j_new/)
 
-        ! accounting for new neighbors
+        ! scan over new neighbors
         do m=1,nnn
+            ! (i,j) is a position of neighbor m
             i = modulo(i_new + nn_list(m,1)-1,nlat) + 1
             j = modulo(j_new + nn_list(m,2)-1,nlat) + 1
-            change_list(m+nnn) = occupations(i,j)
-        end do
-
-
-        ! Update rate constants for the new state of the system
-
-        do k=1,2*nnn
-
-            i = change_list(k)
-
-            if (i > 0) then
-
-                do m=1,nnn
-
-                    i_new = modulo(ads_list(i,1) + nn_list(m,1)-1,nlat) + 1
-                    j_new = modulo(ads_list(i,2) + nn_list(m,2)-1,nlat) + 1
-
-                    if (occupations(i_new, j_new) == 0) then
-                        rates(i,m) = r_hop
-                    else
-                        rates(i,m) = 0.0d0
-                    end if
-
-                end do
-
+            ! update rate for neighbor m in direction nn_opps(m)
+            ! as well as rates for particle i_ads which committed a hop
+            if (occupations(i,j) > 0) then
+                rates(occupations(i,j),nn_opps(m)) = 0.0d0
+                rates(i_ads,m) = 0.0d0
+            else
+                rates(i_ads,m) = r_hop
             end if
 
         end do
@@ -407,7 +426,10 @@ allocate(rates(nads,nnn), change_list(2*nnn))
     end do ! over time
 !-------------------------------------------------------------
 
+    close(10)
+
     enddo ! over trajectories
+
 
     case default
         stop 'Error: mc algorithm not defined'
@@ -434,9 +456,9 @@ close(6)
 !kdiff = 5.0d9 ! in s-1
 !Ediff = 0.43*eV2K
 
-deallocate(rates,change_list)
+deallocate(rates)
 deallocate(cluster_label, cluster_sizes, hist)
-deallocate(ads_list,nn_list,temp1D,occupations)
+deallocate(ads_list,nn_list,nn_opps,temp1D,occupations)
 
 
 end program
@@ -685,3 +707,12 @@ integer :: i, ic
     end do
 
 end subroutine
+
+real(8) function arrhenius(temperature, prefactor, act_energy)
+
+real(8), intent(in) :: temperature, prefactor, act_energy
+
+    arrhenius = prefactor*exp(-act_energy/temperature)
+
+
+end function
