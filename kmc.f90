@@ -8,6 +8,7 @@ implicit none
 
 real(8), parameter :: eV2K = 11604.52
 real(8), parameter :: big_bang = 0.0d0 ! in fortnights
+real(8), parameter :: pi = 4.0d0*atan(1.0d0)
 
 character(len=3) :: algorithm   ! MC algorithm to use (kmc or mmc)
 integer :: nlat         ! size of 2D lattice (nlat x nlat)
@@ -30,6 +31,8 @@ integer :: icount1, icount2
 
 integer :: nads, nnn, nn_counter, nlat_old, nads_old
 integer :: i, j, k, m, n, ihop, istep, i_old, j_old, i_new, j_new, itraj
+
+real(8), dimension(2) :: b1, b2
 integer, dimension(:,:), allocatable   :: occupations, ads_list, nn_list
 integer, dimension(:),   allocatable   :: nn_opps, temp1D
 
@@ -47,7 +50,10 @@ integer :: ios, pos1, largest_label, hist_counter
 character(len=120) buffer, label, fname, cfg_fname
 
 character(len=120) :: rate_key
-real(8) :: rate_par1, rate_par2
+real(8) :: rate_par1, rate_par2, rtemp
+
+real(8), dimension(:), allocatable :: delta_r2
+integer, dimension(2) :: singularity
 
 character(len=10) cfg_fmt
 character(len=13) ads_fmt
@@ -156,6 +162,12 @@ nn_list(3,:) = (/ 1,-1/)
 nn_list(4,:) = (/ 0,-1/)
 nn_list(5,:) = (/-1, 0/)
 nn_list(6,:) = (/-1, 1/)
+
+! Hexagonal transformation matrix
+
+b1 = (/         1.0d0,       0.0d0/)
+b2 = (/ cos(pi/3.0d0), sin(pi/3.0d0) /)
+
 
 do m=1,nnn
     nn_opps(m) = modulo(m-1+nnn/2,nnn)+1
@@ -284,11 +296,9 @@ select case (algorithm)
 ! Put it later to the beginning
 
 allocate(rates(nads,nnn))
+allocate(delta_r2(n_bins))
 
-
-occupations = 0
-occupations(nlat/2,nlat/2) = 1
-ads_list(1,:) = (/ nlat/2,nlat/2 /)
+        singularity = (/ nlat/2,nlat/2 /)
 
         ! time binning for distributions
         step_bin = t_end/n_bins
@@ -298,6 +308,12 @@ ads_list(1,:) = (/ nlat/2,nlat/2 /)
 
         do itraj=1, ntrajs
 
+            occupations = 0
+            occupations(nlat/2,nlat/2) = 1
+            ads_list(1,:) = singularity
+
+            delta_r2 = 0
+            ibin = 1
             print*,itraj
 
             ! initialize random number generator
@@ -306,8 +322,6 @@ ads_list(1,:) = (/ nlat/2,nlat/2 /)
 
             write(buffer,'(i6.6)') itraj
             call open_for_write(10,trim(fname)//trim(buffer)//'.pos')
-
-            ibin = 0
 
             ! Construct rate array
             do i=1,nads
@@ -343,45 +357,26 @@ ads_list(1,:) = (/ nlat/2,nlat/2 /)
                 delta_t = -log(ran1())/total_rate   ! when does a hop occur?
                 time_new = time + delta_t
 
-                ! histogram
                 if (time_new > t_end) time_new = t_end
 
-!                ibin_new = int(time_new/step_bin)   ! do we pass a time bin boundary?
-!                if (ibin_new == ibin) then          ! if not
-!
-!                    fract = delta_t/step_bin
-!                    do i=1,nlat
-!                    do j=1,nlat
-!                        vib_d(ibin,vib_state(i,j)) = vib_d(ibin,vib_state(i,j)) + fract
-!                    end do
-!                    end do
-!
-!                else                                 ! if so
-!
-!                    fract = ibin - time/step_bin
-!                    do i=1,nlat
-!                    do j=1,nlat
-!                        vib_d(ibin,vib_state(i,j)) = vib_d(ibin,vib_state(i,j)) + fract
-!                    end do
-!                    end do
-!
-!                    fract = time_new/step_bin - ibin_new
-!                    do i=1,nlat
-!                    do j=1,nlat
-!                        do k=ibin,ibin_new-1
-!                            vib_d(k,vib_state(i,j)) = vib_d(k,vib_state(i,j)) + 1
-!                        end do
-!                        vib_d(ibin_new,vib_state(i,j)) = &
-!                                        vib_d(ibin_new,vib_state(i,j)) + fract
-!                    end do
-!                    end do
-!                    ibin = ibin_new
-!
-!            endif
+                ibin_new = int(time_new/step_bin) + 1
 
-    write(10,*) time, ads_list(:,:)
+                if (ibin_new - ibin > 1 ) then
+                    do i=ibin+1, ibin_new-1
+                        delta_r2(i) = delta_r2(ibin)
+                    end do
+                end if
+                ibin = ibin_new
 
-!stop
+                rtemp = (ads_list(1,1) - singularity(1))*b2(1) &
+                      + (ads_list(1,2) - singularity(2))*b1(1)
+
+                delta_r2(ibin) = rtemp*rtemp
+
+                rtemp = (ads_list(1,1) - singularity(1))*b2(2) &
+                      + (ads_list(1,2) - singularity(2))*b1(2)
+
+                delta_r2(ibin) = delta_r2(ibin) + rtemp*rtemp
 
     time = time_new ! time shift
 
@@ -426,6 +421,9 @@ ads_list(1,:) = (/ nlat/2,nlat/2 /)
     end do ! over time
 !-------------------------------------------------------------
 
+    write(10,*) t_end, n_bins
+    write(10,*) delta_r2
+
     close(10)
 
     enddo ! over trajectories
@@ -456,7 +454,7 @@ close(6)
 !kdiff = 5.0d9 ! in s-1
 !Ediff = 0.43*eV2K
 
-deallocate(rates)
+deallocate(rates, delta_r2)
 deallocate(cluster_label, cluster_sizes, hist)
 deallocate(ads_list,nn_list,nn_opps,temp1D,occupations)
 
