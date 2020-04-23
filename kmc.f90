@@ -52,12 +52,8 @@ character(len=120) buffer, label, fname, cfg_fname
 character(len=120) :: rate_key
 real(8) :: rate_par1, rate_par2, rtemp
 
-real(8), dimension(:), allocatable :: delta_r2
-integer, dimension(2) :: singularity
-
 character(len=10) cfg_fmt
 character(len=13) ads_fmt
-
 
 ! Read in simulation parameters
 
@@ -98,7 +94,7 @@ do while (ios == 0)
                 eps = eps * eV2K
             case('save_period')
                 read(buffer,*,iostat=ios) save_period
-            case('hist_period')
+            case('mmc_hist_period')
                 read(buffer,*,iostat=ios) hist_period
             case('mmc_nsteps')
                 read(buffer,*,iostat=ios) nsteps
@@ -292,36 +288,28 @@ select case (algorithm)
 
     case ('kmc')
 
-! Provisional declaration block
-! Put it later to the beginning
-
-allocate(rates(nads,nnn))
-allocate(delta_r2(n_bins))
-
-        singularity = (/ nlat/2,nlat/2 /)
+        allocate(rates(nads,nnn))
 
         ! time binning for distributions
-        step_bin = t_end/n_bins
+        if (n_bins > 0) step_bin = t_end/n_bins
 
         ! Provisional definition of rates
-        r_hop = arrhenius(temperature, rate_par1, rate_par2)
+        r_hop = arrhenius(temperature, rate_par1, rate_par2)/nnn
 
         do itraj=1, ntrajs
 
-            occupations = 0
-            occupations(nlat/2,nlat/2) = 1
-            ads_list(1,:) = singularity
-
-            delta_r2 = 0
             ibin = 1
-            print*,itraj
 
             ! initialize random number generator
             call random_seed(size=nseed)
             call random_seed(put=itraj*seed)
 
             write(buffer,'(i6.6)') itraj
-            call open_for_write(10,trim(fname)//trim(buffer)//'.pos')
+            if (n_bins > 0) then
+                call open_for_write(10,trim(fname)//trim(buffer)//'.csz')
+                write(10,*) t_end, n_bins
+            end if
+
 
             ! Construct rate array
             do i=1,nads
@@ -359,74 +347,78 @@ allocate(delta_r2(n_bins))
 
                 if (time_new > t_end) time_new = t_end
 
-                ibin_new = int(time_new/step_bin) + 1
+                if(n_bins > 0) then
 
-                if (ibin_new - ibin > 1 ) then
-                    do i=ibin+1, ibin_new-1
-                        delta_r2(i) = delta_r2(ibin)
-                    end do
+
+                    ibin_new = int(time_new/step_bin) + 1
+
+                    if (ibin_new - ibin > 0 ) then
+                        call hoshen_kopelman(cluster_label, largest_label, occupations, ads_list, &
+                                                nn_list, nads, nlat, nnn)
+                    stop 100
+                        call count_cluster_sizes(cluster_sizes, cluster_label,&
+                                                                ads_list, nads, nlat)
+                        hist = 0
+                        do i=1,largest_label
+                            if (cluster_sizes(i) > 0) &
+                                hist(cluster_sizes(i)) = hist(cluster_sizes(i)) + 1
+                        end do
+
+                        write(10,*) ibin
+                        write(10,cfg_fmt) hist
+
+                    end if
+
+                    ibin = ibin_new
+
                 end if
-                ibin = ibin_new
 
-                rtemp = (ads_list(1,1) - singularity(1))*b2(1) &
-                      + (ads_list(1,2) - singularity(2))*b1(1)
-
-                delta_r2(ibin) = rtemp*rtemp
-
-                rtemp = (ads_list(1,1) - singularity(1))*b2(2) &
-                      + (ads_list(1,2) - singularity(2))*b1(2)
-
-                delta_r2(ibin) = delta_r2(ibin) + rtemp*rtemp
-
-    time = time_new ! time shift
+                time = time_new ! time shift
 
 
-        ! Update rate constants
-        ! Particle i_ads is going to hop in direction i_nn
+                ! Update rate constants
+                ! Particle i_ads is going to hop in direction i_nn
 
-        ! scan over old neighbors
-        do m=1,nnn
-            ! (i,j) is a position of neighbor m
-            i = modulo(ads_list(i_ads,1) + nn_list(m,1)-1,nlat) + 1
-            j = modulo(ads_list(i_ads,2) + nn_list(m,2)-1,nlat) + 1
-            ! update rate for neighbor m in direction nn_opps(m)
-            if (occupations(i,j) > 0) rates(occupations(i,j),nn_opps(m)) = r_hop
+                ! scan over old neighbors
+                do m=1,nnn
+                    ! (i,j) is a position of neighbor m
+                    i = modulo(ads_list(i_ads,1) + nn_list(m,1)-1,nlat) + 1
+                    j = modulo(ads_list(i_ads,2) + nn_list(m,2)-1,nlat) + 1
+                    ! update rate for neighbor m in direction nn_opps(m)
+                    if (occupations(i,j) > 0) rates(occupations(i,j),nn_opps(m)) = r_hop
 
-        end do
+                end do
 
-        ! Update adsorbate position after hop
-        i_new = modulo(ads_list(i_ads,1) + nn_list(i_nn,1)-1,nlat) + 1
-        j_new = modulo(ads_list(i_ads,2) + nn_list(i_nn,2)-1,nlat) + 1
-        ! Update occupations and ads. list
-        occupations(ads_list(i_ads,1),ads_list(i_ads,2)) = 0
-        occupations(i_new,j_new) = i_ads
-        ads_list(i_ads,:) = (/i_new,j_new/)
+                ! Update adsorbate position after hop
+                i_new = modulo(ads_list(i_ads,1) + nn_list(i_nn,1)-1,nlat) + 1
+                j_new = modulo(ads_list(i_ads,2) + nn_list(i_nn,2)-1,nlat) + 1
+                ! Update occupations and ads. list
+                occupations(ads_list(i_ads,1),ads_list(i_ads,2)) = 0
+                occupations(i_new,j_new) = i_ads
+                ads_list(i_ads,:) = (/i_new,j_new/)
 
-        ! scan over new neighbors
-        do m=1,nnn
-            ! (i,j) is a position of neighbor m
-            i = modulo(i_new + nn_list(m,1)-1,nlat) + 1
-            j = modulo(j_new + nn_list(m,2)-1,nlat) + 1
-            ! update rate for neighbor m in direction nn_opps(m)
-            ! as well as rates for particle i_ads which committed a hop
-            if (occupations(i,j) > 0) then
-                rates(occupations(i,j),nn_opps(m)) = 0.0d0
-                rates(i_ads,m) = 0.0d0
-            else
-                rates(i_ads,m) = r_hop
-            end if
+                ! scan over new neighbors
+                do m=1,nnn
+                    ! (i,j) is a position of neighbor m
+                    i = modulo(i_new + nn_list(m,1)-1,nlat) + 1
+                    j = modulo(j_new + nn_list(m,2)-1,nlat) + 1
+                    ! update rate for neighbor m in direction nn_opps(m)
+                    ! as well as rates for particle i_ads which committed a hop
+                    if (occupations(i,j) > 0) then
+                        rates(occupations(i,j),nn_opps(m)) = 0.0d0
+                        rates(i_ads,m) = 0.0d0
+                    else
+                        rates(i_ads,m) = r_hop
+                    end if
 
-        end do
+                end do
 
-    end do ! over time
+            end do ! over time
 !-------------------------------------------------------------
 
-    write(10,*) t_end, n_bins
-    write(10,*) delta_r2
+            if (n_bins > 0) close(10)
 
-    close(10)
-
-    enddo ! over trajectories
+        end do ! over trajectories
 
 
     case default
@@ -454,7 +446,7 @@ close(6)
 !kdiff = 5.0d9 ! in s-1
 !Ediff = 0.43*eV2K
 
-deallocate(rates, delta_r2)
+deallocate(rates)
 deallocate(cluster_label, cluster_sizes, hist)
 deallocate(ads_list,nn_list,nn_opps,temp1D,occupations)
 
@@ -567,7 +559,6 @@ do i=1,nads
     labels(i) = i
 end do
 
-!write(*,cfg_fmt) (occupations(m,:), m=1,nlat)
 largest_label = 0
 do i=1,nlat
 do j=1,nlat
@@ -603,7 +594,7 @@ do j=1,nlat
                 end if
             end do
 
-        case (2)
+       case (2)
 
             do m=1,nnn2-1
                 itemp = cluster_label(i_nn(m),j_nn(m))
@@ -634,6 +625,7 @@ do j=1,nlat
         end select
 
     end if
+
 end do
 end do
 
