@@ -41,7 +41,7 @@ integer, dimension(:,:), allocatable   :: cluster_label
 
 real(8) :: time, delta_t, time_new, step_bin
 real(8) :: r_hop, rate_acc, u, total_rate
-integer :: i_nn, i_ads, ibin_new, ibin, k_change
+integer :: i_nn, i_ads, ibin_new, ibin, k_change, kmc_nsteps
 real(8), dimension(:,:),   allocatable :: rates
 
 real(8) :: energy_old, delta_E, bexp
@@ -251,10 +251,12 @@ select case (algorithm)
 
             enddo
 
-        if (hist_period > 0 .and. mod(istep, hist_period) == 0) then
+!print*,istep, hist_period, mod(istep, hist_period)
 
+        if (hist_period > 0 .and. mod(istep, hist_period) == 0) then
             call hoshen_kopelman(cluster_label, largest_label, occupations, ads_list, &
                                                 nn_list, nads, nlat, nnn)
+
             call count_cluster_sizes(cluster_sizes, cluster_label,&
                                                                 ads_list, nads, nlat)
 
@@ -295,10 +297,15 @@ select case (algorithm)
 
         ! Provisional definition of rates
         r_hop = arrhenius(temperature, rate_par1, rate_par2)/nnn
+        print*,"Hopping rate is ", r_hop
+        print*
 
         do itraj=1, ntrajs
 
+            print*, 'Running trajectory no.',itraj
+            print*
             ibin = 1
+            kmc_nsteps = 0
 
             ! initialize random number generator
             call random_seed(size=nseed)
@@ -344,6 +351,7 @@ select case (algorithm)
 
                 delta_t = -log(ran1())/total_rate   ! when does a hop occur?
                 time_new = time + delta_t
+                kmc_nsteps = kmc_nsteps + 1
 
                 if (time_new > t_end) time_new = t_end
 
@@ -355,7 +363,6 @@ select case (algorithm)
                     if (ibin_new - ibin > 0 ) then
                         call hoshen_kopelman(cluster_label, largest_label, occupations, ads_list, &
                                                 nn_list, nads, nlat, nnn)
-                    stop 100
                         call count_cluster_sizes(cluster_sizes, cluster_label,&
                                                                 ads_list, nads, nlat)
                         hist = 0
@@ -365,7 +372,7 @@ select case (algorithm)
                         end do
 
                         write(10,*) ibin
-                        write(10,cfg_fmt) hist
+                        write(10,ads_fmt) hist
 
                     end if
 
@@ -418,8 +425,12 @@ select case (algorithm)
 
             if (n_bins > 0) close(10)
 
+            print*,'Number of kmc-steps is ', kmc_nsteps
+            print*
+
         end do ! over trajectories
 
+        deallocate(rates)
 
     case default
         stop 'Error: mc algorithm not defined'
@@ -441,12 +452,6 @@ write(6,cfg_fmt) (occupations(i,:), i=1,nlat)
 
 close(6)
 
-! rate constants
-
-!kdiff = 5.0d9 ! in s-1
-!Ediff = 0.43*eV2K
-
-deallocate(rates)
 deallocate(cluster_label, cluster_sizes, hist)
 deallocate(ads_list,nn_list,nn_opps,temp1D,occupations)
 
@@ -560,8 +565,12 @@ do i=1,nads
 end do
 
 largest_label = 0
+
+!print'(4i4)', transpose(occupations)
+
 do i=1,nlat
 do j=1,nlat
+
 
     if (occupations(i,j) > 0) then
 
@@ -570,7 +579,11 @@ do j=1,nlat
             i_nn(m) = modulo(i + nn_list(nnn2+m,1)-1,nlat) + 1
             j_nn(m) = modulo(j + nn_list(nnn2+m,2)-1,nlat) + 1
 
-            if (occupations(i_nn(m), j_nn(m)) > 0) scanned_nn_occs(m) = 1
+            if (occupations(i_nn(m), j_nn(m)) > 0) then
+                scanned_nn_occs(m) = 1
+            else
+                scanned_nn_occs(m) = 0
+            end if
 
             if (i==1) scanned_nn_occs(2:3) = 0
             if (j==1) scanned_nn_occs(1) = 0
@@ -578,15 +591,22 @@ do j=1,nlat
 
         end do
 
+!print*,scanned_nn_occs
+
         select case (sum(scanned_nn_occs))
 
         case (0)
 
+!print*
+!print*,"Case 0"
             largest_label = largest_label + 1
             cluster_label(i,j) = largest_label
 
+
         case (1)
 
+!print*
+!print*,"Case 1"
             do m=1,nnn2
                 if (scanned_nn_occs(m) == 1) then
                     cluster_label(i,j) = &
@@ -595,6 +615,9 @@ do j=1,nlat
             end do
 
        case (2)
+
+!print*
+!print*,"Case 2"
 
             do m=1,nnn2-1
                 itemp = cluster_label(i_nn(m),j_nn(m))
@@ -611,6 +634,8 @@ do j=1,nlat
 
         case (3)
 
+!print*
+!print*,"Case 3"
             itemp = cluster_label(i_nn(1),j_nn(1))
             call lunion(itemp, cluster_label(i_nn(2),j_nn(2)),&
                                                         labels, nads )
@@ -626,11 +651,18 @@ do j=1,nlat
 
     end if
 
+!print*,i,j, occupations(i,j)
+!print*
+!print'(4i4)', transpose(cluster_label)
+!print*
+
 end do
 end do
 
 !print*
-!write(*,cfg_fmt) (cluster_label(m,:), m=1,nlat)
+!write(*,*) occupations
+!print*
+!write(*,*) cluster_label
 !print*
 !do i=1,largest_label
 !    print('(i3,a5,i3)'), i, ' --> ' , labels(i)
