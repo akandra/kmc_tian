@@ -30,10 +30,12 @@ integer, parameter :: seed(8) = (/1,6,3,5,7,3,3,7/)
 integer :: icount1, icount2
 
 integer :: nads, nnn, nn_counter, nlat_old, nads_old
-integer :: i, j, k, m, n, ihop, istep, i_old, j_old, i_new, j_new, itraj
+integer :: i, j, k, m, n, ihop, istep, kk
+integer :: i_old, j_old, i_new, j_new, itraj
 
 real(8), dimension(2) :: b1, b2
-integer, dimension(:,:), allocatable   :: occupations, ads_list, nn_list
+integer, dimension(:,:), allocatable   :: occupations, ads_list
+integer, dimension(:,:), allocatable   :: nn_list, nn_pos
 integer, dimension(:),   allocatable   :: nn_opps, temp1D
 
 integer, dimension(:),   allocatable   :: cluster_sizes, hist
@@ -41,10 +43,10 @@ integer, dimension(:,:), allocatable   :: cluster_label
 
 real(8) :: time, delta_t, time_new, step_bin
 real(8) :: r_hop, rate_acc, u, total_rate
-integer :: i_nn, i_ads, ibin_new, ibin, k_change, kmc_nsteps
+integer :: i_nn, i_ads, ibin_new, ibin, kmc_nsteps
 real(8), dimension(:,:),   allocatable :: rates
 
-real(8) :: energy_old, delta_E, bexp
+real(8) :: energy_old, delta_E, beta
 
 integer :: ios, pos1, largest_label, hist_counter
 character(len=120) buffer, label, fname, cfg_fname
@@ -140,7 +142,7 @@ if (hist_period > 0) call open_for_write(8,trim(fname)//'.hist')
 
 ! allocate memory for arrays
 allocate(occupations(nlat,nlat), ads_list(nads,2))
-allocate(nn_list(nnn,2), nn_opps(nnn), temp1D(nlat*nlat))
+allocate(nn_list(nnn,2), nn_pos(nnn,2), nn_opps(nnn), temp1D(nlat*nlat))
 allocate(cluster_label(nlat,nlat), cluster_sizes(nads), hist(nads))
 
 ! NN list for the hexagonal structure
@@ -292,12 +294,15 @@ select case (algorithm)
 
         allocate(rates(nads,nnn))
 
+        beta = eps/temperature
+
         ! time binning for distributions
         if (n_bins > 0) step_bin = t_end/n_bins
 
-        ! Provisional definition of rates
+        ! Free particle hopping rate
         r_hop = arrhenius(temperature, rate_par1, rate_par2)/nnn
-        print*,"Hopping rate is ", r_hop
+
+        print*,"Free particle hopping rate is ", r_hop
         print*
 
         do itraj=1, ntrajs
@@ -320,20 +325,43 @@ select case (algorithm)
 
             ! Construct rate array
             do i=1,nads
-            do m=1,nnn
+                k = 0
+                do m=1,nnn
 
-                i_new = modulo(ads_list(i,1) + nn_list(m,1)-1,nlat) + 1
-                j_new = modulo(ads_list(i,2) + nn_list(m,2)-1,nlat) + 1
+                    nn_pos(m,:) =&
+                     modulo(ads_list(i,:) + nn_list(m,:)-1,nlat) + 1
 
-                if (occupations(i_new, j_new) == 0) then
-                    rates(i,m) = r_hop
-                else
-                    rates(i,m) = 0.0d0
-                end if
+                    if (occupations(nn_pos(m,1), nn_pos(m,2)) > 0)&
+                        k = k + 1
+                end do
 
+                do m=1,nnn
+
+                    if (occupations(nn_pos(m,1), nn_pos(m,2)) == 0) then
+                        kk = -1 ! Excluding self-counting
+
+                        do n=1,nnn
+                            i_new = modulo(nn_pos(m,1) + nn_list(n,1)-1,nlat) + 1
+                            j_new = modulo(nn_pos(m,2) + nn_list(n,2)-1,nlat) + 1
+                            if (occupations(i_new,j_new) > 0) kk = kk + 1
+                        end do
+
+                        if (k > kk) then
+                            rates(i,m) = r_hop*exp( beta*(k - kk) )
+                        else
+                            rates(i,m) = r_hop
+                        end if
+                    else
+                        rates(i,m) = 0
+                    end if
+
+                end do
             end do
-            end do
 
+!write(*,cfg_fmt) transpose(occupations)
+!print*
+!print'(6e16.4)', (rates(i,:)/r_hop,i=1,nads)
+!stop 11
             ! start time propagation
             time = big_bang
             do while (time<t_end)
@@ -387,6 +415,52 @@ select case (algorithm)
                 ! Particle i_ads is going to hop in direction i_nn
 
                 ! scan over old neighbors
+                do m=1,nnn
+                    ! (i,j) is a position of neighbor m
+                    i = modulo(ads_list(i_ads,1) + nn_list(m,1)-1,nlat) + 1
+                    j = modulo(ads_list(i_ads,2) + nn_list(m,2)-1,nlat) + 1
+                    ! update rate for neighbor m in direction nn_opps(m)
+                    if (occupations(i,j) > 0) then
+
+                        k = 0
+                        do n=1,nnn
+-------WE ARE HERE!
+                            nn_pos(n,1) = modulo(i + nn_list(n,1)-1,nlat) + 1
+                            nn_pos(n,2) = modulo(j + nn_list(n,2)-1,nlat) + 1
+
+                            if (occupations(nn_pos(m,1), nn_pos(m,2)) > 0)&
+                                k = k + 1
+                        end do
+
+
+                    end if
+
+                end do
+
+                do m=1,nnn
+
+                    if (occupations(nn_pos(m,1), nn_pos(m,2)) == 0) then
+                        kk = -1 ! Excluding self-counting
+
+                        do n=1,nnn
+                            i_new = modulo(nn_pos(m,1) + nn_list(n,1)-1,nlat) + 1
+                            j_new = modulo(nn_pos(m,2) + nn_list(n,2)-1,nlat) + 1
+                            if (occupations(i_new,j_new) > 0) kk = kk + 1
+                        end do
+
+                        if (k > kk) then
+                            rates(i,m) = r_hop*exp( beta*(k - kk) )
+                        else
+                            rates(i,m) = r_hop
+                        end if
+                    else
+                        rates(i,m) = 0
+                    end if
+
+                end do
+
+
+
                 do m=1,nnn
                     ! (i,j) is a position of neighbor m
                     i = modulo(ads_list(i_ads,1) + nn_list(m,1)-1,nlat) + 1
@@ -453,7 +527,7 @@ write(6,cfg_fmt) (occupations(i,:), i=1,nlat)
 close(6)
 
 deallocate(cluster_label, cluster_sizes, hist)
-deallocate(ads_list,nn_list,nn_opps,temp1D,occupations)
+deallocate(ads_list,nn_pos,nn_list,nn_opps,temp1D,occupations)
 
 
 end program
