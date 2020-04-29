@@ -30,13 +30,13 @@ integer, parameter :: seed(8) = (/1,6,3,5,7,3,3,7/)
 integer :: icount1, icount2
 
 integer :: nads, nnn, nn_counter, nlat_old, nads_old
-integer :: i, j, k, m, n, ihop, istep, kk
+integer :: i, j, k, m, n, ihop, istep, kk, k_change
 integer :: i_old, j_old, i_new, j_new, itraj
 
 real(8), dimension(2) :: b1, b2
 integer, dimension(:,:), allocatable   :: occupations, ads_list
-integer, dimension(:,:), allocatable   :: nn_list, nn_pos
-integer, dimension(:),   allocatable   :: nn_opps, temp1D
+integer, dimension(:,:), allocatable   :: nn_list, nn_pos, nn_new
+integer, dimension(:),   allocatable   :: nn_opps, temp1D, change_list
 
 integer, dimension(:),   allocatable   :: cluster_sizes, hist
 integer, dimension(:,:), allocatable   :: cluster_label
@@ -137,11 +137,10 @@ write(ads_fmt,'(i6)') nads
 ads_fmt = '('//trim(adjustl(ads_fmt))//'i8)'
 
 call open_for_write(6,trim(fname)//'.confs')
-call open_for_write(7,trim(fname)//'.en')
 if (hist_period > 0) call open_for_write(8,trim(fname)//'.hist')
 
 ! allocate memory for arrays
-allocate(occupations(nlat,nlat), ads_list(nads,2))
+allocate(occupations(nlat,nlat), ads_list(nads,2), change_list(2*nnn),nn_new(nnn,nnn/2))
 allocate(nn_list(nnn,2), nn_pos(nnn,2), nn_opps(nnn), temp1D(nlat*nlat))
 allocate(cluster_label(nlat,nlat), cluster_sizes(nads), hist(nads))
 
@@ -161,15 +160,24 @@ nn_list(4,:) = (/ 0,-1/)
 nn_list(5,:) = (/-1, 0/)
 nn_list(6,:) = (/-1, 1/)
 
+! List of opposite directions
+do m=1,nnn
+    nn_opps(m) = modulo(m-1+nnn/2,nnn)+1
+end do
+
+! List of additional nn directions to scan after hop
+do m=1,nnn
+do n=1,nnn/2
+    nn_new(m,n) = modulo(m+n-nnn/2,nnn) + 1
+end do
+end do
+
 ! Hexagonal transformation matrix
 
 b1 = (/         1.0d0,       0.0d0/)
 b2 = (/ cos(pi/3.0d0), sin(pi/3.0d0) /)
 
 
-do m=1,nnn
-    nn_opps(m) = modulo(m-1+nnn/2,nnn)+1
-end do
 
 select case (iargc())
 
@@ -211,13 +219,15 @@ hist_counter = 0
 write(6,*) nlat, nads
 write(6,cfg_fmt) (occupations(i,:), i=1,nlat)
 
-write(7,*) total_energy(nlat, nads, nnn, occupations, ads_list, nn_list, eps)
 
 select case (algorithm)
 
     case ('mmc')
 
-        !call system_clock(icount1)
+        call open_for_write(7,trim(fname)//'.en')
+        write(7,*) 0,total_energy(nlat, nads, nnn, occupations, ads_list, nn_list, eps)/eV2K
+
+        !loop over mmc steps
         do istep=2, nsteps
 
             do i=1, nads
@@ -281,7 +291,7 @@ select case (algorithm)
             if (mod(istep, save_period) == 0) then
                 print*, istep
                 write(6,cfg_fmt) (occupations(i,:), i=1,nlat)
-                write(7,*) total_energy(nlat, nads, nnn, occupations, ads_list, nn_list, eps)
+                write(7,*) istep-1, total_energy(nlat, nads, nnn, occupations, ads_list, nn_list, eps)/eV2K
                 if (hist_period > 0) then
                     write(8,*) hist_counter
                     write(8,ads_fmt) hist
@@ -289,6 +299,8 @@ select case (algorithm)
            end if
 
         enddo
+
+        close(7)
 
     case ('kmc')
 
@@ -318,8 +330,13 @@ select case (algorithm)
 
             write(buffer,'(i6.6)') itraj
             if (n_bins > 0) then
+
+                call open_for_write(7,trim(fname)//trim(buffer)//'.en')
+                write(7,*) big_bang ,total_energy(nlat, nads, nnn, occupations, ads_list, nn_list, eps)/eV2K
+
                 call open_for_write(10,trim(fname)//trim(buffer)//'.csz')
                 write(10,*) t_end, n_bins
+
             end if
 
 
@@ -402,6 +419,9 @@ select case (algorithm)
                         write(10,*) ibin
                         write(10,ads_fmt) hist
 
+!                        write(6,cfg_fmt) (occupations(i,:), i=1,nlat)
+                        write(7,*) time,total_energy(nlat, nads, nnn, occupations, ads_list, nn_list, eps)/eV2K
+
                     end if
 
                     ibin = ibin_new
@@ -410,94 +430,107 @@ select case (algorithm)
 
                 time = time_new ! time shift
 
-
                 ! Update rate constants
                 ! Particle i_ads is going to hop in direction i_nn
+
+                change_list = 0
+                k_change = 1
+                ! Put the hopping particle into the list
+                change_list(k_change) = i_ads
 
                 ! scan over old neighbors
                 do m=1,nnn
                     ! (i,j) is a position of neighbor m
                     i = modulo(ads_list(i_ads,1) + nn_list(m,1)-1,nlat) + 1
                     j = modulo(ads_list(i_ads,2) + nn_list(m,2)-1,nlat) + 1
-                    ! update rate for neighbor m in direction nn_opps(m)
+
                     if (occupations(i,j) > 0) then
-
-                        k = 0
-                        do n=1,nnn
--------WE ARE HERE!
-                            nn_pos(n,1) = modulo(i + nn_list(n,1)-1,nlat) + 1
-                            nn_pos(n,2) = modulo(j + nn_list(n,2)-1,nlat) + 1
-
-                            if (occupations(nn_pos(m,1), nn_pos(m,2)) > 0)&
-                                k = k + 1
-                        end do
-
-
+                        k_change = k_change + 1
+                        change_list(k_change) = occupations(i,j)
                     end if
 
                 end do
 
-                do m=1,nnn
-
-                    if (occupations(nn_pos(m,1), nn_pos(m,2)) == 0) then
-                        kk = -1 ! Excluding self-counting
-
-                        do n=1,nnn
-                            i_new = modulo(nn_pos(m,1) + nn_list(n,1)-1,nlat) + 1
-                            j_new = modulo(nn_pos(m,2) + nn_list(n,2)-1,nlat) + 1
-                            if (occupations(i_new,j_new) > 0) kk = kk + 1
-                        end do
-
-                        if (k > kk) then
-                            rates(i,m) = r_hop*exp( beta*(k - kk) )
-                        else
-                            rates(i,m) = r_hop
-                        end if
-                    else
-                        rates(i,m) = 0
-                    end if
-
-                end do
-
-
-
-                do m=1,nnn
-                    ! (i,j) is a position of neighbor m
-                    i = modulo(ads_list(i_ads,1) + nn_list(m,1)-1,nlat) + 1
-                    j = modulo(ads_list(i_ads,2) + nn_list(m,2)-1,nlat) + 1
-                    ! update rate for neighbor m in direction nn_opps(m)
-                    if (occupations(i,j) > 0) rates(occupations(i,j),nn_opps(m)) = r_hop
-
-                end do
-
-                ! Update adsorbate position after hop
+                ! a new position of particle i_ads after a hop to a neighbor i_nn
                 i_new = modulo(ads_list(i_ads,1) + nn_list(i_nn,1)-1,nlat) + 1
                 j_new = modulo(ads_list(i_ads,2) + nn_list(i_nn,2)-1,nlat) + 1
+                ! scan over additional new neighbors
+                do m=1,nnn/2
+
+                    ! (i,j) is a position of neighbor m
+                    i = modulo(i_new + nn_list(nn_new(i_nn,m),1)-1,nlat) + 1
+                    j = modulo(j_new + nn_list(nn_new(i_nn,m),2)-1,nlat) + 1
+
+                    if (occupations(i,j) > 0) then
+                        k_change = k_change + 1
+                        change_list(k_change) = occupations(i,j)
+                    end if
+
+                end do
+
+!                print*,i_ads, i_nn
+!                print(cfg_fmt), transpose(occupations)
+!                print*
+!                print'(6e16.4)', (rates(i,:)/r_hop,i=1,nads)
+                !print*,k
+!                print*,change_list
+                !stop 15
+
                 ! Update occupations and ads. list
                 occupations(ads_list(i_ads,1),ads_list(i_ads,2)) = 0
                 occupations(i_new,j_new) = i_ads
                 ads_list(i_ads,:) = (/i_new,j_new/)
 
-                ! scan over new neighbors
-                do m=1,nnn
-                    ! (i,j) is a position of neighbor m
-                    i = modulo(i_new + nn_list(m,1)-1,nlat) + 1
-                    j = modulo(j_new + nn_list(m,2)-1,nlat) + 1
-                    ! update rate for neighbor m in direction nn_opps(m)
-                    ! as well as rates for particle i_ads which committed a hop
-                    if (occupations(i,j) > 0) then
-                        rates(occupations(i,j),nn_opps(m)) = 0.0d0
-                        rates(i_ads,m) = 0.0d0
-                    else
-                        rates(i_ads,m) = r_hop
-                    end if
+                ! Update rate array
+                ! see building up the rate array above
+                ! with i replaced by change_list(i)
+                do i=1,k_change
+                    k = 0
+                    do m=1,nnn
 
+                        nn_pos(m,:) =&
+                         modulo(ads_list(change_list(i),:) + nn_list(m,:)-1,nlat) + 1
+
+                        if (occupations(nn_pos(m,1), nn_pos(m,2)) > 0)&
+                            k = k + 1
+                    end do
+
+                    do m=1,nnn
+
+                        if (occupations(nn_pos(m,1), nn_pos(m,2)) == 0) then
+                            kk = -1 ! Excluding self-counting
+
+                            do n=1,nnn
+                                i_new = modulo(nn_pos(m,1) + nn_list(n,1)-1,nlat) + 1
+                                j_new = modulo(nn_pos(m,2) + nn_list(n,2)-1,nlat) + 1
+                                if (occupations(i_new,j_new) > 0) kk = kk + 1
+                            end do
+
+                            if (k > kk) then
+                                rates(change_list(i),m) = r_hop*exp( beta*(k - kk) )
+                            else
+                                rates(change_list(i),m) = r_hop
+                            end if
+                        else
+                            rates(change_list(i),m) = 0
+                        end if
+
+                    end do
                 end do
+
+!write(*,cfg_fmt) transpose(occupations)
+!print*
+!print'(6e16.4)', (rates(i,:)/r_hop,i=1,nads)
+!stop 11
+
 
             end do ! over time
 !-------------------------------------------------------------
 
-            if (n_bins > 0) close(10)
+            if (n_bins > 0) then
+                close(7)
+                close(10)
+            end if
 
             print*,'Number of kmc-steps is ', kmc_nsteps
             print*
@@ -512,7 +545,7 @@ end select
 
 
 close(6)
-close(7)
+
 if (hist_period > 0) close(8)
 
 call system_clock(icount2)
@@ -526,7 +559,7 @@ write(6,cfg_fmt) (occupations(i,:), i=1,nlat)
 
 close(6)
 
-deallocate(cluster_label, cluster_sizes, hist)
+deallocate(cluster_label, cluster_sizes, hist, change_list, nn_new)
 deallocate(ads_list,nn_pos,nn_list,nn_opps,temp1D,occupations)
 
 
