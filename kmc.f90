@@ -21,7 +21,8 @@ integer :: nsteps   ! number of Metropolis MC steps
 integer :: ntrajs	! number of kmc trajectories (ignored for mmc)
 real(8) :: t_end     ! kmc simulation time (s)
 integer :: n_bins  	! number of time intervals in kmc histogram
-character(len=120) :: rate_file ! file name with rate parameters
+character(len=120) :: rate_file ! name of the file with rate parameters
+character(len=120) :: cfg_fname='' ! name of the file with initial configuration
 
 real(8) :: energy, total_energy, arrhenius
 
@@ -49,7 +50,7 @@ real(8), dimension(:,:),   allocatable :: rates
 real(8) :: energy_old, delta_E, beta
 
 integer :: ios, pos1, largest_label, hist_counter
-character(len=120) buffer, label, fname, cfg_fname
+character(len=120) buffer, label, fname
 
 character(len=120) :: rate_key
 real(8) :: rate_par1, rate_par2, rtemp
@@ -63,9 +64,6 @@ select case (iargc())
 
 case(1)
     call getarg(1,fname)
-case(2)
-    call getarg(1,fname)
-    call getarg(2,cfg_fname)
 case default
     stop "Wrong number of arguments"
 end select
@@ -96,6 +94,8 @@ do while (ios == 0)
                 eps = eps * eV2K
             case('save_period')
                 read(buffer,*,iostat=ios) save_period
+            case('ini_conf')
+                read(buffer,*,iostat=ios) cfg_fname
             case('mmc_hist_period')
                 read(buffer,*,iostat=ios) hist_period
             case('mmc_nsteps')
@@ -179,9 +179,7 @@ b2 = (/ cos(pi/3.0d0), sin(pi/3.0d0) /)
 
 
 
-select case (iargc())
-
-case(1)
+if (cfg_fname=='') then
 
     temp1D = 0
     do i=1,nads
@@ -189,7 +187,7 @@ case(1)
     end do
     occupations = reshape(temp1D,(/nlat,nlat/))
 
-case(2)
+else
 
     call open_for_read(5,trim(cfg_fname))
     read(5,*) nlat_old, nads_old
@@ -197,11 +195,14 @@ case(2)
         stop 'Error: inconsistent input and configuration files'
     read(5,cfg_fmt) (occupations(i,:), i=1,nlat)
     close(5)
+    print*
+    print*,'    Dear Sir,'
+    print*,'I would like to humbly notify you that the initial configuration is read from:'
+    print*, trim(cfg_fname)
+    print*,'Remaining your humble servant, K.M.C. Code'
+    print*
 
-case default
-    stop "Wrong number of arguments"
-
-end select
+end if
 
 do j=1,nlat
 do i=1,nlat
