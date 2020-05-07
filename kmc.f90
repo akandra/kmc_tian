@@ -6,12 +6,23 @@ use open_file
 
 implicit none
 
+! Assignment for the surface site types
+integer(1), parameter :: terrace_site = 1
+integer(1), parameter :: step_site    = 2
+integer(1), parameter :: corner_site  = 3
+
+integer, parameter :: inp_unit  = 1
+integer, parameter :: outcfg_unit  = 10
+integer, parameter :: outeng_unit  = 11
+integer, parameter :: outhst_unit  = 12
+
 real(8), parameter :: eV2K = 11604.52
 real(8), parameter :: big_bang = 0.0d0 ! in fortnights
 real(8), parameter :: pi = 4.0d0*atan(1.0d0)
 
 character(len=3) :: algorithm   ! MC algorithm to use (kmc or mmc)
 integer :: nlat         ! size of 2D lattice (nlat x nlat)
+integer :: step_period  ! = step_density^-1, 0 means no steps
 real(8) :: temperature  ! temperature in K
 real(8) :: coverage     ! coverage in ML per 2D MC lattice (nlat x nlat)
 real(8) :: eps          ! O-O interaction energy in eV
@@ -21,7 +32,8 @@ integer :: nsteps   ! number of Metropolis MC steps
 integer :: ntrajs	! number of kmc trajectories (ignored for mmc)
 real(8) :: t_end     ! kmc simulation time (s)
 integer :: n_bins  	! number of time intervals in kmc histogram
-character(len=120) :: rate_file ! name of the file with rate parameters
+character(len=120) :: rate_file='' ! name of the file with rate parameters
+character(len=120) :: energy_file=''! name of the file with binding and interaction energy
 character(len=120) :: cfg_fname='' ! name of the file with initial configuration
 
 real(8) :: energy, total_energy, arrhenius
@@ -36,6 +48,7 @@ integer :: i_old, j_old, i_new, j_new, itraj
 
 real(8), dimension(2) :: b1, b2
 integer, dimension(:,:), allocatable   :: occupations, ads_list
+integer(1), dimension(:,:), allocatable   :: site_type
 integer, dimension(:,:), allocatable   :: nn_list, nn_pos, nn_new
 integer, dimension(:),   allocatable   :: nn_opps, temp1D, change_list
 
@@ -51,6 +64,9 @@ real(8) :: energy_old, delta_E, beta
 
 integer :: ios, pos1, largest_label, hist_counter
 character(len=120) buffer, label, fname
+
+real(8), dimension(3) :: ads_energy
+real(8), dimension(3,3) :: int_energy
 
 character(len=120) :: rate_key
 real(8) :: rate_par1, rate_par2, rtemp
@@ -68,11 +84,12 @@ case default
     stop "Wrong number of arguments"
 end select
 
-call open_for_read(5, trim(fname)//'.inp' )
+
+call open_for_read(inp_unit, trim(fname)//'.inp' )
 ios = 0
 do while (ios == 0)
 
-        read(5, '(A)', iostat=ios) buffer
+        read(inp_unit, '(A)', iostat=ios) buffer
         if (ios == 0) then
 
         ! Find the first instance of whitespace.  Split label and data.
@@ -85,13 +102,18 @@ do while (ios == 0)
                 read(buffer,*,iostat=ios) algorithm
             case('nlat')
                 read(buffer,*,iostat=ios) nlat
+            case('step_period')
+                read(buffer,*,iostat=ios) step_period
             case('temperature')
                 read(buffer,*,iostat=ios) temperature
             case('coverage')
                 read(buffer,*,iostat=ios) coverage
-            case('eps')
-                read(buffer,*,iostat=ios) eps
-                eps = eps * eV2K
+            case('energy')
+                read(buffer,*,iostat=ios) energy_file
+                energy_file = trim(energy_file)
+!            case('eps')
+!                read(buffer,*,iostat=ios) eps
+!                eps = eps * eV2K
             case('save_period')
                 read(buffer,*,iostat=ios) save_period
             case('ini_conf')
@@ -110,23 +132,75 @@ do while (ios == 0)
                 read(buffer,*,iostat=ios) rate_file
                 rate_file = trim(rate_file)
             case default
-                print *, 'Skipping invalid label at line', label
+                if (label(1:1) /= '!')&
+                    print *, 'Skipping invalid label at line', label
             end select
         end if
 
 end do ! ios
 
-close(5)
-
-call open_for_read(6,rate_file)
-
-read(6,*) rate_key, rate_par1, rate_par2
-rate_par2 = rate_par2 * eV2K
-
-close(6)
+close(inp_unit)
 
 ! Number of adsorbate particles
 nads = nint(coverage*nlat*nlat)
+
+! Consistency checks
+
+if (step_period > 0 .and. mod(nlat,step_period) /= 0)&
+    stop "Error in the inp file: inconsistent nlat and step_period values"
+
+call open_for_read(inp_unit,energy_file)
+
+ios = 0
+do while (ios == 0)
+
+        read(inp_unit, '(A)', iostat=ios) buffer
+        if (ios == 0) then
+
+        ! Find the first instance of whitespace.  Split label and data.
+            pos1 = scan(buffer, ' ')
+            label = buffer(1:pos1)
+            buffer = buffer(pos1+1:)
+
+            select case (label)
+
+            case('binding')
+
+                read(buffer,*,iostat=ios) &
+                    ads_energy(terrace_site),&
+                    ads_energy(   step_site),&
+                    ads_energy( corner_site)
+                if (ios /= 0) stop 'Error in energy file: binding'
+                ads_energy = ads_energy*eV2K
+
+            case('interaction')
+                read(buffer,*,iostat=ios)&
+                    int_energy(terrace_site,terrace_site),&
+                    int_energy(   step_site,   step_site),&
+                    int_energy(terrace_site,   step_site),&
+                    int_energy( corner_site, corner_site),&
+                    int_energy(terrace_site, corner_site),&
+                    int_energy(   step_site, corner_site)
+                if (ios /= 0) stop 'Error in energy file: interaction'
+
+                int_energy(  step_site,terrace_site) = int_energy(terrace_site,  step_site)
+                int_energy(corner_site,terrace_site) = int_energy(terrace_site,corner_site)
+                int_energy(corner_site,   step_site) = int_energy(   step_site,corner_site)
+
+                int_energy = int_energy*eV2K
+
+            case default
+                if (label(1:1) /= '!')&
+                    print *, 'Skipping invalid label at line', label
+
+            end select
+
+        end if
+
+end do ! ios
+
+close(inp_unit)
+
 ! Number of neighbors for the hexagonal structure
 nnn = 6
 
@@ -136,11 +210,12 @@ cfg_fmt = '('//trim(adjustl(cfg_fmt))//'i8)'
 write(ads_fmt,'(i6)') nads
 ads_fmt = '('//trim(adjustl(ads_fmt))//'i8)'
 
-call open_for_write(6,trim(fname)//'.confs')
-if (hist_period > 0) call open_for_write(8,trim(fname)//'.hist')
+call open_for_write(outcfg_unit,trim(fname)//'.confs')
+if (hist_period > 0) call open_for_write(outhst_unit,trim(fname)//'.hist')
 
 ! allocate memory for arrays
-allocate(occupations(nlat,nlat), ads_list(nads,2), change_list(2*nnn),nn_new(nnn,nnn/2))
+allocate(occupations(nlat,nlat), site_type(nlat,nlat))
+allocate(ads_list(nads,2), change_list(2*nnn),nn_new(nnn,nnn/2))
 allocate(nn_list(nnn,2), nn_pos(nnn,2), nn_opps(nnn), temp1D(nlat*nlat))
 allocate(cluster_label(nlat,nlat), cluster_sizes(nads), hist(nads))
 
@@ -177,7 +252,18 @@ end do
 b1 = (/         1.0d0,       0.0d0/)
 b2 = (/ cos(pi/3.0d0), sin(pi/3.0d0) /)
 
+site_type = terrace_site
+! Define where steps are
+if (step_period > 0) then
+    do j=1,nlat,step_period
+        site_type(:,j)   = step_site
+        site_type(:,j+1) = corner_site
+    end do
+end if
 
+!print*
+!write(*,cfg_fmt) transpose(site_type)
+!stop
 
 if (cfg_fname=='') then
 
@@ -189,12 +275,12 @@ if (cfg_fname=='') then
 
 else
 
-    call open_for_read(5,trim(cfg_fname))
-    read(5,*) nlat_old, nads_old
+    call open_for_read(inp_unit,trim(cfg_fname))
+    read(inp_unit,*) nlat_old, nads_old
     if (nlat_old /= nlat .OR. nads_old /= nads ) &
         stop 'Error: inconsistent input and configuration files'
-    read(5,cfg_fmt) (occupations(i,:), i=1,nlat)
-    close(5)
+    read(inp_unit,cfg_fmt) (occupations(i,:), i=1,nlat)
+    close(inp_unit)
     print*
     print*,'    Dear Sir,'
     print*,'I would like to humbly notify you that the initial configuration is read from:'
@@ -217,16 +303,29 @@ end do
 hist = 0
 hist_counter = 0
 
-write(6,*) nlat, nads
-write(6,cfg_fmt) (occupations(i,:), i=1,nlat)
+write(outcfg_unit,*) nlat, nads
+write(outcfg_unit,cfg_fmt) (occupations(i,:), i=1,nlat)
 
 
 select case (algorithm)
 
     case ('mmc')
 
-        call open_for_write(7,trim(fname)//'.en')
-        write(7,*) 0,total_energy(nlat, nads, nnn, occupations, ads_list, nn_list, eps)/eV2K
+        call open_for_write(outeng_unit,trim(fname)//'.en')
+        write(outeng_unit,*) 0,&
+            total_energy(nlat, nads, nnn, occupations, site_type, &
+                         ads_list, nn_list, ads_energy, int_energy)
+
+!        write(*,cfg_fmt) transpose(site_type)
+!        print*
+!        write(*,cfg_fmt) transpose(occupations)
+!        print*
+!        write(*,'(3f12.3)') int_energy/eV2K
+!        write(*,*) total_energy(nlat, nads, nnn, occupations, site_type, &
+!                         ads_list, nn_list, ads_energy, int_energy)/eV2K
+!        stop 33
+
+-------WE ARE HERE------
 
         !loop over mmc steps
         do istep=2, nsteps
@@ -291,19 +390,31 @@ select case (algorithm)
 
             if (mod(istep, save_period) == 0) then
                 print*, istep
-                write(6,cfg_fmt) (occupations(i,:), i=1,nlat)
-                write(7,*) istep-1, total_energy(nlat, nads, nnn, occupations, ads_list, nn_list, eps)/eV2K
+                write(outcfg_unit,cfg_fmt) (occupations(i,:), i=1,nlat)
+                write(outeng_unit,*) istep-1,&
+                    total_energy(nlat, nads, nnn, occupations, site_type, &
+                                 ads_list, nn_list, ads_energy, int_energy)
+
                 if (hist_period > 0) then
-                    write(8,*) hist_counter
-                    write(8,ads_fmt) hist
+                    write(outhst_unit,*) hist_counter
+                    write(outhst_unit,ads_fmt) hist
                 end if
            end if
 
         enddo
 
-        close(7)
+        close(outeng_unit)
 
     case ('kmc')
+
+        ! Read in the rates
+
+        call open_for_read(inp_unit,rate_file)
+
+        read(inp_unit,*) rate_key, rate_par1, rate_par2
+        rate_par2 = rate_par2 * eV2K
+
+        close(inp_unit)
 
         allocate(rates(nads,nnn))
 
@@ -333,7 +444,9 @@ select case (algorithm)
             if (n_bins > 0) then
 
                 call open_for_write(7,trim(fname)//trim(buffer)//'.en')
-                write(7,*) big_bang ,total_energy(nlat, nads, nnn, occupations, ads_list, nn_list, eps)/eV2K
+                write(7,*) big_bang ,&
+                    total_energy(nlat, nads, nnn, occupations, site_type, &
+                                 ads_list, nn_list, ads_energy, int_energy)
 
                 call open_for_write(10,trim(fname)//trim(buffer)//'.csz')
                 write(10,*) t_end, n_bins
@@ -421,7 +534,9 @@ select case (algorithm)
                         write(10,ads_fmt) hist
 
 !                        write(6,cfg_fmt) (occupations(i,:), i=1,nlat)
-                        write(7,*) time,total_energy(nlat, nads, nnn, occupations, ads_list, nn_list, eps)/eV2K
+                        write(7,*) time,&
+                            total_energy(nlat, nads, nnn, occupations, site_type, &
+                                         ads_list, nn_list, ads_energy, int_energy)
 
                     end if
 
@@ -545,23 +660,23 @@ select case (algorithm)
 end select
 
 
-close(6)
+close(outcfg_unit)
 
-if (hist_period > 0) close(8)
+if (hist_period > 0) close(outhst_unit)
 
 call system_clock(icount2)
 print*
 print*, 'Number of clock ticks = ', icount2-icount1
 
-call open_for_write(6,trim(fname)//'.out')
+call open_for_write(outcfg_unit,trim(fname)//'.out')
 
-write(6,*) nlat, nads
-write(6,cfg_fmt) (occupations(i,:), i=1,nlat)
+write(outcfg_unit,*) nlat, nads
+write(outcfg_unit,cfg_fmt) (occupations(i,:), i=1,nlat)
 
-close(6)
+close(outcfg_unit)
 
 deallocate(cluster_label, cluster_sizes, hist, change_list, nn_new)
-deallocate(ads_list,nn_pos,nn_list,nn_opps,temp1D,occupations)
+deallocate(ads_list,nn_pos,nn_list,nn_opps,temp1D,site_type,occupations)
 
 
 end program
@@ -589,28 +704,41 @@ integer :: i, ic, jc, counter
 
 end function
 
-real(8) function total_energy(nlat, nads, nnn, occupations, ads_list, nn_list, eps)
+real(8) function total_energy(nlat, nads, nnn, occupations, site_type, &
+                              ads_list, nn_list, ads_energy, int_energy)
 
 integer, intent(in) :: nlat, nads, nnn
 integer, dimension(nlat,nlat), intent(in) :: occupations
+integer(1), dimension(nlat,nlat), intent(in) :: site_type
 integer, dimension(nads,2), intent(in) :: ads_list
 integer, dimension(nnn,2), intent(in) :: nn_list
-real(8), intent(in) :: eps
+real(8), dimension(3) :: ads_energy
+real(8), dimension(3,3) :: int_energy
 
-integer :: i, ic, jc, counter
+integer :: i, ic, jc, iads, jads
+real(8) :: energy_acc
 
-    counter = 0
+    energy_acc = 0.0d0
     do inx=1,nads
-    do i=1, nnn/2 ! count interaction with neighbors once
 
-        ic = modulo(ads_list(inx,1)+nn_list(i,1)-1,nlat) + 1
-        jc = modulo(ads_list(inx,2)+nn_list(i,2)-1,nlat) + 1
-        if (occupations(ic,jc) > 0) counter = counter + 1
+        iads = ads_list(inx,1)
+        jads = ads_list(inx,2)
+
+        energy_acc = energy_acc + ads_energy(site_type(iads,jads))
+
+        do i=1, nnn/2 ! count interaction with neighbors once
+
+            ic = modulo(iads+nn_list(i,1)-1,nlat) + 1
+            jc = modulo(jads+nn_list(i,2)-1,nlat) + 1
+            if (occupations(ic,jc) > 0) &
+                energy_acc = energy_acc +&
+                        int_energy(site_type(iads,jads),site_type(ic,jc))
+
+        end do
 
     end do
-    end do
 
-    total_energy = counter*eps
+    total_energy = energy_acc
 
 end function
 
