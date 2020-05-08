@@ -56,7 +56,7 @@ integer, dimension(:),   allocatable   :: cluster_sizes, hist
 integer, dimension(:,:), allocatable   :: cluster_label
 
 real(8) :: time, delta_t, time_new, step_bin
-real(8) :: r_hop, rate_acc, u, total_rate
+real(8) :: rate_acc, u, total_rate
 integer :: i_nn, i_ads, ibin_new, ibin, kmc_nsteps
 real(8), dimension(:,:),   allocatable :: rates
 
@@ -68,7 +68,8 @@ character(len=120) buffer, label, fname
 real(8), dimension(3) :: ads_energy
 real(8), dimension(3,3) :: int_energy
 
-character(len=120) :: rate_key
+real(8), dimension(3,3) :: r_hop
+character(len=2) :: st_tag
 real(8) :: rate_par1, rate_par2, rtemp
 
 character(len=10) cfg_fmt
@@ -106,6 +107,7 @@ do while (ios == 0)
                 read(buffer,*,iostat=ios) step_period
             case('temperature')
                 read(buffer,*,iostat=ios) temperature
+                beta = 1.0d0/temperature ! thermodynamic temperature
             case('coverage')
                 read(buffer,*,iostat=ios) coverage
             case('energy')
@@ -325,14 +327,13 @@ select case (algorithm)
 !                         ads_list, nn_list, ads_energy, int_energy)/eV2K
 !        stop 33
 
--------WE ARE HERE------
-
         !loop over mmc steps
-        do istep=2, nsteps
+        do istep=1, nsteps
 
             do i=1, nads
 
-                energy_old = energy(i, nlat, nads, nnn, occupations, ads_list, nn_list, eps)
+                energy_old = energy(i, nlat, nads, nnn, occupations, site_type, &
+                                       ads_list, nn_list, ads_energy, int_energy)
 
                 ihop = floor(nnn*ran1()) + 1
 
@@ -348,8 +349,9 @@ select case (algorithm)
                     occupations(i_old,j_old) = 0
                     ads_list(i,:) = (/i_new,j_new/)
 
-                    delta_E = energy(i, nlat, nads, nnn, occupations,&
-                                      ads_list, nn_list, eps) - energy_old
+                    delta_E = energy(i, nlat, nads, nnn, occupations, site_type, &
+                                     ads_list, nn_list, ads_energy, int_energy) &
+                            - energy_old
 
                     if (exp(- delta_E/temperature) < ran1()) then
 
@@ -407,28 +409,90 @@ select case (algorithm)
 
     case ('kmc')
 
-        ! Read in the rates
+        ! Read in the rates and
+        ! construct an array of free-particle hopping rates
+        ! with account for detailed balance
+
+        r_hop = -1.0d0
 
         call open_for_read(inp_unit,rate_file)
 
-        read(inp_unit,*) rate_key, rate_par1, rate_par2
-        rate_par2 = rate_par2 * eV2K
+        read(inp_unit,*,iostat=ios) buffer
+
+        ios = 0
+        do while (ios == 0)
+
+            if (ios == 0) then
+
+                ! Find the first instance of whitespace.  Split label and data.
+                pos1 = scan(buffer, ' ')
+                label = buffer(1:pos1)
+                buffer = buffer(pos1+1:)
+
+                select case (label)
+
+                case('Arrhenius')
+
+                    read(buffer,*) st_tag, rate_par1, rate_par2
+                    rate_par2 = rate_par2 * eV2K
+
+                    select case (st_tag)
+
+                    case('tt')
+                        r_hop(terrace_site,terrace_site) = &
+                            arrhenius(temperature, rate_par1, rate_par2)
+                    case('ss')
+                        r_hop(step_site,step_site) = &
+                            arrhenius(temperature, rate_par1, rate_par2)
+                    case('ts')
+                        r_hop(terrace_site,step_site) = &
+                            arrhenius(temperature, rate_par1, rate_par2)
+                        r_hop(step_site,terrace_site) = r_hop(terrace_site,step_site)&
+                                *exp( -beta*(ads_energy(terrace_site) - ads_energy(step_site)))
+                    case('cc')
+                        r_hop(corner_site,corner_site) = &
+                            arrhenius(temperature, rate_par1, rate_par2)
+                    case('tc')
+                        r_hop(terrace_site,corner_site) = &
+                            arrhenius(temperature, rate_par1, rate_par2)
+                        r_hop(corner_site,terrace_site) = r_hop(terrace_site,corner_site)&
+                                *exp( -beta*(ads_energy(terrace_site) - ads_energy(corner_site)))
+                    case('sc')
+                        r_hop(step_site,corner_site) = &
+                            arrhenius(temperature, rate_par1, rate_par2)
+                        r_hop(corner_site,step_site) = r_hop(step_site,corner_site)&
+                                *exp( -beta*(ads_energy(step_site) - ads_energy(corner_site)))
+
+                    case default
+                        print*, 'Error in the rate file: unknown site-type tag: ', st_tag
+                        stop
+                    end select
+
+                case('extArrhenius')
+                    stop 'Extended Arrhenius is not yet implemented.'
+
+                case default
+                    if (label(1:1) /= '!')&
+                        stop 'Error in the rate file: unknown rate form.'
+
+                end select
+
+            end if
+
+        end do
 
         close(inp_unit)
 
-        allocate(rates(nads,nnn))
-
-        beta = eps/temperature
-
-        ! time binning for distributions
-        if (n_bins > 0) step_bin = t_end/n_bins
-
-        ! Free particle hopping rate
-        r_hop = arrhenius(temperature, rate_par1, rate_par2)/nnn
+        if (any(r_hop) < 0) stop 'Error in the rate file: not all the rates are defined.'
 
         print*,"Free particle hopping rate is ", r_hop
         print*
 
+        allocate(rates(nads,nnn))
+
+        ! time binning for distributions
+        if (n_bins > 0) step_bin = t_end/n_bins
+------WE ARE HERE----------
         do itraj=1, ntrajs
 
             print*, 'Running trajectory no.',itraj
@@ -681,26 +745,36 @@ deallocate(ads_list,nn_pos,nn_list,nn_opps,temp1D,site_type,occupations)
 
 end program
 
-real(8) function energy(inx, nlat, nads, nnn, occupations, ads_list, nn_list, eps)
+real(8) function energy(inx, nlat, nads, nnn, occupations, site_type, &
+                        ads_list, nn_list, ads_energy, int_energy)
 
 integer, intent(in) :: inx, nlat, nads, nnn
 integer, dimension(nlat,nlat), intent(in) :: occupations
+integer(1), dimension(nlat,nlat), intent(in) :: site_type
 integer, dimension(nads,2), intent(in) :: ads_list
 integer, dimension(nnn,2), intent(in) :: nn_list
-real(8), intent(in) :: eps
+real(8), dimension(3), intent(in) :: ads_energy
+real(8), dimension(3,3), intent(in) :: int_energy
 
-integer :: i, ic, jc, counter
+integer :: i, ic, jc, iads, jads
+real(8) :: energy_acc
 
-    counter = 0
-    do i=1, nnn
+        iads = ads_list(inx,1)
+        jads = ads_list(inx,2)
 
-        ic = modulo(ads_list(inx,1)+nn_list(i,1)-1,nlat) + 1
-        jc = modulo(ads_list(inx,2)+nn_list(i,2)-1,nlat) + 1
-        if (occupations(ic,jc) > 0) counter = counter + 1
+        energy_acc = ads_energy(site_type(iads,jads))
 
-    end do
+        do i=1, nnn ! Sum up the int. energy over all nearest neighbors
 
-    energy = eps*counter
+            ic = modulo(iads+nn_list(i,1)-1,nlat) + 1
+            jc = modulo(jads+nn_list(i,2)-1,nlat) + 1
+            if (occupations(ic,jc) > 0) &
+                energy_acc = energy_acc +&
+                        int_energy(site_type(iads,jads),site_type(ic,jc))
+
+        end do
+
+    energy = energy_acc
 
 end function
 
@@ -712,8 +786,8 @@ integer, dimension(nlat,nlat), intent(in) :: occupations
 integer(1), dimension(nlat,nlat), intent(in) :: site_type
 integer, dimension(nads,2), intent(in) :: ads_list
 integer, dimension(nnn,2), intent(in) :: nn_list
-real(8), dimension(3) :: ads_energy
-real(8), dimension(3,3) :: int_energy
+real(8), dimension(3), intent(in) :: ads_energy
+real(8), dimension(3,3), intent(in) :: int_energy
 
 integer :: i, ic, jc, iads, jads
 real(8) :: energy_acc
