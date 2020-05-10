@@ -33,7 +33,7 @@ integer :: ntrajs	! number of kmc trajectories (ignored for mmc)
 real(8) :: t_end     ! kmc simulation time (s)
 integer :: n_bins  	! number of time intervals in kmc histogram
 character(len=120) :: rate_file='' ! name of the file with rate parameters
-character(len=120) :: energy_file=''! name of the file with binding and interaction energy
+character(len=120) :: energy_file=''! name of the file with adsorption and interaction energy
 character(len=120) :: cfg_fname='' ! name of the file with initial configuration
 
 real(8) :: energy, total_energy, arrhenius
@@ -44,7 +44,8 @@ integer :: icount1, icount2
 
 integer :: nads, nnn, nn_counter, nlat_old, nads_old
 integer :: i, j, k, m, n, ihop, istep, kk, k_change
-integer :: i_old, j_old, i_new, j_new, itraj
+integer :: i_old, j_old, i_new, j_new, itraj, ic_nn, jc_nn
+integer :: st_old, st_nn, st_new
 
 real(8), dimension(2) :: b1, b2
 integer, dimension(:,:), allocatable   :: occupations, ads_list
@@ -61,6 +62,7 @@ integer :: i_nn, i_ads, ibin_new, ibin, kmc_nsteps
 real(8), dimension(:,:),   allocatable :: rates
 
 real(8) :: energy_old, delta_E, beta
+real(8) :: energy_acc_old, energy_acc_new
 
 integer :: ios, pos1, largest_label, hist_counter
 character(len=120) buffer, label, fname
@@ -166,13 +168,13 @@ do while (ios == 0)
 
             select case (label)
 
-            case('binding')
+            case('adsorption')
 
                 read(buffer,*,iostat=ios) &
                     ads_energy(terrace_site),&
                     ads_energy(   step_site),&
                     ads_energy( corner_site)
-                if (ios /= 0) stop 'Error in energy file: binding'
+                if (ios /= 0) stop 'Error in energy file: adsorption'
                 ads_energy = ads_energy*eV2K
 
             case('interaction')
@@ -417,19 +419,20 @@ select case (algorithm)
 
         call open_for_read(inp_unit,rate_file)
 
-        read(inp_unit,*,iostat=ios) buffer
 
         ios = 0
         do while (ios == 0)
 
-            if (ios == 0) then
+           read(inp_unit, '(A)', iostat=ios) buffer
+
+           if (ios == 0) then
 
                 ! Find the first instance of whitespace.  Split label and data.
                 pos1 = scan(buffer, ' ')
                 label = buffer(1:pos1)
                 buffer = buffer(pos1+1:)
 
-                select case (label)
+                select case (trim(label))
 
                 case('Arrhenius')
 
@@ -472,8 +475,8 @@ select case (algorithm)
                     stop 'Extended Arrhenius is not yet implemented.'
 
                 case default
-                    if (label(1:1) /= '!')&
-                        stop 'Error in the rate file: unknown rate form.'
+
+                    if (label(1:1) /= '!') stop 'Error in the rate file: unknown rate form.'
 
                 end select
 
@@ -483,16 +486,19 @@ select case (algorithm)
 
         close(inp_unit)
 
-        if (any(r_hop) < 0) stop 'Error in the rate file: not all the rates are defined.'
+        if (any(r_hop < 0)) stop 'Error in the rate file: not all the rates are defined.'
 
-        print*,"Free particle hopping rate is ", r_hop
+        print'(4i6)', transpose(site_type)
+        print*,"Free-particle hopping rate is: "
+        print'(3e16.6)', r_hop
         print*
+!        stop 44
 
         allocate(rates(nads,nnn))
 
         ! time binning for distributions
         if (n_bins > 0) step_bin = t_end/n_bins
-------WE ARE HERE----------
+
         do itraj=1, ntrajs
 
             print*, 'Running trajectory no.',itraj
@@ -507,56 +513,85 @@ select case (algorithm)
             write(buffer,'(i6.6)') itraj
             if (n_bins > 0) then
 
-                call open_for_write(7,trim(fname)//trim(buffer)//'.en')
-                write(7,*) big_bang ,&
+                call open_for_write(outeng_unit,trim(fname)//trim(buffer)//'.en')
+                write(outeng_unit,*) big_bang ,&
                     total_energy(nlat, nads, nnn, occupations, site_type, &
                                  ads_list, nn_list, ads_energy, int_energy)
 
-                call open_for_write(10,trim(fname)//trim(buffer)//'.csz')
-                write(10,*) t_end, n_bins
+                call open_for_write(outhst_unit,trim(fname)//trim(buffer)//'.csz')
+                write(outhst_unit,*) t_end, n_bins
 
             end if
 
 
             ! Construct rate array
             do i=1,nads
-                k = 0
+
+                i_old = ads_list(i,1)
+                j_old = ads_list(i,2)
+                st_old = site_type(i_old,j_old)
+
+                energy_acc_old = 0.0d0
+
                 do m=1,nnn
 
-                    nn_pos(m,:) =&
-                     modulo(ads_list(i,:) + nn_list(m,:)-1,nlat) + 1
+                    nn_pos(m,1) = modulo(i_old + nn_list(m,1)-1,nlat) + 1
+                    nn_pos(m,2) = modulo(j_old + nn_list(m,2)-1,nlat) + 1
 
-                    if (occupations(nn_pos(m,1), nn_pos(m,2)) > 0)&
-                        k = k + 1
+                    i_new = nn_pos(m,1)
+                    j_new = nn_pos(m,2)
+                    st_new  = site_type(i_new,j_new)
+
+                    if (occupations(i_new, j_new) > 0)&
+                        energy_acc_old = energy_acc_old + int_energy(st_old, st_new)
                 end do
 
                 do m=1,nnn
 
-                    if (occupations(nn_pos(m,1), nn_pos(m,2)) == 0) then
-                        kk = -1 ! Excluding self-counting
+                    i_new = nn_pos(m,1)
+                    j_new = nn_pos(m,2)
+                    st_new  = site_type(i_new,j_new)
+
+                    if (occupations(i_new, j_new) == 0) then
+
+                        ! Excluding self-counting
+                        energy_acc_new = - int_energy(st_old,st_new)
 
                         do n=1,nnn
-                            i_new = modulo(nn_pos(m,1) + nn_list(n,1)-1,nlat) + 1
-                            j_new = modulo(nn_pos(m,2) + nn_list(n,2)-1,nlat) + 1
-                            if (occupations(i_new,j_new) > 0) kk = kk + 1
-                        end do
 
-                        if (k > kk) then
-                            rates(i,m) = r_hop*exp( beta*(k - kk) )
+                            ic_nn = modulo(i_new + nn_list(n,1)-1,nlat) + 1
+                            jc_nn = modulo(j_new + nn_list(n,2)-1,nlat) + 1
+                            st_nn = site_type(ic_nn,jc_nn)
+
+!                print*, i, i_old, j_old, st_old
+!                print*, m, i_new, j_new, st_new
+!                print*, n, ic_nn, jc_nn, st_nn
+!                pause
+                            if (occupations(i_new,j_new) > 0) &
+                                energy_acc_new = energy_acc_new + int_energy(st_new,st_nn)
+                        end do
+---WE ARE HERE!---
+                        if (energy_acc_old < energy_acc_new) then
+                            rates(i,m) = r_hop(st_old,st_new)&
+                                *exp( -beta*(energy_acc_new - energy_acc_old) )
                         else
-                            rates(i,m) = r_hop
+                            rates(i,m) = r_hop(st_old,st_new)
                         end if
-                    else
-                        rates(i,m) = 0
+
+                    else ! if the neighbor site is occupied
+                        rates(i,m) = 0.0d0
                     end if
 
+                            print*, i, m, st_old, st_new, rates(i,m), i_new, j_new
+                            stop 60
                 end do
+
             end do
 
-!write(*,cfg_fmt) transpose(occupations)
-!print*
-!print'(6e16.4)', (rates(i,:)/r_hop,i=1,nads)
-!stop 11
+write(*,cfg_fmt) transpose(occupations)
+print*
+print'(6e16.4)', (rates(i,:),i=1,nads)
+stop 11
             ! start time propagation
             time = big_bang
             do while (time<t_end)
@@ -594,11 +629,11 @@ select case (algorithm)
                                 hist(cluster_sizes(i)) = hist(cluster_sizes(i)) + 1
                         end do
 
-                        write(10,*) ibin
-                        write(10,ads_fmt) hist
+                        write(outhst_unit,*) ibin
+                        write(outhst_unit,ads_fmt) hist
 
 !                        write(6,cfg_fmt) (occupations(i,:), i=1,nlat)
-                        write(7,*) time,&
+                        write(outeng_unit,*) time,&
                             total_energy(nlat, nads, nnn, occupations, site_type, &
                                          ads_list, nn_list, ads_energy, int_energy)
 
@@ -664,35 +699,59 @@ select case (algorithm)
                 ! Update rate array
                 ! see building up the rate array above
                 ! with i replaced by change_list(i)
-                do i=1,k_change
-                    k = 0
+
+                do kk=1,k_change
+
+                    i = change_list(kk)
+                    i_old = ads_list(i,1)
+                    j_old = ads_list(i,2)
+                    st_old = site_type(i_old,j_old)
+
+                    energy_acc_old = 0.0d0
+
                     do m=1,nnn
 
-                        nn_pos(m,:) =&
-                         modulo(ads_list(change_list(i),:) + nn_list(m,:)-1,nlat) + 1
+                        nn_pos(m,1) = modulo(i_old + nn_list(m,1)-1,nlat) + 1
+                        nn_pos(m,2) = modulo(j_old + nn_list(m,2)-1,nlat) + 1
 
-                        if (occupations(nn_pos(m,1), nn_pos(m,2)) > 0)&
-                            k = k + 1
+                        ic_nn = nn_pos(m,1)
+                        jc_nn = nn_pos(m,2)
+                        st_nn  = site_type(ic_nn,jc_nn)
+
+                        if (occupations(ic_nn, jc_nn) > 0)&
+                            energy_acc_old = energy_acc_old + int_energy(st_old, st_nn)
                     end do
 
                     do m=1,nnn
 
-                        if (occupations(nn_pos(m,1), nn_pos(m,2)) == 0) then
-                            kk = -1 ! Excluding self-counting
+                        ic_nn = nn_pos(m,1)
+                        jc_nn = nn_pos(m,2)
+                        st_nn  = site_type(ic_nn,jc_nn)
+
+                        if (occupations(ic_nn, jc_nn) == 0) then
+
+                            ! Excluding self-counting
+                            energy_acc_new = - int_energy(st_old,st_nn)
 
                             do n=1,nnn
-                                i_new = modulo(nn_pos(m,1) + nn_list(n,1)-1,nlat) + 1
-                                j_new = modulo(nn_pos(m,2) + nn_list(n,2)-1,nlat) + 1
-                                if (occupations(i_new,j_new) > 0) kk = kk + 1
+
+                                i_new = modulo(ic_nn + nn_list(n,1)-1,nlat) + 1
+                                j_new = modulo(jc_nn + nn_list(n,2)-1,nlat) + 1
+                                st_new = site_type(i_new,j_new)
+
+                                if (occupations(i_new,j_new) > 0) &
+                                    energy_acc_new = energy_acc_new + int_energy(st_nn,st_new)
                             end do
 
-                            if (k > kk) then
-                                rates(change_list(i),m) = r_hop*exp( beta*(k - kk) )
+                            if (energy_acc_old < energy_acc_new) then
+                                rates(i,m) = r_hop(st_old,st_new)&
+                                    *exp( -beta*(energy_acc_new - energy_acc_old) )
                             else
-                                rates(change_list(i),m) = r_hop
+                                rates(i,m) = r_hop(st_old,st_new)
                             end if
-                        else
-                            rates(change_list(i),m) = 0
+
+                        else ! if the neighbor site is occupied
+                            rates(i,m) = 0.0d0
                         end if
 
                     end do
@@ -708,8 +767,8 @@ select case (algorithm)
 !-------------------------------------------------------------
 
             if (n_bins > 0) then
-                close(7)
-                close(10)
+                close(outeng_unit)
+                close(outhst_unit)
             end if
 
             print*,'Number of kmc-steps is ', kmc_nsteps
