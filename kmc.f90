@@ -43,9 +43,9 @@ integer, parameter :: seed(8) = (/1,6,3,5,7,3,3,7/)
 integer :: icount1, icount2
 
 integer :: nads, nnn, nn_counter, nlat_old, nads_old
-integer :: i, j, k, m, n, ihop, istep, kk, k_change
-integer :: i_old, j_old, i_new, j_new, itraj, ic_nn, jc_nn
-integer :: st_old, st_nn, st_new
+integer :: i, j, k, m, m2, n, ihop, istep, itraj, kk, k_change
+integer :: i_old, j_old, i_new, j_new, i_new2, j_new2
+integer :: st_old, st_new, st_new2
 
 real(8), dimension(2) :: b1, b2
 integer, dimension(:,:), allocatable   :: occupations, ads_list
@@ -205,6 +205,7 @@ end do ! ios
 
 close(inp_unit)
 
+
 ! Number of neighbors for the hexagonal structure
 nnn = 6
 
@@ -308,7 +309,7 @@ hist = 0
 hist_counter = 0
 
 write(outcfg_unit,*) nlat, nads
-write(outcfg_unit,cfg_fmt) (occupations(i,:), i=1,nlat)
+write(outcfg_unit,cfg_fmt) transpose(occupations)
 
 
 select case (algorithm)
@@ -318,12 +319,13 @@ select case (algorithm)
         call open_for_write(outeng_unit,trim(fname)//'.en')
         write(outeng_unit,*) 0,&
             total_energy(nlat, nads, nnn, occupations, site_type, &
-                         ads_list, nn_list, ads_energy, int_energy)
+                         ads_list, nn_list, ads_energy, int_energy)/eV2K
 
 !        write(*,cfg_fmt) transpose(site_type)
 !        print*
 !        write(*,cfg_fmt) transpose(occupations)
 !        print*
+!        print*,energy_file
 !        write(*,'(3f12.3)') int_energy/eV2K
 !        write(*,*) total_energy(nlat, nads, nnn, occupations, site_type, &
 !                         ads_list, nn_list, ads_energy, int_energy)/eV2K
@@ -394,10 +396,10 @@ select case (algorithm)
 
             if (mod(istep, save_period) == 0) then
                 print*, istep
-                write(outcfg_unit,cfg_fmt) (occupations(i,:), i=1,nlat)
+                write(outcfg_unit,cfg_fmt) transpose(occupations)
                 write(outeng_unit,*) istep-1,&
                     total_energy(nlat, nads, nnn, occupations, site_type, &
-                                 ads_list, nn_list, ads_energy, int_energy)
+                                 ads_list, nn_list, ads_energy, int_energy)/eV2K
 
                 if (hist_period > 0) then
                     write(outhst_unit,*) hist_counter
@@ -450,21 +452,18 @@ select case (algorithm)
                     case('ts')
                         r_hop(terrace_site,step_site) = &
                             arrhenius(temperature, rate_par1, rate_par2)
-                        r_hop(step_site,terrace_site) = r_hop(terrace_site,step_site)&
-                                *exp( -beta*(ads_energy(terrace_site) - ads_energy(step_site)))
+                        r_hop(step_site,terrace_site) = r_hop(terrace_site,step_site)
                     case('cc')
                         r_hop(corner_site,corner_site) = &
                             arrhenius(temperature, rate_par1, rate_par2)
                     case('tc')
                         r_hop(terrace_site,corner_site) = &
                             arrhenius(temperature, rate_par1, rate_par2)
-                        r_hop(corner_site,terrace_site) = r_hop(terrace_site,corner_site)&
-                                *exp( -beta*(ads_energy(terrace_site) - ads_energy(corner_site)))
+                        r_hop(corner_site,terrace_site) = r_hop(terrace_site,corner_site)
                     case('sc')
                         r_hop(step_site,corner_site) = &
                             arrhenius(temperature, rate_par1, rate_par2)
-                        r_hop(corner_site,step_site) = r_hop(step_site,corner_site)&
-                                *exp( -beta*(ads_energy(step_site) - ads_energy(corner_site)))
+                        r_hop(corner_site,step_site) = r_hop(step_site,corner_site)
 
                     case default
                         print*, 'Error in the rate file: unknown site-type tag: ', st_tag
@@ -488,7 +487,7 @@ select case (algorithm)
 
         if (any(r_hop < 0)) stop 'Error in the rate file: not all the rates are defined.'
 
-        print'(4i6)', transpose(site_type)
+!        print'(4i6)', transpose(site_type)
         print*,"Free-particle hopping rate is: "
         print'(3e16.6)', r_hop
         print*
@@ -516,7 +515,7 @@ select case (algorithm)
                 call open_for_write(outeng_unit,trim(fname)//trim(buffer)//'.en')
                 write(outeng_unit,*) big_bang ,&
                     total_energy(nlat, nads, nnn, occupations, site_type, &
-                                 ads_list, nn_list, ads_energy, int_energy)
+                                 ads_list, nn_list, ads_energy, int_energy)/eV2K
 
                 call open_for_write(outhst_unit,trim(fname)//trim(buffer)//'.csz')
                 write(outhst_unit,*) t_end, n_bins
@@ -531,8 +530,10 @@ select case (algorithm)
                 j_old = ads_list(i,2)
                 st_old = site_type(i_old,j_old)
 
-                energy_acc_old = 0.0d0
+                energy_acc_old = ads_energy(st_old)
 
+                ! Calculate the interaction energy for particle i in its old positions
+                ! Loop over the neighbors of particle i
                 do m=1,nnn
 
                     nn_pos(m,1) = modulo(i_old + nn_list(m,1)-1,nlat) + 1
@@ -546,6 +547,9 @@ select case (algorithm)
                         energy_acc_old = energy_acc_old + int_energy(st_old, st_new)
                 end do
 
+                ! Calculate the interaction energy for particle i in its NEW positions
+
+                ! Loop over possible new positions of particle i
                 do m=1,nnn
 
                     i_new = nn_pos(m,1)
@@ -555,22 +559,26 @@ select case (algorithm)
                     if (occupations(i_new, j_new) == 0) then
 
                         ! Excluding self-counting
-                        energy_acc_new = - int_energy(st_old,st_new)
+                        energy_acc_new = ads_energy(st_new) - int_energy(st_old,st_new)
 
-                        do n=1,nnn
+                        ! Loop over the neighbors of particle i in its possible NEW positions
+                        do m2=1,nnn
 
-                            ic_nn = modulo(i_new + nn_list(n,1)-1,nlat) + 1
-                            jc_nn = modulo(j_new + nn_list(n,2)-1,nlat) + 1
-                            st_nn = site_type(ic_nn,jc_nn)
+                            i_new2 = modulo(i_new + nn_list(m2,1)-1,nlat) + 1
+                            j_new2 = modulo(j_new + nn_list(m2,2)-1,nlat) + 1
+                            st_new2= site_type(i_new2,j_new2)
 
-!                print*, i, i_old, j_old, st_old
-!                print*, m, i_new, j_new, st_new
-!                print*, n, ic_nn, jc_nn, st_nn
-!                pause
-                            if (occupations(i_new,j_new) > 0) &
-                                energy_acc_new = energy_acc_new + int_energy(st_new,st_nn)
+            !                print*, 'i, i_old, j_old, st_old :',i, i_old, j_old, st_old
+            !                print*, 'm, i_new, j_new, st_new :',m, i_new, j_new, st_new
+            !                print*, 'm2,i_new2,j_new2,st_new2:',m2, i_new2,j_new2, st_new2
+            !                pause
+
+                            if (occupations(i_new2,j_new2) > 0) &
+                                energy_acc_new = energy_acc_new + int_energy(st_new,st_new2)
                         end do
----WE ARE HERE!---
+
+                        ! Apply detailed balance when
+                        ! total energy in the old position < total energy in the new position
                         if (energy_acc_old < energy_acc_new) then
                             rates(i,m) = r_hop(st_old,st_new)&
                                 *exp( -beta*(energy_acc_new - energy_acc_old) )
@@ -582,16 +590,18 @@ select case (algorithm)
                         rates(i,m) = 0.0d0
                     end if
 
-                            print*, i, m, st_old, st_new, rates(i,m), i_new, j_new
-                            stop 60
+!                            write(*,cfg_fmt) transpose(occupations)
+!                            print*
+!                            print*, 'i, i_old, j_old, st_old:',i, i_old, j_old, st_old
+!                            print*, 'm, i_new, j_new, st_new:',m, i_new, j_new, st_new
+!                            print'(A,f18.2)', 'rates(i,m):',rates(i,m)
+!                            print'(A,f18.4)', 'Eacc_old  = ',energy_acc_old/eV2K
+!                            print'(A,f18.4)', 'E_acc_new = ',energy_acc_new/eV2K
+!                            pause
                 end do
 
             end do
 
-write(*,cfg_fmt) transpose(occupations)
-print*
-print'(6e16.4)', (rates(i,:),i=1,nads)
-stop 11
             ! start time propagation
             time = big_bang
             do while (time<t_end)
@@ -635,7 +645,7 @@ stop 11
 !                        write(6,cfg_fmt) (occupations(i,:), i=1,nlat)
                         write(outeng_unit,*) time,&
                             total_energy(nlat, nads, nnn, occupations, site_type, &
-                                         ads_list, nn_list, ads_energy, int_energy)
+                                         ads_list, nn_list, ads_energy, int_energy)/eV2K
 
                     end if
 
@@ -707,42 +717,55 @@ stop 11
                     j_old = ads_list(i,2)
                     st_old = site_type(i_old,j_old)
 
-                    energy_acc_old = 0.0d0
+                    energy_acc_old = ads_energy(st_old)
 
+                    ! Calculate the interaction energy for particle i in its old positions
+                    ! Loop over the neighbors of particle i
                     do m=1,nnn
 
                         nn_pos(m,1) = modulo(i_old + nn_list(m,1)-1,nlat) + 1
                         nn_pos(m,2) = modulo(j_old + nn_list(m,2)-1,nlat) + 1
 
-                        ic_nn = nn_pos(m,1)
-                        jc_nn = nn_pos(m,2)
-                        st_nn  = site_type(ic_nn,jc_nn)
+                        i_new = nn_pos(m,1)
+                        j_new = nn_pos(m,2)
+                        st_new  = site_type(i_new,j_new)
 
-                        if (occupations(ic_nn, jc_nn) > 0)&
-                            energy_acc_old = energy_acc_old + int_energy(st_old, st_nn)
+                        if (occupations(i_new, j_new) > 0)&
+                            energy_acc_old = energy_acc_old + int_energy(st_old, st_new)
                     end do
 
+                    ! Calculate the interaction energy for particle i in its NEW positions
+
+                    ! Loop over possible new positions of particle i
                     do m=1,nnn
 
-                        ic_nn = nn_pos(m,1)
-                        jc_nn = nn_pos(m,2)
-                        st_nn  = site_type(ic_nn,jc_nn)
+                        i_new = nn_pos(m,1)
+                        j_new = nn_pos(m,2)
+                        st_new  = site_type(i_new,j_new)
 
-                        if (occupations(ic_nn, jc_nn) == 0) then
+                        if (occupations(i_new, j_new) == 0) then
 
                             ! Excluding self-counting
-                            energy_acc_new = - int_energy(st_old,st_nn)
+                            energy_acc_new = ads_energy(st_new) - int_energy(st_old,st_new)
 
-                            do n=1,nnn
+                            ! Loop over the neighbors of particle i in its possible NEW positions
+                            do m2=1,nnn
 
-                                i_new = modulo(ic_nn + nn_list(n,1)-1,nlat) + 1
-                                j_new = modulo(jc_nn + nn_list(n,2)-1,nlat) + 1
-                                st_new = site_type(i_new,j_new)
+                                i_new2 = modulo(i_new + nn_list(m2,1)-1,nlat) + 1
+                                j_new2 = modulo(j_new + nn_list(m2,2)-1,nlat) + 1
+                                st_new2= site_type(i_new2,j_new2)
 
-                                if (occupations(i_new,j_new) > 0) &
-                                    energy_acc_new = energy_acc_new + int_energy(st_nn,st_new)
+                !                print*, 'i, i_old, j_old, st_old :',i, i_old, j_old, st_old
+                !                print*, 'm, i_new, j_new, st_new :',m, i_new, j_new, st_new
+                !                print*, 'm2,i_new2,j_new2,st_new2:',m2, i_new2,j_new2, st_new2
+                !                pause
+
+                                if (occupations(i_new2,j_new2) > 0) &
+                                    energy_acc_new = energy_acc_new + int_energy(st_new,st_new2)
                             end do
 
+                            ! Apply detailed balance when
+                            ! total energy in the old position < total energy in the new position
                             if (energy_acc_old < energy_acc_new) then
                                 rates(i,m) = r_hop(st_old,st_new)&
                                     *exp( -beta*(energy_acc_new - energy_acc_old) )
@@ -754,14 +777,17 @@ stop 11
                             rates(i,m) = 0.0d0
                         end if
 
+!                        write(*,cfg_fmt) transpose(occupations)
+!                        print*
+!                        print*, 'i, i_old, j_old, st_old:',i, i_old, j_old, st_old
+!                        print*, 'm, i_new, j_new, st_new:',m, i_new, j_new, st_new
+!                        print'(A,f18.2)', 'rates(i,m):',rates(i,m)
+!                        print'(A,f18.4)', 'Eacc_old  = ',energy_acc_old/eV2K
+!                        print'(A,f18.4)', 'E_acc_new = ',energy_acc_new/eV2K
+!                        pause
                     end do
+
                 end do
-
-!write(*,cfg_fmt) transpose(occupations)
-!print*
-!print'(6e16.4)', (rates(i,:)/r_hop,i=1,nads)
-!stop 11
-
 
             end do ! over time
 !-------------------------------------------------------------
@@ -794,7 +820,7 @@ print*, 'Number of clock ticks = ', icount2-icount1
 call open_for_write(outcfg_unit,trim(fname)//'.out')
 
 write(outcfg_unit,*) nlat, nads
-write(outcfg_unit,cfg_fmt) (occupations(i,:), i=1,nlat)
+write(outcfg_unit,cfg_fmt) transpose(occupations)
 
 close(outcfg_unit)
 
