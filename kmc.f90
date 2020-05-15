@@ -58,6 +58,7 @@ program kmc_tian
 !character(len=13) ads_fmt
 
 ! load module with random number and absorption rate functions
+
 use mc_lat_class
 use open_file
 use utilities
@@ -66,7 +67,7 @@ implicit none
 
 type(mc_lat) :: lat1     ! Declare a variable of type mc_lat.
 
-integer :: i,j, ios, nlat
+integer :: i,j, ios, n_row, n_col
 character(len=120) fname
 character(len= 10) fmt1
 
@@ -79,21 +80,21 @@ end select
 
 ! read nlat from first line of input file
 call open_for_read(5, trim(fname)//'.in' )
-read (5,*) nlat
-print *, 'nlat=',nlat
+read (5,*) n_row, n_col
+print *, 'n_row = ',n_row, 'n_col = ',n_col
 
 !   initialize lat1
-lat1 = mc_lat_init(nlat)
+lat1 = mc_lat_init(n_row,n_col)
 
   ! read occupations
-  do i=1,nlat
-    read(5,*) (lat1%occupations(i,j), j=1,nlat)
+  do i=1,n_row
+    read(5,*) (lat1%occupations(i,j), j=1,n_col)
   end do
 
   call lat1%print_ocs
-  call lat1%print_clus
 
-  print*, huge(0.0_dp), huge(0_int8)
+  print*, lat1%n_nn
+
 !! Read in simulation parameters
 !
 !select case (iargc())
@@ -223,8 +224,6 @@ lat1 = mc_lat_init(nlat)
 !close(inp_unit)
 !
 !
-!! Number of neighbors for the hexagonal structure
-!nnn = 6
 !
 !! configuration input/output format
 !write(cfg_fmt,'(i6)') nlat
@@ -241,22 +240,7 @@ lat1 = mc_lat_init(nlat)
 !allocate(nn_list(nnn,2), nn_pos(nnn,2), nn_opps(nnn), temp1D(nlat*nlat))
 !allocate(cluster_label(nlat,nlat), cluster_sizes(nads), hist(nads))
 !
-!! NN list for the hexagonal structure
-!!  11    12*   13*   14
-!!
-!!     21*   22*   23*   24
-!!
-!!        31*   32*   33    34
-!!
-!!           41    42    43    44
-!
-!nn_list(1,:) = (/ 0, 1/)
-!nn_list(2,:) = (/ 1, 0/)
-!nn_list(3,:) = (/ 1,-1/)
-!nn_list(4,:) = (/ 0,-1/)
-!nn_list(5,:) = (/-1, 0/)
-!nn_list(6,:) = (/-1, 1/)
-!
+
 !! List of opposite directions
 !do m=1,nnn
 !    nn_opps(m) = modulo(m-1+nnn/2,nnn)+1

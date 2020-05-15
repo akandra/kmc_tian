@@ -33,18 +33,18 @@ module constants
   real(dp), parameter :: tolerance        = 1.0e-9_dp
 
   ! Defaults
-  integer,   parameter  :: default_int           = huge(0_4)
-  real(dp),  parameter  :: default_real          = huge(0_dp)
+  integer,   parameter  :: default_int           = 0
+  real(dp),  parameter  :: default_real          = 0.0_dp
   character, parameter  :: default_string        = ""
-  logical,   parameter  :: default_bool          = .false.
+  logical,   parameter  :: default_bool          = .true.
 
 
   ! Conversion constants to program units
   !
   ! Program basic units
-  !           Length : Ang
-  !           Time   : s
-  !           Energy : eV
+  !           Temperature   : Kelvin
+  !           Time          : s
+  !           Energy        : eV
   real(dp), parameter :: Kelvin2eV        = kB
 
 
