@@ -67,7 +67,7 @@ implicit none
 
 type(mc_lat) :: lat1     ! Declare a variable of type mc_lat.
 
-integer :: i,j, ios, n_row, n_col
+integer :: i,j, ios, n_row, n_col, nads
 character(len=120) fname
 character(len= 10) fmt1
 
@@ -80,20 +80,27 @@ end select
 
 ! read nlat from first line of input file
 call open_for_read(5, trim(fname)//'.in' )
-read (5,*) n_row, n_col
+read (5,*) n_row, n_col, nads
 print *, 'n_row = ',n_row, 'n_col = ',n_col
+print *, 'n_ads = ', nads
 
 !   initialize lat1
-lat1 = mc_lat_init(n_row,n_col)
+lat1 = mc_lat_init(n_row,n_col,nads)
 
   ! read occupations
-  do i=1,n_row
-    read(5,*) (lat1%occupations(i,j), j=1,n_col)
-  end do
+!  do i=1,n_row
+!    read(5,*) (lat1%occupations(i,j,1), j=1,n_col)
+!  end do
 
-  call lat1%print_ocs
+  lat1%occupations(1,1,1) = 1
+  lat1%occupations(3,4,2) = 2
+  lat1%occupations(2,1,3) = 3
+  lat1%occupations(1,3,4) = 4
+  lat1%occupations(4,5,5) = 5
+  lat1%occupations(4,4,6) = 6
 
-  print*, lat1%n_nn
+  call lat1%print_ads
+
 
 !! Read in simulation parameters
 !

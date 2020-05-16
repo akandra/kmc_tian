@@ -32,12 +32,16 @@ module constants
   integer, parameter :: max_string_length = 1000
   real(dp), parameter :: tolerance        = 1.0e-9_dp
 
-  ! Defaults
-  integer,   parameter  :: default_int           = 0
-  real(dp),  parameter  :: default_real          = 0.0_dp
-  character, parameter  :: default_string        = ""
-  logical,   parameter  :: default_bool          = .true.
+  ! adsorption sites for the hexagonal lattice
 
+  character(len=3), dimension(6), parameter :: ads_site_names = ['top','fcc','hcp','br1','br2','br3']
+
+  integer, parameter :: top_id = 1
+  integer, parameter :: fcc_id = 2
+  integer, parameter :: hcp_id = 3
+  integer, parameter :: br1_id = 4
+  integer, parameter :: br2_id = 5
+  integer, parameter :: br3_id = 6
 
   ! Conversion constants to program units
   !
