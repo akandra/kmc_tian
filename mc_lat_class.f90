@@ -38,13 +38,16 @@ module mc_lat_class
     type(adsorbate), dimension(:), allocatable  :: ads_list
 
     contains
+
       procedure :: print_ocs  => mc_lat_print_ocs
       procedure :: print_ads  => mc_lat_print_ads
 
   end type mc_lat
 
   interface mc_lat
+
     module procedure :: mc_lat_init
+
   end interface
 
 

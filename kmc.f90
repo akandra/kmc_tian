@@ -1,105 +1,43 @@
 program kmc_tian
 
-!character(len=3) :: algorithm   ! MC algorithm to use (kmc or mmc)
-!integer :: nlat         ! size of 2D lattice (nlat x nlat)
-!integer :: step_period  ! = step_density^-1, 0 means no steps
-!real(8) :: temperature  ! temperature in K
-!real(8) :: coverage     ! coverage in ML per 2D MC lattice (nlat x nlat)
-!real(8) :: eps          ! O-O interaction energy in eV
-!integer :: save_period  ! period for conf. output
-!integer :: hist_period  ! period for histogram  calculation
-!integer :: nsteps   ! number of Metropolis MC steps
-!integer :: ntrajs	! number of kmc trajectories (ignored for mmc)
-!real(8) :: t_end     ! kmc simulation time (s)
-!integer :: n_bins  	! number of time intervals in kmc histogram
-!character(len=120) :: rate_file='' ! name of the file with rate parameters
-!character(len=120) :: energy_file=''! name of the file with adsorption and interaction energy
-!character(len=120) :: cfg_fname='' ! name of the file with initial configuration
-!
-!real(8) :: energy, total_energy, arrhenius
-!
-!integer :: nseed = 8
-!integer, parameter :: seed(8) = (/1,6,3,5,7,3,3,7/)
-!integer :: icount1, icount2
-!
-!integer :: nads, nnn, nn_counter, nlat_old, nads_old
-!integer :: i, j, k, m, m2, n, ihop, istep, itraj, kk, k_change
-!integer :: i_old, j_old, i_new, j_new, i_new2, j_new2
-!integer :: st_old, st_new, st_new2
-!
-!real(8), dimension(2) :: b1, b2
-!integer, dimension(:,:), allocatable   :: occupations, ads_list
-!integer(1), dimension(:,:), allocatable   :: site_type
-!integer, dimension(:,:), allocatable   :: nn_list, nn_pos, nn_new
-!integer, dimension(:),   allocatable   :: nn_opps, temp1D, change_list
-!
-!integer, dimension(:),   allocatable   :: cluster_sizes, hist
-!integer, dimension(:,:), allocatable   :: cluster_label
-!
-!real(8) :: time, delta_t, time_new, step_bin
-!real(8) :: rate_acc, u, total_rate
-!integer :: i_nn, i_ads, ibin_new, ibin, kmc_nsteps
-!real(8), dimension(:,:),   allocatable :: rates
-!
-!real(8) :: energy_old, delta_E, beta
-!real(8) :: energy_acc_old, energy_acc_new
-!
-!integer :: ios, pos1, largest_label, hist_counter
-!character(len=120) buffer, label, fname
-!
-!real(8), dimension(3) :: ads_energy
-!real(8), dimension(3,3) :: int_energy
-!
-!real(8), dimension(3,3) :: r_hop
-!character(len=2) :: st_tag
-!real(8) :: rate_par1, rate_par2, rtemp
-!
-!character(len=10) cfg_fmt
-!character(len=13) ads_fmt
-
-! load module with random number and absorption rate functions
-
 use mc_lat_class
-use open_file
-use utilities
+use control_parameters_class
+!use utilities
 
 implicit none
 
-type(mc_lat) :: lat1     ! Declare a variable of type mc_lat.
+type(mc_lat) :: lattice     ! Declare a variable of type mc_lat.
+type(control_parameters) :: control_pars
 
-integer :: i,j, ios, n_row, n_col, nads
-character(len=120) fname
-character(len= 10) fmt1
+character(len=max_string_length) file_name_base
 
+
+! Take a file name base
 select case (iargc())
     case(1)
-      call getarg(1,fname)
+      call getarg(1,file_name_base)
     case default
       stop "Wrong number of arguments"
 end select
 
-! read nlat from first line of input file
-call open_for_read(5, trim(fname)//'.in' )
-read (5,*) n_row, n_col, nads
-print *, 'n_row = ',n_row, 'n_col = ',n_col
-print *, 'n_ads = ', nads
+control_pars = control_parameters_init(file_name_base)
 
 !   initialize lat1
-lat1 = mc_lat_init(n_row,n_col,nads)
+!latattice = mc_lat_init(n_row,n_col,nads)
 
   ! read occupations
 !  do i=1,n_row
 !    read(5,*) (lat1%occupations(i,j,1), j=1,n_col)
 !  end do
 
-  lat1%occupations(1,1,1) = 1
-  lat1%occupations(3,4,2) = 2
-  lat1%occupations(2,1,3) = 3
-  lat1%occupations(1,3,4) = 4
-  lat1%occupations(4,5,5) = 5
-  lat1%occupations(4,4,6) = 6
-
-  call lat1%print_ads
+!  lat1%occupations(1,1,1) = 1
+!  lat1%occupations(3,4,2) = 2
+!  lat1%occupations(2,1,3) = 3
+!  lat1%occupations(1,3,4) = 4
+!  lat1%occupations(4,5,5) = 5
+!  lat1%occupations(4,4,6) = 6
+!
+!  call lat1%print_ads
 
 
 !! Read in simulation parameters
@@ -113,62 +51,6 @@ lat1 = mc_lat_init(n_row,n_col,nads)
 !end select
 !
 !
-!call open_for_read(inp_unit, trim(fname)//'.inp' )
-!ios = 0
-!do while (ios == 0)
-!
-!        read(inp_unit, '(A)', iostat=ios) buffer
-!        if (ios == 0) then
-!
-!        ! Find the first instance of whitespace.  Split label and data.
-!            pos1 = scan(buffer, ' ')
-!            label = buffer(1:pos1)
-!            buffer = buffer(pos1+1:)
-!
-!            select case (label)
-!            case('algorithm')
-!                read(buffer,*,iostat=ios) algorithm
-!            case('nlat')
-!                read(buffer,*,iostat=ios) nlat
-!            case('step_period')
-!                read(buffer,*,iostat=ios) step_period
-!            case('temperature')
-!                read(buffer,*,iostat=ios) temperature
-!                beta = 1.0d0/temperature ! thermodynamic temperature
-!            case('coverage')
-!                read(buffer,*,iostat=ios) coverage
-!            case('energy')
-!                read(buffer,*,iostat=ios) energy_file
-!                energy_file = trim(energy_file)
-!!            case('eps')
-!!                read(buffer,*,iostat=ios) eps
-!!                eps = eps * eV2K
-!            case('save_period')
-!                read(buffer,*,iostat=ios) save_period
-!            case('ini_conf')
-!                read(buffer,*,iostat=ios) cfg_fname
-!            case('mmc_hist_period')
-!                read(buffer,*,iostat=ios) hist_period
-!            case('mmc_nsteps')
-!                read(buffer,*,iostat=ios) nsteps
-!            case('kmc_ntrajs')
-!                read(buffer,*,iostat=ios) ntrajs
-!            case('kmc_time')
-!                read(buffer,*,iostat=ios) t_end
-!            case('kmc_nbins')
-!                read(buffer,*,iostat=ios) n_bins
-!            case('kmc_rates')
-!                read(buffer,*,iostat=ios) rate_file
-!                rate_file = trim(rate_file)
-!            case default
-!                if (label(1:1) /= '!')&
-!                    print *, 'Skipping invalid label at line', label
-!            end select
-!        end if
-!
-!end do ! ios
-!
-!close(inp_unit)
 !
 !! Number of adsorbate particles
 !nads = nint(coverage*nlat*nlat)
