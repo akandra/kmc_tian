@@ -26,18 +26,28 @@ subroutine lower_case(str)
 
 end subroutine lower_case
 
-subroutine split_string ( line, words, nw )
+subroutine split_string ( line, words, nw, comment_character )
 
   character(*), intent(in)  :: line
   character(*), intent(out) :: words(:)
   integer,      intent(out) :: nw
+  character, optional       :: comment_character
+
   character(len(words)) :: buf( size(words) )
+  character :: cc
   integer :: i, ios
+
+  if (present(comment_character)) then
+    cc = comment_character
+  else
+    cc = '!'
+  end if
 
   nw = 0 ; words(:) = ""
   do i = 1, size(words)
       read( line, *, iostat=ios ) buf( 1 : i )
       if ( ios /= 0 ) exit
+      if ( buf(i)(1:1) == cc ) exit
       nw = i
       words( 1 : nw ) = buf( 1 : nw )
   enddo

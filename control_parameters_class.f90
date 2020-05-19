@@ -56,10 +56,13 @@ contains
     character(len=max_string_length), intent(in) :: file_name_base
 
     character(len=*), parameter :: err = "Error in the control file: "
+    character(len=*), parameter :: warning = "Control file: "
 
-    integer :: ios, nwords
+    integer :: i, ios, nwords
     character(len=max_string_length) :: buffer
     character(len=max_string_length) :: words(100)
+
+    real(dp),allocatable :: coverage(:)
 
 
 
@@ -97,51 +100,102 @@ contains
       if (ios == 0) then
 
         ! Split an input string
+        words = ''
         call split_string(buffer, words, nwords)
 
         select case (words(1)) ! take a keyword
 
           case('algorithm')
 
-            if (control_parameters_init%algorithm /= '')&
-              stop err // "Multiple use of the algorithm key"
-
+            if (nwords/=2) stop err // "algorithm must have 1 parameter."
             read(words(2),'(A)') control_parameters_init%algorithm
+            !print*, 'algorithm is .',control_parameters_init%algorithm,'.'
 
-            print*, 'algorithm is .',control_parameters_init%algorithm,'.'
+          case('nlat')
 
-!          case('nlat')
-!              read(buffer,*,iostat=ios) nlat
-!          case('step_period')
-!              read(buffer,*,iostat=ios) step_period
-!          case('temperature')
-!              read(buffer,*,iostat=ios) temperature
-!              beta = 1.0d0/temperature ! thermodynamic temperature
-!          case('coverage')
-!              read(buffer,*,iostat=ios) coverage
-!          case('energy')
-!              read(buffer,*,iostat=ios) energy_file
-!              energy_file = trim(energy_file)
-!          case('save_period')
-!              read(buffer,*,iostat=ios) save_period
-!          case('ini_conf')
-!              read(buffer,*,iostat=ios) cfg_fname
-!          case('mmc_hist_period')
-!              read(buffer,*,iostat=ios) hist_period
-!          case('mmc_nsteps')
-!              read(buffer,*,iostat=ios) nsteps
-!          case('kmc_ntrajs')
-!              read(buffer,*,iostat=ios) ntrajs
-!          case('kmc_time')
-!              read(buffer,*,iostat=ios) t_end
-!          case('kmc_nbins')
-!              read(buffer,*,iostat=ios) n_bins
-!          case('kmc_rates')
-!              read(buffer,*,iostat=ios) rate_file
-!              rate_file = trim(rate_file)
-!          case default
-!              if (label(1:1) /= '!')&
-!                  print *, 'Skipping invalid label at line', label
+            select case (nwords)
+
+              case (2)
+                read(words(2),*) control_parameters_init%n_rows
+                control_parameters_init%n_cols = control_parameters_init%n_rows
+
+              case (3)
+                read(words(2),*) control_parameters_init%n_rows
+                read(words(3),*) control_parameters_init%n_cols
+
+              case default
+                stop err // "nlat must have 1 or 2 parameters."
+
+            end select
+
+          case('step_period')
+
+            if (nwords/=2) stop err // "step_period must have 1 parameter."
+            read(words(2),*) control_parameters_init%step_period
+
+          case('adsorbates')
+
+            if (nwords==1) stop err // "adsorbates must have at least 1 parameter."
+            control_parameters_init%n_species = nwords - 1
+            allocate(control_parameters_init%ads_names(nwords - 1))
+            do i=1,nwords-1
+              read(words(i+1),*) control_parameters_init%ads_names(i)
+            end do
+
+          case('coverages')
+
+            if (nwords==1) stop err // "coverages must have at least 1 parameter."
+            control_parameters_init%n_species = nwords - 1
+            allocate(coverage(nwords - 1))
+            do i=1,nwords-1
+              read(words(i+1),*) coverage(i)
+            end do
+
+          case('temperature')
+
+            if (nwords/=2) stop err // "temperature must have 1 parameter."
+            read(words(2),*) control_parameters_init%temperature
+
+          case('energy')
+            if (nwords/=2) stop err // "energy must have 1 parameter."
+            read(words(2),*) control_parameters_init%energy_file_name
+
+          case('start_conf')
+            if (nwords/=2) stop err // "start_conf must have 1 parameter."
+            read(words(2),*) control_parameters_init%cfg_file_name
+
+          case('save_period')
+            if (nwords/=2) stop err // "save_period must have 1 parameter."
+            read(words(2),*) control_parameters_init%save_period
+
+          case('mmc_nsteps')
+            if (nwords/=2) stop err // "mmc_nsteps must have 1 parameter."
+            read(words(2),*) control_parameters_init%n_mmc_steps
+
+          case('mmc_hist_period')
+            if (nwords/=2) stop err // "mmc_hist_period must have 1 parameter."
+            read(words(2),*) control_parameters_init%hist_period
+
+          case('kmc_ntrajs')
+            if (nwords/=2) stop err // "kmc_ntrajs_period must have 1 parameter."
+            read(words(2),*) control_parameters_init%n_trajs
+
+          case('kmc_time')
+            if (nwords/=2) stop err // "kmc_time must have 1 parameter."
+            read(words(2),*) control_parameters_init%t_end
+
+          case('kmc_nbins')
+            if (nwords/=2) stop err // "kmc_nbins must have 1 parameter."
+            read(words(2),*) control_parameters_init%n_bins
+
+          case('kmc_rates')
+            if (nwords/=2) stop err // "kmc_rates must have 1 parameter."
+            read(words(2),*) control_parameters_init%rate_file_name
+
+          case('')
+
+          case default
+            print *, warning // 'Skipping invalid key ', trim(words(1))
         end select
 
       end if
@@ -150,6 +204,14 @@ contains
 
     close(inp_unit)
 
+    ! Check the input consistency
+    if (size(coverage) /= size(control_parameters_init%ads_names))&
+      stop err // "adsorbates and coverages are inconsistent"
+
+    allocate(control_parameters_init%n_ads(control_parameters_init%n_species))
+    ! Calculate number of adsorbate particles
+    control_parameters_init%n_ads = nint(coverage*control_parameters_init%n_rows&
+                                                 *control_parameters_init%n_cols)
 
   end function
 

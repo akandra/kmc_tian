@@ -22,6 +22,8 @@ end select
 
 control_pars = control_parameters_init(file_name_base)
 
+print*, control_pars
+
 !   initialize lat1
 !latattice = mc_lat_init(n_row,n_col,nads)
 
@@ -40,20 +42,6 @@ control_pars = control_parameters_init(file_name_base)
 !  call lat1%print_ads
 
 
-!! Read in simulation parameters
-!
-!select case (iargc())
-!
-!case(1)
-!    call getarg(1,fname)
-!case default
-!    stop "Wrong number of arguments"
-!end select
-!
-!
-!
-!! Number of adsorbate particles
-!nads = nint(coverage*nlat*nlat)
 !
 !! Consistency checks
 !
