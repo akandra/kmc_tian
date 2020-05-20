@@ -2,12 +2,14 @@ program kmc_tian
 
 use mc_lat_class
 use control_parameters_class
+use  energy_parameters_class
 !use utilities
 
 implicit none
 
 type(mc_lat) :: lattice     ! Declare a variable of type mc_lat.
 type(control_parameters) :: control_pars
+type( energy_parameters) :: energy_pars
 
 character(len=max_string_length) file_name_base
 
@@ -24,22 +26,20 @@ control_pars = control_parameters_init(file_name_base)
 
 print*, control_pars
 
-!   initialize lat1
-!latattice = mc_lat_init(n_row,n_col,nads)
+energy_pars = energy_parameters_init(control_pars)
+
+print*, energy_pars
+
+!   initialize lattice
+!lattice = mc_lat_init(control_pars%n_rows,control_pars%n_cols,control_pars%n_ads)
 
   ! read occupations
 !  do i=1,n_row
 !    read(5,*) (lat1%occupations(i,j,1), j=1,n_col)
 !  end do
 
-!  lat1%occupations(1,1,1) = 1
-!  lat1%occupations(3,4,2) = 2
-!  lat1%occupations(2,1,3) = 3
-!  lat1%occupations(1,3,4) = 4
-!  lat1%occupations(4,5,5) = 5
-!  lat1%occupations(4,4,6) = 6
-!
-!  call lat1%print_ads
+  lattice%occupations(1,1) = 1
+  call lattice%print_ocs
 
 
 !

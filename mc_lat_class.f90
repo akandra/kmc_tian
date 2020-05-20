@@ -28,8 +28,8 @@ module mc_lat_class
     integer :: n_col       ! number of columns in 2D lattice
     integer :: n_ads_sites ! number of adsorbtion site in the unit cell
 
-    integer, dimension(:,:,:), allocatable  :: occupations  !  n_row x n_col x n_ads_sites
-    integer, dimension(:,:  ), allocatable  :: site_type   ! n_row x n_col
+    integer, dimension(:,:), allocatable  :: occupations  !  n_row x n_col x n_ads_sites
+    integer, dimension(:,:), allocatable  :: site_type   ! n_row x n_col
 
     integer :: n_nn      ! number of nearest neighbors (6 for hex lattice)
     integer, dimension(:,:), allocatable  :: nn_list
@@ -61,7 +61,7 @@ contains
     mc_lat_init%n_row = rows
     mc_lat_init%n_col = cols
 
-    ! Adsorption sites on the unit hex c ell
+    ! Adsorption sites on the unit hex cell
     !  T. . . . .B1 . . . . .           1 top       (T)
     !   .  .              .  .          2 fcc       (F)
     !    .     F         .    .         3 hcp       (H)
@@ -73,9 +73,10 @@ contains
     !          .. . . . . . . . . . .
     mc_lat_init%n_ads_sites = 6
 
-    allocate(mc_lat_init%occupations(rows,cols,mc_lat_init%n_ads_sites))
-    mc_lat_init%occupations = 0
+    allocate(mc_lat_init%occupations(rows,cols))
+!    allocate(mc_lat_init%occupations(rows,cols,mc_lat_init%n_ads_sites))
 
+    mc_lat_init%occupations = 0
     mc_lat_init%n_ads = 0
 
     mc_lat_init%n_nn = 6
@@ -111,13 +112,11 @@ contains
 !------------------------------------------------------------------------------
   subroutine mc_lat_print_ocs (this)
     class(mc_lat), intent(in) :: this
-    integer                   :: i,j,k
+    integer                   :: i,j
 
-    do k=1,this%n_ads_sites
-      print '(A3,A)', ads_site_names(k), ' occupations:'
-      do i=1,this%n_row
-        write(6,'(100i4)') (this%occupations(i,j,k), j=1,this%n_col)
-      end do
+    print '(A)',' occupations:'
+    do i=1,this%n_row
+      write(6,'(100i4)') (this%occupations(i,j), j=1,this%n_col)
     end do
     print *
   end subroutine mc_lat_print_ocs

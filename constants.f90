@@ -20,6 +20,15 @@ module constants
   integer(int8), parameter :: step_site    = 2
   integer(int8), parameter :: corner_site  = 3
 
+  ! Number of site types
+  integer, parameter :: n_site_types = 3
+
+  ! Maximum number of adsorption sites in the unit cell
+  integer, parameter :: n_ads_sites = 6
+
+  ! Maximum number of interaction parameters
+  integer, parameter :: n_shells = 3
+
   ! file units
   integer, parameter :: inp_unit     = 1
   integer, parameter :: outcfg_unit  = 10
