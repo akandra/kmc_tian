@@ -54,4 +54,17 @@ subroutine split_string ( line, words, nw, comment_character )
 
 end subroutine
 
+integer function get_index (key, keylist)
+  character(*), intent(in)  :: key
+  character(*), intent(in)  :: keylist(:)
+  integer                   :: i, index
+
+  index = 0
+  do i = 1,size(keylist)
+    if(key == keylist(i)) index=i
+  end do
+  get_index = index
+
+end function get_index
+
 end module utilities
