@@ -27,7 +27,7 @@ control_pars = control_parameters_init(file_name_base)
 
 energy_pars = energy_parameters_init(control_pars)
 
-!print*, energy_pars
+print*, energy_pars
 
 !   initialize lattice
 !lattice = mc_lat_init(control_pars%n_rows,control_pars%n_cols,control_pars%n_ads)
@@ -37,8 +37,8 @@ energy_pars = energy_parameters_init(control_pars)
 !    read(5,*) (lat1%occupations(i,j,1), j=1,n_col)
 !  end do
 
-  lattice%occupations(1,1) = 1
-  call lattice%print_ocs
+!  lattice%occupations(1,1) = 1
+!  call lattice%print_ocs
 
 
 !

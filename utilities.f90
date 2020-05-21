@@ -67,4 +67,21 @@ integer function get_index (key, keylist)
 
 end function get_index
 
+subroutine error(file_name, line_number, line, message)
+
+  character(*), intent(in) :: file_name, line, message
+  character(100) :: dummy
+  integer, intent(in) :: line_number
+
+  print*, '  Dear Sir/Madam, '
+  print*, 'It is my duty to inform you that you have an error'
+  print*, '  in file ', trim(file_name)
+  write(dummy,*) line_number
+  print*, '  line ' // trim(adjustl(dummy)) // ': ' // trim(line)
+  print*, '  reason: ',trim(message)
+  print*, 'Remaining your humble servant, K.M.C. Code'
+  stop
+
+end subroutine
+
 end module utilities

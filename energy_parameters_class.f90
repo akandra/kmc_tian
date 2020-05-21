@@ -13,7 +13,7 @@ module energy_parameters_class
     real(dp), dimension(:,:,:), allocatable :: ads_energy
     ! Interaction energy law id (n_species x n_species)
     integer, dimension(:,:), allocatable :: int_energy_law_id
-    ! Interaction energy (n_species x n_species x 3)
+    ! Interaction energy (n_species x n_species x n_shells)
     real(dp), dimension(:,:,:),allocatable :: int_energy_pars
 
   contains
@@ -37,12 +37,10 @@ contains
 
     type(control_parameters), intent(inout) :: control_pars
 
-    character(len=*), parameter :: err = "Error in the energy file: "
-    character(len=*), parameter :: warning = "energy file: "
-
-    integer :: i, ios, nwords, nwords1
+     integer :: i, ios, nwords, line_number, i1, i2
     character(len=max_string_length) :: buffer
-    character(len=max_string_length) :: words(100), words1(100)
+    character(len=max_string_length) :: words(100)
+    character(len=len(trim(control_pars%energy_file_name))) :: file_name
 
     character(len=10) :: current_species_name
     integer           :: current_species_id
@@ -52,6 +50,9 @@ contains
     integer           :: parse_state_adsorption   =1
     integer           :: parse_state_interaction  =2
 
+    integer,  parameter:: default_int = 0
+    real(dp), parameter:: default_dp  = huge(0.0_dp)
+
     logical :: found_it
 
 
@@ -60,21 +61,22 @@ contains
     allocate(energy_parameters_init%int_energy_law_id(i,i))
     allocate(energy_parameters_init%int_energy_pars(i,i,n_shells))
 
-    energy_parameters_init%ads_energy = huge(0.0_dp)
-!    energy_parameters_init%int_energy_law_id = ''
-    energy_parameters_init%int_energy_law_id = 0
-    energy_parameters_init%int_energy_pars = 0.0_dp
+    energy_parameters_init%ads_energy = default_dp
+    energy_parameters_init%int_energy_law_id = default_int
+    energy_parameters_init%int_energy_pars = default_dp
 
     !  read energy definitions from the input file
-
-    call open_for_read(inp_unit, trim(control_pars%energy_file_name) )
+    file_name = control_pars%energy_file_name
+    call open_for_read(inp_unit, file_name )
 
     ios = 0
     parse_state = parse_state_default
+    line_number = 0
 
     do while (ios == 0)
 
       read(inp_unit, '(A)', iostat=ios) buffer
+      line_number = line_number + 1
         ! ios < 0: end of record condition encountered or endfile condition detected
         ! ios > 0: an error is detected
         ! ios = 0  otherwise
@@ -88,29 +90,87 @@ contains
         select case (words(1)) ! take a keyword
 
           case('adsorption')
-
+            if (parse_state /= parse_state_default) &
+              call error(file_name, line_number, buffer, &
+                         "invalid ending of the adsorption/interaction section")
             parse_state = parse_state_adsorption
-            if (nwords/=2) stop err // "adsorption must have 1 parameter."
+            if (nwords/=2) call error(file_name, line_number, buffer, &
+                               "adsorption key must have 1 parameter")
 
             read(words(2),'(A)') current_species_name
             current_species_id = get_index(current_species_name, control_pars%ads_names )
-            if (current_species_id == 0) stop err // "Inconsistent adsorbate definition."
+            if (current_species_id == 0) call error(file_name, line_number, buffer, &
+                                                  "inconsistent adsorbate definition")
+!            print*, 'name     =', current_species_name
+!            print*, 'id       =', current_species_id
+!            print*, control_pars%ads_names
 
-            print*, 'name     =', current_species_name
-            print*, 'id       =', current_species_id
-            print*, control_pars%ads_names
+          case ('terrace','step','corner')
+             if (parse_state /= parse_state_adsorption) &
+              call error(file_name, line_number, buffer, "invalid site type statement")
+              i1 = get_index(words(1),    site_names)
+              i2 = get_index(words(2),ads_site_names)
+
+              if (energy_parameters_init%ads_energy(current_species_id,i1,i2 ) /= default_dp)&
+                call error(file_name, line_number, buffer, "duplicated entry")
+
+              read(words(3),*) energy_parameters_init%ads_energy(current_species_id,i1,i2 )
+!              print*, 'species  ' ,current_species_id, &
+!                      'site     ' ,get_index(words(1),    site_names),&
+!                      'ads_site ' ,get_index(words(2),ads_site_names)
+!              print*, 'energy:  ' ,energy_parameters_init%ads_energy&
+!                                    (current_species_id,&
+!                                     get_index(words(1),    site_names),&
+!                                     get_index(words(2),ads_site_names) )
+
+          case('interaction')
+            if (parse_state /= parse_state_default) &
+              call error(file_name, line_number, buffer, &
+                         "invalid ending of the adsorption/interaction section")
+            parse_state = parse_state_interaction
+            if (nwords/=1) call error(file_name, line_number, buffer, &
+                               "interaction key must have no parameters")
+
+          case('linear','sqrt')
+            if (parse_state /= parse_state_interaction) &
+              call error(file_name, line_number, buffer, &
+                        "invalid interaction law statement")
+            if (nwords/=3+n_shells) call error(file_name, line_number, buffer, &
+                              "interaction law key must have (3 + n_shells) parameters")
+            i1 = get_index(words(2),control_pars%ads_names)
+            i2 = get_index(words(3),control_pars%ads_names)
+            i  = get_index(words(1),int_law_names)
+            if (i1*i2 == 0) call error(file_name, line_number, buffer, &
+                              "wrong species name in the interaction law")
+            if (energy_parameters_init%int_energy_law_id(i1,i2) /= default_int)&
+                call error(file_name, line_number, buffer, "duplicated entry for species")
+            energy_parameters_init%int_energy_law_id(i1,i2) = i
+            energy_parameters_init%int_energy_law_id(i2,i1) = i
+            do i=1, n_shells
+              read(words(3+i),*) energy_parameters_init%int_energy_pars(i1,i2,i)
+              energy_parameters_init%int_energy_pars(i1,i2,i) = &
+                                  energy_parameters_init%int_energy_pars(i2,i1,i)
+            end do
+!            print*, 'int. law: ', energy_parameters_init%int_energy_law_id(i1,i2),&
+!                    ' for species 1:', i1,&
+!                    ' and species 2:', i2
+!            print'(A,3f16.3)', 'int. pars: ', energy_parameters_init%int_energy_pars(i1,i2,:)
+
+          case('')
+            if (buffer == '') then
+              parse_state = parse_state_default
+!              print*, 'blank line '
+!            else
+!              print*, 'comment: ', trim(buffer)
+            end if
 
           case default
-            print*, 'unprocessed line: ', trim(buffer)
+!            print*, 'unprocessed line: ', trim(buffer)
+            call error(file_name, line_number, buffer, "unknown key")
 
         end select
 
     end do ! while ios=0
-
-
-
-stop 123
-
 
     ! Check the input consistency
 
