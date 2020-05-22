@@ -73,7 +73,8 @@ subroutine error(file_name, line_number, line, message)
   character(100) :: dummy
   integer, intent(in) :: line_number
 
-  print*, '  Dear Sir/Madam, '
+  print*
+  print*, '---Dear Sir/Madam, '
   print*, 'It is my duty to inform you that you have an error'
   print*, '  in file ', trim(file_name)
   write(dummy,*) line_number

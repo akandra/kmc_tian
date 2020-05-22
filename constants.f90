@@ -15,20 +15,26 @@ module constants
   real(dp), parameter :: kB             = 8.61733238496e-5_dp       ! eV / K
   real(dp), parameter :: hbar           = 0.6582119514467406e-15_dp ! eV * s
 
+  !-------- Site type info ---------!
+
   ! Number of site types
   integer, parameter :: n_site_types = 3
-  ! Surface site types
+  ! List of site types
   character(len=10), dimension(n_site_types), parameter :: &
             site_names = ['terrace','step','corner']
+  ! Site type ids
   integer, parameter :: terrace_site = 1
   integer, parameter :: step_site    = 2
   integer, parameter :: corner_site  = 3
 
+  !-------- Adsorption sites info ---------!
+
   ! Maximum number of adsorption sites in the unit cell
   integer, parameter :: n_ads_sites = 6
-  ! adsorption sites for the hexagonal lattice
+  ! List of adsorption sites for the hexagonal lattice
   character(len=3), dimension(n_ads_sites), parameter :: &
           ads_site_names = ['top','fcc','hcp','br1','br2','br3']
+  ! Adsorption site ids
   integer, parameter :: top_id = 1
   integer, parameter :: fcc_id = 2
   integer, parameter :: hcp_id = 3
@@ -36,11 +42,37 @@ module constants
   integer, parameter :: br2_id = 5
   integer, parameter :: br3_id = 6
 
+  !-------- Interaction energy laws ---------!
+
   ! List of interaction laws
   character(len=10), dimension(2), parameter :: &
           int_law_names = ['linear','sqrt']
   ! Maximum number of interaction parameters
+  ! defined by the number of shells
   integer, parameter :: n_shells = 3
+
+  !-------- Reactions info ---------!
+
+  ! Number of reaction types
+  integer, parameter :: n_reaction_types = 1
+  ! List of reaction types
+  character(len=10), dimension(n_reaction_types), parameter :: &
+            reaction_names = ['hopping']
+  ! Reaction ids
+  integer, parameter :: hopping_id = 1
+
+  !-------- Temperature dependences info ---------!
+
+  ! Number of temperature dependence equations
+  integer, parameter :: n_laws = 2
+  ! List of laws
+  character(len=20), dimension(n_laws), parameter :: &
+            law_names = ['Arrhenius',&
+                         'extArrhenius']
+  ! Law ids
+  integer, parameter :: Arrhenius_id   = 1
+  integer, parameter :: extArrhenius_id = 2
+
 
   ! file units
   integer, parameter :: inp_unit     = 1

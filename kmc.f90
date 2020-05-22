@@ -3,6 +3,7 @@ program kmc_tian
 use mc_lat_class
 use control_parameters_class
 use  energy_parameters_class
+use  rates_class
 !use utilities
 
 implicit none
@@ -10,6 +11,7 @@ implicit none
 type(mc_lat) :: lattice     ! Declare a variable of type mc_lat.
 type(control_parameters) :: control_pars
 type( energy_parameters) :: energy_pars
+type( rates_type)        :: rates
 
 character(len=max_string_length) file_name_base
 
@@ -22,12 +24,14 @@ select case (iargc())
 end select
 
 control_pars = control_parameters_init(file_name_base)
-
 !print*, control_pars
 
 energy_pars = energy_parameters_init(control_pars)
+!print*, energy_pars
 
-print*, energy_pars
+
+rates = rates_init(control_pars)
+!print*, energy_pars
 
 !   initialize lattice
 !lattice = mc_lat_init(control_pars%n_rows,control_pars%n_cols,control_pars%n_ads)
@@ -46,58 +50,6 @@ print*, energy_pars
 !
 !if (step_period > 0 .and. mod(nlat,step_period) /= 0)&
 !    stop "Error in the inp file: inconsistent nlat and step_period values"
-!
-!call open_for_read(inp_unit,energy_file)
-!
-!ios = 0
-!do while (ios == 0)
-!
-!        read(inp_unit, '(A)', iostat=ios) buffer
-!        if (ios == 0) then
-!
-!        ! Find the first instance of whitespace.  Split label and data.
-!            pos1 = scan(buffer, ' ')
-!            label = buffer(1:pos1)
-!            buffer = buffer(pos1+1:)
-!
-!            select case (label)
-!
-!            case('adsorption')
-!
-!                read(buffer,*,iostat=ios) &
-!                    ads_energy(terrace_site),&
-!                    ads_energy(   step_site),&
-!                    ads_energy( corner_site)
-!                if (ios /= 0) stop 'Error in energy file: adsorption'
-!                ads_energy = ads_energy*eV2K
-!
-!            case('interaction')
-!                read(buffer,*,iostat=ios)&
-!                    int_energy(terrace_site,terrace_site),&
-!                    int_energy(   step_site,   step_site),&
-!                    int_energy(terrace_site,   step_site),&
-!                    int_energy( corner_site, corner_site),&
-!                    int_energy(terrace_site, corner_site),&
-!                    int_energy(   step_site, corner_site)
-!                if (ios /= 0) stop 'Error in energy file: interaction'
-!
-!                int_energy(  step_site,terrace_site) = int_energy(terrace_site,  step_site)
-!                int_energy(corner_site,terrace_site) = int_energy(terrace_site,corner_site)
-!                int_energy(corner_site,   step_site) = int_energy(   step_site,corner_site)
-!
-!                int_energy = int_energy*eV2K
-!
-!            case default
-!                if (label(1:1) /= '!')&
-!                    print *, 'Skipping invalid label at line', label
-!
-!            end select
-!
-!        end if
-!
-!end do ! ios
-!
-!close(inp_unit)
 !
 !
 !

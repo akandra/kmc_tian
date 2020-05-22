@@ -53,9 +53,6 @@ contains
     integer,  parameter:: default_int = 0
     real(dp), parameter:: default_dp  = huge(0.0_dp)
 
-    logical :: found_it
-
-
     i = control_pars%n_species
     allocate(energy_parameters_init%ads_energy(i,n_site_types,n_ads_sites))
     allocate(energy_parameters_init%int_energy_law_id(i,i))
@@ -106,15 +103,19 @@ contains
 !            print*, control_pars%ads_names
 
           case ('terrace','step','corner')
-             if (parse_state /= parse_state_adsorption) &
+            if (parse_state /= parse_state_adsorption) &
               call error(file_name, line_number, buffer, "invalid site type statement")
-              i1 = get_index(words(1),    site_names)
-              i2 = get_index(words(2),ads_site_names)
 
-              if (energy_parameters_init%ads_energy(current_species_id,i1,i2 ) /= default_dp)&
+            i1 = get_index(words(1),    site_names)
+            i2 = get_index(words(2),ads_site_names)
+
+            if ( i1==0 .or. i2==0 ) &
+                call error(file_name, line_number, buffer, &
+                             "wrong species name in the adsorption section")
+            if (energy_parameters_init%ads_energy(current_species_id,i1,i2 ) /= default_dp)&
                 call error(file_name, line_number, buffer, "duplicated entry")
 
-              read(words(3),*) energy_parameters_init%ads_energy(current_species_id,i1,i2 )
+            read(words(3),*) energy_parameters_init%ads_energy(current_species_id,i1,i2 )
 !              print*, 'species  ' ,current_species_id, &
 !                      'site     ' ,get_index(words(1),    site_names),&
 !                      'ads_site ' ,get_index(words(2),ads_site_names)
@@ -140,7 +141,7 @@ contains
             i1 = get_index(words(2),control_pars%ads_names)
             i2 = get_index(words(3),control_pars%ads_names)
             i  = get_index(words(1),int_law_names)
-            if (i1*i2 == 0) call error(file_name, line_number, buffer, &
+            if ( i1==0 .or. i2==0 ) call error(file_name, line_number, buffer, &
                               "wrong species name in the interaction law")
             if (energy_parameters_init%int_energy_law_id(i1,i2) /= default_int)&
                 call error(file_name, line_number, buffer, "duplicated entry for species")
