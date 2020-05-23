@@ -18,7 +18,7 @@ module rates_class
 
   contains
 
-!    procedure :: read  => control_parameters_read
+    procedure ::  print_r_hop
 
   end type
 
@@ -101,9 +101,9 @@ contains
             current_law_id = get_index(words(3), law_names )
             if (current_law_id == 0) call error(file_name, line_number, buffer, &
                                                   "unknown temperature law")
-            print*, 'name     =', current_species_name
-            print*, 'id       =', current_species_id
-            print*, control_pars%ads_names
+!            print*, 'name     =', current_species_name
+!            print*, 'id       =', current_species_id
+!            print*, control_pars%ads_names
 
           case ('terrace','step','corner')
 
@@ -130,7 +130,7 @@ contains
                     read(words(5),*) pars(1)
                     read(words(6),*) pars(2)
                     rates_init%r_hop(current_species_id,i1,i2,i3,i4 ) = &
-                                0.0_dp ! arrhenius(control_pars%temperature, pars(1:2))
+                                arrhenius(control_pars%temperature, pars(1:2))
                     rates_init%r_hop(current_species_id,i3,i4,i1,i2 ) = &
                     rates_init%r_hop(current_species_id,i1,i2,i3,i4 )
 
@@ -141,7 +141,7 @@ contains
                     read(words(6),*) pars(2)
                     read(words(7),*) pars(3)
                     rates_init%r_hop(current_species_id,i1,i2,i3,i4 ) = &
-                                0.0_dp ! extarrhenius(control_pars%temperature, pars(1:3))
+                                extArrhenius(control_pars%temperature, pars(1:3))
                     rates_init%r_hop(current_species_id,i3,i4,i1,i2 ) = &
                     rates_init%r_hop(current_species_id,i1,i2,i3,i4 )
 
@@ -150,12 +150,12 @@ contains
 
                 end select
 
-                 print*, 'reaction: ', reaction_names(parse_state),&
-                        ' for species:', current_species_name
-                 print*, 'law: ', law_names(current_law_id),&
-                        ' from:', site_names(i1),ads_site_names(i2),&
-                        ' to:'  , site_names(i3),ads_site_names(i4)
-                print'(A,3f16.3)', 'with pars: ', pars
+!                 print*, 'reaction: ', reaction_names(parse_state),&
+!                        ' for species:', current_species_name
+!                 print*, 'law: ', law_names(current_law_id),&
+!                        ' from:', site_names(i1),ads_site_names(i2),&
+!                        ' to:'  , site_names(i3),ads_site_names(i4)
+!                print'(A,3f16.3)', 'with pars: ', pars
 
               case default
                 call error(file_name, line_number, buffer, "invalid site type statement")
@@ -166,13 +166,12 @@ contains
           case('')
             if (buffer == '') then
               parse_state = parse_state_default
-              print*, 'blank line '
-            else
-              print*, 'comment: ', trim(buffer)
+!              print*, 'blank line '
+!            else
+!              print*, 'comment: ', trim(buffer)
             end if
 
           case default
-            print*, 'unprocessed line: ', trim(buffer)
             call error(file_name, line_number, buffer, "unknown key")
 
         end select
@@ -183,14 +182,61 @@ contains
 
   end function
 
-!real(8) function arrhenius(temperature, prefactor, act_energy)
-!
-!real(8), intent(in) :: temperature, prefactor, act_energy
-!
-!    arrhenius = prefactor*exp(-act_energy/temperature)
-!
-!
-!end function
+  ! Print the rates
 
+ subroutine print_r_hop(this, control_pars)
+
+    class(rates_type), intent(in) :: this
+
+    class(control_parameters), intent(in) :: control_pars
+
+    integer :: i, i1, i2, i3, i4
+
+    print*, 'Hopping Rates:'
+    do i=1,size(this%r_hop,1)
+      print '(/A)','---------------------------'
+      print '( A,A)','species: ', control_pars%ads_names(i)
+      print '(A)', '---------------------------'
+      do i1=1,n_site_types
+      do i2=1,n_ads_sites
+      do i3=1,n_site_types
+        print'(A,A,2X,A,6e12.3)', site_names(i1), ads_site_names(i2), site_names(i3),&
+                (this%r_hop(i,i1,i2,i3,i4), i4=1,n_ads_sites)
+      end do
+      end do
+      end do
+    end do
+    print*
+
+  end subroutine
+  !------------ Temperature dependence laws ----------------!
+
+  real(dp) function arrhenius(temperature, parameters)
+
+    real(dp), intent(in) :: temperature
+    real(dp), dimension(:), intent(in) :: parameters
+    real(dp) :: prefactor, act_energy
+
+      prefactor  = parameters(1)
+      act_energy = parameters(2)
+
+      arrhenius = prefactor*exp(-act_energy/(kB*temperature))
+
+  end function
+
+  real(dp) function extArrhenius(temperature, parameters)
+
+    real(dp), intent(in) :: temperature
+    real(dp), dimension(:), intent(in) :: parameters
+    real(dp) :: prefactor, act_energy, power, kT
+
+      prefactor  = parameters(1)
+      act_energy = parameters(2)
+      power = parameters(3)
+      kT = kB*temperature
+
+      extArrhenius = prefactor*exp(-act_energy/kT)/(kT**power)
+
+  end function
 
 end module rates_class

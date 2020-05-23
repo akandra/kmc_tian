@@ -15,6 +15,7 @@ type( rates_type)        :: rates
 
 character(len=max_string_length) file_name_base
 
+
 ! Take a file name base
 select case (iargc())
     case(1)
@@ -23,15 +24,13 @@ select case (iargc())
       stop "Wrong number of arguments"
 end select
 
+! Read simulation parameters
 control_pars = control_parameters_init(file_name_base)
 !print*, control_pars
-
 energy_pars = energy_parameters_init(control_pars)
 !print*, energy_pars
-
-
 rates = rates_init(control_pars)
-!print*, energy_pars
+!call rates%print_r_hop(control_pars)
 
 !   initialize lattice
 !lattice = mc_lat_init(control_pars%n_rows,control_pars%n_cols,control_pars%n_ads)
