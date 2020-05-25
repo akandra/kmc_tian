@@ -33,15 +33,11 @@ rates = rates_init(control_pars)
 !call rates%print_r_hop(control_pars)
 
 !   initialize lattice
-!lattice = mc_lat_init(control_pars%n_rows,control_pars%n_cols,control_pars%n_ads)
+lattice = mc_lat_init(control_pars)
 
-  ! read occupations
-!  do i=1,n_row
-!    read(5,*) (lat1%occupations(i,j,1), j=1,n_col)
-!  end do
-
-!  lattice%occupations(1,1) = 1
-!  call lattice%print_ocs
+  call lattice%print_st
+  call lattice%print_ocs
+  call lattice%print_ads
 
 
 !
@@ -85,53 +81,9 @@ rates = rates_init(control_pars)
 !b1 = (/         1.0d0,       0.0d0/)
 !b2 = (/ cos(pi/3.0d0), sin(pi/3.0d0) /)
 !
-!site_type = terrace_site
-!! Define where steps are
-!if (step_period > 0) then
-!    do j=1,nlat,step_period
-!        site_type(:,j)   = step_site
-!        site_type(:,j+1) = corner_site
-!    end do
-!end if
-!
 !!print*
 !!write(*,cfg_fmt) transpose(site_type)
 !!stop
-!
-!if (cfg_fname=='') then
-!
-!    temp1D = 0
-!    do i=1,nads
-!        temp1D(i) = i
-!    end do
-!    occupations = reshape(temp1D,(/nlat,nlat/))
-!
-!else
-!
-!    call open_for_read(inp_unit,trim(cfg_fname))
-!    read(inp_unit,*) nlat_old, nads_old
-!    if (nlat_old /= nlat .OR. nads_old /= nads ) &
-!        stop 'Error: inconsistent input and configuration files'
-!    read(inp_unit,cfg_fmt) (occupations(i,:), i=1,nlat)
-!    close(inp_unit)
-!    print*
-!    print*,'    Dear Sir,'
-!    print*,'I would like to humbly notify you that the initial configuration is read from:'
-!    print*, trim(cfg_fname)
-!    print*,'Remaining your humble servant, K.M.C. Code'
-!    print*
-!
-!end if
-!
-!do j=1,nlat
-!do i=1,nlat
-!    k = occupations(i,j)
-!    if (k > 0) then
-!        ads_list(k,1) = i
-!        ads_list(k,2) = j
-!    end if
-!end do
-!end do
 !
 !hist = 0
 !hist_counter = 0
