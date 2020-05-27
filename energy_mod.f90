@@ -1,0 +1,92 @@
+module energy_mod
+
+  use mc_lat_class
+  use energy_parameters_class
+
+  implicit none
+
+contains
+
+real(dp) function energy(ref, lat, e_pars)
+
+  integer, intent(in)      :: ref
+  type(mc_lat), intent(in) :: lat
+  type(energy_parameters ), intent(in) :: e_pars
+
+  integer :: i, i_shell
+  integer :: ref_row, ref_col, ref_site, ref_id
+  integer :: row, col, id
+  real(8) :: energy_acc
+
+  ref_row  = lat%ads_list(ref)%row
+  ref_col  = lat%ads_list(ref)%col
+  ref_site = lat%ads_list(ref)%site
+  ref_id   = lat%ads_list(ref)%id
+
+  energy_acc = e_pars%ads_energy(ref_id, lat%site_type(ref_row,ref_col), ref_site)
+
+  do i_shell=1,n_shells
+  do i=1, lat%n_nn(i_shell) ! Sum up the int. energy over all nearest neighbors
+
+    row = modulo(ref_row + lat%shell_list(i_shell,i,1) - 1,lat%n_rows) + 1
+    col = modulo(ref_col + lat%shell_list(i_shell,i,2) - 1,lat%n_cols) + 1
+    id = lat%ads_list(lat%occupations(row,col))%id
+
+    if (lat%occupations(row,col) > 0) then
+
+      if (e_pars%int_energy_law_id(ref_id,id) /= linear_id) then
+        print'(A,i3,A)', "module energy.f90: function energy: interaction law with id = ", &
+                e_pars%int_energy_law_id(ref_id,id), ' is not yet implemented.'
+        stop
+      end if
+
+      energy_acc = energy_acc + e_pars%int_energy_pars(ref_id,id,i_shell)
+
+    end if
+
+  end do
+  end do
+
+  energy = energy_acc
+
+end function
+!
+!real(8) function total_energy(nlat, nads, nnn, occupations, site_type, &
+!                              ads_list, nn_list, ads_energy, int_energy)
+!
+!integer, intent(in) :: nlat, nads, nnn
+!integer, dimension(nlat,nlat), intent(in) :: occupations
+!integer(1), dimension(nlat,nlat), intent(in) :: site_type
+!integer, dimension(nads,2), intent(in) :: ads_list
+!integer, dimension(nnn,2), intent(in) :: nn_list
+!real(8), dimension(3), intent(in) :: ads_energy
+!real(8), dimension(3,3), intent(in) :: int_energy
+!
+!integer :: i, ic, jc, iads, jads
+!real(8) :: energy_acc
+!
+!    energy_acc = 0.0d0
+!    do inx=1,nads
+!
+!        iads = ads_list(inx,1)
+!        jads = ads_list(inx,2)
+!
+!        energy_acc = energy_acc + ads_energy(site_type(iads,jads))
+!
+!        do i=1, nnn/2 ! count interaction with neighbors once
+!
+!            ic = modulo(iads+nn_list(i,1)-1,nlat) + 1
+!            jc = modulo(jads+nn_list(i,2)-1,nlat) + 1
+!            if (occupations(ic,jc) > 0) &
+!                energy_acc = energy_acc +&
+!                        int_energy(site_type(iads,jads),site_type(ic,jc))
+!
+!        end do
+!
+!    end do
+!
+!    total_energy = energy_acc
+!
+!end function
+
+end module energy_mod

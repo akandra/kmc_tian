@@ -205,8 +205,14 @@ contains
     close(inp_unit)
 
     ! Check the input consistency
+
     if (size(coverage) /= size(control_parameters_init%ads_names))&
       stop err // "adsorbates and coverages are inconsistent"
+
+    if (control_parameters_init%step_period > 0 &
+        .and. mod(control_parameters_init%n_cols,&
+                  control_parameters_init%step_period) /= 0)&
+      stop err // "inconsistent number of columns (nlat's second value) and step_period."
 
     allocate(control_parameters_init%n_ads(control_parameters_init%n_species))
     ! Calculate number of adsorbate particles

@@ -2,8 +2,9 @@ program kmc_tian
 
 use mc_lat_class
 use control_parameters_class
-use  energy_parameters_class
-use  rates_class
+use energy_parameters_class
+use rates_class
+use mmc
 !use utilities
 
 implicit none
@@ -41,13 +42,6 @@ lattice = mc_lat_init(control_pars)
 
 
 !
-!! Consistency checks
-!
-!if (step_period > 0 .and. mod(nlat,step_period) /= 0)&
-!    stop "Error in the inp file: inconsistent nlat and step_period values"
-!
-!
-!
 !! configuration input/output format
 !write(cfg_fmt,'(i6)') nlat
 !cfg_fmt = '('//trim(adjustl(cfg_fmt))//'i8)'
@@ -56,12 +50,6 @@ lattice = mc_lat_init(control_pars)
 !
 !call open_for_write(outcfg_unit,trim(fname)//'.confs')
 !if (hist_period > 0) call open_for_write(outhst_unit,trim(fname)//'.hist')
-!
-!! allocate memory for arrays
-!allocate(occupations(nlat,nlat), site_type(nlat,nlat))
-!allocate(ads_list(nads,2), change_list(2*nnn),nn_new(nnn,nnn/2))
-!allocate(nn_list(nnn,2), nn_pos(nnn,2), nn_opps(nnn), temp1D(nlat*nlat))
-!allocate(cluster_label(nlat,nlat), cluster_sizes(nads), hist(nads))
 !
 
 !! List of opposite directions
@@ -76,14 +64,6 @@ lattice = mc_lat_init(control_pars)
 !end do
 !end do
 !
-!! Hexagonal transformation matrix
-!
-!b1 = (/         1.0d0,       0.0d0/)
-!b2 = (/ cos(pi/3.0d0), sin(pi/3.0d0) /)
-!
-!!print*
-!!write(*,cfg_fmt) transpose(site_type)
-!!stop
 !
 !hist = 0
 !hist_counter = 0
@@ -92,106 +72,14 @@ lattice = mc_lat_init(control_pars)
 !write(outcfg_unit,cfg_fmt) transpose(occupations)
 !
 !
-!select case (algorithm)
+select case (control_pars%algorithm)
 !
-!    case ('mmc')
-!
-!        call open_for_write(outeng_unit,trim(fname)//'.en')
-!        write(outeng_unit,*) 0,&
-!            total_energy(nlat, nads, nnn, occupations, site_type, &
-!                         ads_list, nn_list, ads_energy, int_energy)/eV2K
-!
-!!        write(*,cfg_fmt) transpose(site_type)
-!!        print*
-!!        write(*,cfg_fmt) transpose(occupations)
-!!        print*
-!!        print*,energy_file
-!!        write(*,'(3f12.3)') int_energy/eV2K
-!!        write(*,*) total_energy(nlat, nads, nnn, occupations, site_type, &
-!!                         ads_list, nn_list, ads_energy, int_energy)/eV2K
-!!        stop 33
-!
-!        !loop over mmc steps
-!        do istep=1, nsteps
-!
-!            do i=1, nads
-!
-!                energy_old = energy(i, nlat, nads, nnn, occupations, site_type, &
-!                                       ads_list, nn_list, ads_energy, int_energy)
-!
-!                ihop = floor(nnn*ran1()) + 1
-!
-!                i_new = modulo(ads_list(i,1) + nn_list(ihop,1)-1,nlat) + 1
-!                j_new = modulo(ads_list(i,2) + nn_list(ihop,2)-1,nlat) + 1
-!
-!                if (occupations(i_new, j_new) == 0) then
-!
-!                    i_old = ads_list(i,1)
-!                    j_old = ads_list(i,2)
-!
-!                    occupations(i_new,j_new) = i
-!                    occupations(i_old,j_old) = 0
-!                    ads_list(i,:) = (/i_new,j_new/)
-!
-!                    delta_E = energy(i, nlat, nads, nnn, occupations, site_type, &
-!                                     ads_list, nn_list, ads_energy, int_energy) &
-!                            - energy_old
-!
-!                    if (exp(- delta_E/temperature) < ran1()) then
-!
-!                        occupations(i_old,j_old) = i
-!                        occupations(i_new,j_new) = 0
-!                        ads_list(i,:) = (/i_old,j_old/)
-!
-!                    end if
-!
-!                end if
-!
-!            enddo
-!
-!!print*,istep, hist_period, mod(istep, hist_period)
-!
-!        if (hist_period > 0 .and. mod(istep, hist_period) == 0) then
-!            call hoshen_kopelman(cluster_label, largest_label, occupations, ads_list, &
-!                                                nn_list, nads, nlat, nnn)
-!
-!            call count_cluster_sizes(cluster_sizes, cluster_label,&
-!                                                                ads_list, nads, nlat)
-!
-!            hist_counter = hist_counter + 1
-!            do i=1,largest_label
-!                if (cluster_sizes(i) > 0) &
-!                    hist(cluster_sizes(i)) = hist(cluster_sizes(i)) + 1
-!            end do
-!
-!        !print*,largest_label
-!        !print*,cluster_sizes
-!        !print*
-!        !write(*,cfg_fmt) (cluster_label(m,:), m=1,nlat)
-!        !print*
-!        !write(*,cfg_fmt) hist
-!        !
-!
-!        end if
-!
-!            if (mod(istep, save_period) == 0) then
-!                print*, istep
-!                write(outcfg_unit,cfg_fmt) transpose(occupations)
-!                write(outeng_unit,*) istep-1,&
-!                    total_energy(nlat, nads, nnn, occupations, site_type, &
-!                                 ads_list, nn_list, ads_energy, int_energy)/eV2K
-!
-!                if (hist_period > 0) then
-!                    write(outhst_unit,*) hist_counter
-!                    write(outhst_unit,ads_fmt) hist
-!                end if
-!           end if
-!
-!        enddo
-!
-!        close(outeng_unit)
-!
-!    case ('kmc')
+  case ('mmc')
+
+    call metropolis(lattice, control_pars, energy_pars)
+
+
+  case ('kmc')
 !
 !        ! Read in the rates and
 !        ! construct an array of free-particle hopping rates
@@ -586,7 +474,7 @@ lattice = mc_lat_init(control_pars)
 !
 !    case default
 !        stop 'Error: mc algorithm not defined'
-!end select
+end select
 !
 !
 !close(outcfg_unit)
@@ -610,76 +498,7 @@ lattice = mc_lat_init(control_pars)
 
 end program
 
-!real(8) function energy(inx, nlat, nads, nnn, occupations, site_type, &
-!                        ads_list, nn_list, ads_energy, int_energy)
-!
-!integer, intent(in) :: inx, nlat, nads, nnn
-!integer, dimension(nlat,nlat), intent(in) :: occupations
-!integer(1), dimension(nlat,nlat), intent(in) :: site_type
-!integer, dimension(nads,2), intent(in) :: ads_list
-!integer, dimension(nnn,2), intent(in) :: nn_list
-!real(8), dimension(3), intent(in) :: ads_energy
-!real(8), dimension(3,3), intent(in) :: int_energy
-!
-!integer :: i, ic, jc, iads, jads
-!real(8) :: energy_acc
-!
-!        iads = ads_list(inx,1)
-!        jads = ads_list(inx,2)
-!
-!        energy_acc = ads_energy(site_type(iads,jads))
-!
-!        do i=1, nnn ! Sum up the int. energy over all nearest neighbors
-!
-!            ic = modulo(iads+nn_list(i,1)-1,nlat) + 1
-!            jc = modulo(jads+nn_list(i,2)-1,nlat) + 1
-!            if (occupations(ic,jc) > 0) &
-!                energy_acc = energy_acc +&
-!                        int_energy(site_type(iads,jads),site_type(ic,jc))
-!
-!        end do
-!
-!    energy = energy_acc
-!
-!end function
-!
-!real(8) function total_energy(nlat, nads, nnn, occupations, site_type, &
-!                              ads_list, nn_list, ads_energy, int_energy)
-!
-!integer, intent(in) :: nlat, nads, nnn
-!integer, dimension(nlat,nlat), intent(in) :: occupations
-!integer(1), dimension(nlat,nlat), intent(in) :: site_type
-!integer, dimension(nads,2), intent(in) :: ads_list
-!integer, dimension(nnn,2), intent(in) :: nn_list
-!real(8), dimension(3), intent(in) :: ads_energy
-!real(8), dimension(3,3), intent(in) :: int_energy
-!
-!integer :: i, ic, jc, iads, jads
-!real(8) :: energy_acc
-!
-!    energy_acc = 0.0d0
-!    do inx=1,nads
-!
-!        iads = ads_list(inx,1)
-!        jads = ads_list(inx,2)
-!
-!        energy_acc = energy_acc + ads_energy(site_type(iads,jads))
-!
-!        do i=1, nnn/2 ! count interaction with neighbors once
-!
-!            ic = modulo(iads+nn_list(i,1)-1,nlat) + 1
-!            jc = modulo(jads+nn_list(i,2)-1,nlat) + 1
-!            if (occupations(ic,jc) > 0) &
-!                energy_acc = energy_acc +&
-!                        int_energy(site_type(iads,jads),site_type(ic,jc))
-!
-!        end do
-!
-!    end do
-!
-!    total_energy = energy_acc
-!
-!end function
+
 !
 !integer function lfind(x, labels, nads)
 !
@@ -905,11 +724,3 @@ end program
 !
 !end subroutine
 !
-!real(8) function arrhenius(temperature, prefactor, act_energy)
-!
-!real(8), intent(in) :: temperature, prefactor, act_energy
-!
-!    arrhenius = prefactor*exp(-act_energy/temperature)
-!
-!
-!end function

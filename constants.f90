@@ -47,6 +47,9 @@ module constants
   ! List of interaction laws
   character(len=10), dimension(2), parameter :: &
           int_law_names = ['linear','sqrt']
+  ! Interaction energy law ids
+  integer, parameter :: linear_id = 1
+  integer, parameter :: sqrt_id   = 2
   ! Maximum number of interaction parameters
   ! defined by the number of shells
   integer, parameter :: n_shells = 3

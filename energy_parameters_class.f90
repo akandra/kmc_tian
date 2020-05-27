@@ -149,13 +149,13 @@ contains
             energy_parameters_init%int_energy_law_id(i2,i1) = i
             do i=1, n_shells
               read(words(3+i),*) energy_parameters_init%int_energy_pars(i1,i2,i)
-              energy_parameters_init%int_energy_pars(i1,i2,i) = &
-                                  energy_parameters_init%int_energy_pars(i2,i1,i)
+              energy_parameters_init%int_energy_pars(i2,i1,i) = &
+                                  energy_parameters_init%int_energy_pars(i1,i2,i)
             end do
-!            print*, 'int. law: ', energy_parameters_init%int_energy_law_id(i1,i2),&
-!                    ' for species 1:', i1,&
-!                    ' and species 2:', i2
-!            print'(A,3f16.3)', 'int. pars: ', energy_parameters_init%int_energy_pars(i1,i2,:)
+            print*, 'int. law: ', energy_parameters_init%int_energy_law_id(i1,i2),&
+                    ' for species 1:', i1,&
+                    ' and species 2:', i2
+            print'(A,3f16.3)', 'int. pars: ', energy_parameters_init%int_energy_pars(i1,i2,:)
 
           case('')
             if (buffer == '') then

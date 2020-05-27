@@ -24,9 +24,9 @@ module mc_lat_class
 
     integer, dimension(:,:), allocatable  :: occupations  !  n_rows x n_cols
     integer, dimension(:,:), allocatable  :: site_type    !  n_rows x n_cols
-
-    integer :: n_nn      ! number of nearest neighbors (6 for hex lattice)
-    integer, dimension(:,:), allocatable  :: nn_list
+    ! shellwise number of neighbors
+    integer, dimension(n_shells) :: n_nn
+    integer, dimension(:,:,:), allocatable  :: shell_list
 
     integer, dimension(:), allocatable :: n_ads  ! initial number of adsorbates
     type(adsorbate), dimension(:), allocatable  :: ads_list
@@ -71,7 +71,10 @@ contains
     !         . .                  .
     !          .. . . . . . . . . . .
 
-    mc_lat_init%n_nn = 6
+
+
+    ! Shellwise number of neighbors for hex lattice
+    mc_lat_init%n_nn = [6,6,6]
 
     ! NN list for the hexagonal structure
     !  11    12*   13*   14
@@ -82,14 +85,37 @@ contains
     !
     !           41    42    43    44
 
-    allocate(mc_lat_init%nn_list(mc_lat_init%n_nn,2))
-    mc_lat_init%nn_list(1,:) = (/ 0, 1/)
-    mc_lat_init%nn_list(2,:) = (/ 1, 0/)
-    mc_lat_init%nn_list(3,:) = (/ 1,-1/)
-    mc_lat_init%nn_list(4,:) = (/ 0,-1/)
-    mc_lat_init%nn_list(5,:) = (/-1, 0/)
-    mc_lat_init%nn_list(6,:) = (/-1, 1/)
+    allocate(mc_lat_init%shell_list(n_shells,maxval(mc_lat_init%n_nn),2))
+    ! Nearest-neigbour (1st) shell (d = 1))
+    mc_lat_init%shell_list(1,1,:) = (/ 0, 1/)
+    mc_lat_init%shell_list(1,2,:) = (/ 1, 0/)
+    mc_lat_init%shell_list(1,3,:) = (/ 1,-1/)
+    mc_lat_init%shell_list(1,4,:) = (/ 0,-1/)
+    mc_lat_init%shell_list(1,5,:) = (/-1, 0/)
+    mc_lat_init%shell_list(1,6,:) = (/-1, 1/)
+    ! Next-Nearest-neigbour (2nd) shell  (d = sqrt(3))
+    mc_lat_init%shell_list(2,1,:) = (/ 1, 1/)
+    mc_lat_init%shell_list(2,2,:) = (/ 2,-1/)
+    mc_lat_init%shell_list(2,3,:) = (/ 1,-2/)
+    mc_lat_init%shell_list(2,4,:) = (/-1,-1/)
+    mc_lat_init%shell_list(2,5,:) = (/-2, 1/)
+    mc_lat_init%shell_list(2,6,:) = (/-1, 2/)
+    ! Next-Next-Nearest-neigbour (3rd) shell  (d = 2)
+    mc_lat_init%shell_list(3,1,:) = (/ 0, 2/)
+    mc_lat_init%shell_list(3,2,:) = (/ 2, 0/)
+    mc_lat_init%shell_list(3,3,:) = (/ 2,-2/)
+    mc_lat_init%shell_list(3,4,:) = (/ 0,-2/)
+    mc_lat_init%shell_list(3,5,:) = (/-2, 0/)
+    mc_lat_init%shell_list(3,6,:) = (/-2, 2/)
 
+    ! Check the distances to the neibours
+!    print*, sqrt( &
+!                 ( mc_lat_init%shell_list(2,:,1)*cos(pi/3.0_dp) &
+!                  +mc_lat_init%shell_list(2,:,2)               )**2    &
+!                +                                                    &
+!                 ( mc_lat_init%shell_list(2,:,1)*sin(pi/3.0_dp))**2    &
+!        )
+!    stop
 
     mc_lat_init%n_ads_sites = n_ads_sites
 
