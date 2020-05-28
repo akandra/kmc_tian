@@ -36,6 +36,7 @@ module mc_lat_class
       procedure :: print_ocs  => mc_lat_print_ocs
       procedure :: print_st   => mc_lat_print_st
       procedure :: print_ads  => mc_lat_print_ads
+      procedure :: hop        => mc_lat_hop_with_pbc
 
   end type mc_lat
 
@@ -178,13 +179,11 @@ contains
     mc_lat_init%site_type = terrace_site
     ! Define where steps and corners are
     if ( control_pars%step_period > 0) then
-    do j=1,mc_lat_init%n_cols,control_pars%step_period
-        mc_lat_init%site_type(:,j)   = step_site
-        mc_lat_init%site_type(:,j+1) = corner_site
-    end do
-
-end if
-
+      do j=1,mc_lat_init%n_cols,control_pars%step_period
+          mc_lat_init%site_type(:,j)   = step_site
+          mc_lat_init%site_type(:,j+1) = corner_site
+      end do
+    end if
 
   end function
 
@@ -243,6 +242,23 @@ end if
 
   end subroutine mc_lat_print_ads
 
+!------------------------------------------------------------------------------
+!  subroutine pbc
+!  applies pbc
+!
+!------------------------------------------------------------------------------
+  subroutine mc_lat_hop_with_pbc(this,i,ihop, row, col)
+
+    class(mc_lat), intent(in) :: this
+    integer, intent(in)  :: i, ihop
+    integer, intent(out) :: row, col
+
+    row = modulo(this%ads_list(i)%row &
+               + this%shell_list(1,ihop,1) - 1, this%n_rows) + 1
+    col = modulo(this%ads_list(i)%col &
+               + this%shell_list(1,ihop,2) - 1, this%n_cols) + 1
+
+  end subroutine
 
 
 end module mc_lat_class

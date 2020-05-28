@@ -13,7 +13,7 @@ real(dp) function energy(ref, lat, e_pars)
   type(mc_lat), intent(in) :: lat
   type(energy_parameters ), intent(in) :: e_pars
 
-  integer :: i, i_shell
+  integer :: i, i_shell, i_n
   integer :: ref_row, ref_col, ref_site, ref_id
   integer :: row, col, id
   real(8) :: energy_acc
@@ -25,27 +25,35 @@ real(dp) function energy(ref, lat, e_pars)
 
   energy_acc = e_pars%ads_energy(ref_id, lat%site_type(ref_row,ref_col), ref_site)
 
-  do i_shell=1,n_shells
-  do i=1, lat%n_nn(i_shell) ! Sum up the int. energy over all nearest neighbors
+  if (e_pars%is_interaction) then
 
-    row = modulo(ref_row + lat%shell_list(i_shell,i,1) - 1,lat%n_rows) + 1
-    col = modulo(ref_col + lat%shell_list(i_shell,i,2) - 1,lat%n_cols) + 1
-    id = lat%ads_list(lat%occupations(row,col))%id
+    do i_shell=1,n_shells
+    do i=1, lat%n_nn(i_shell) ! Sum up the int. energy over all nearest neighbors
 
-    if (lat%occupations(row,col) > 0) then
+      row = modulo(ref_row + lat%shell_list(i_shell,i,1) - 1,lat%n_rows) + 1
+      col = modulo(ref_col + lat%shell_list(i_shell,i,2) - 1,lat%n_cols) + 1
+      i_n = lat%occupations(row,col)
 
-      if (e_pars%int_energy_law_id(ref_id,id) /= linear_id) then
-        print'(A,i3,A)', "module energy.f90: function energy: interaction law with id = ", &
-                e_pars%int_energy_law_id(ref_id,id), ' is not yet implemented.'
-        stop
+      if (i_n > 0) then
+
+        id = lat%ads_list(i_n)%id
+        if (e_pars%int_energy_skip(ref_id,id,i_shell)) cycle
+
+        if (e_pars%int_energy_law_id(ref_id,id) /= linear_id) then
+          print'(A,i3,A)', "module energy.f90: function energy: interaction law with id = ", &
+                  e_pars%int_energy_law_id(ref_id,id), ' is not yet implemented.'
+          stop
+
+        end if
+
+        energy_acc = energy_acc + e_pars%int_energy_pars(ref_id,id,i_shell)
+
       end if
 
-      energy_acc = energy_acc + e_pars%int_energy_pars(ref_id,id,i_shell)
+    end do
+    end do
 
-    end if
-
-  end do
-  end do
+  end if
 
   energy = energy_acc
 

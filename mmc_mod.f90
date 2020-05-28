@@ -15,7 +15,7 @@ subroutine metropolis(lat, c_pars, e_pars)
   type(energy_parameters ), intent(in) :: e_pars
 
 
-  integer :: i, istep, n_ads_total
+  integer :: i, istep, ihop, n_ads_total, new_row, new_col
   real(dp) :: energy_old
 
 !
@@ -45,14 +45,20 @@ subroutine metropolis(lat, c_pars, e_pars)
     do i=1, n_ads_total
 
       energy_old = energy(i, lat, e_pars)
-      print *, energy_old
-      pause
-!
-!                ihop = floor(nnn*ran1()) + 1
-!
-!                i_new = modulo(ads_list(i,1) + nn_list(ihop,1)-1,nlat) + 1
-!                j_new = modulo(ads_list(i,2) + nn_list(ihop,2)-1,nlat) + 1
-!
+!      print *, energy_old
+!      pause
+      ! We consider hops to the nearest-neighbor cells only
+      ! And we doubt that we ever need something else
+      ihop = floor(lat%n_nn(1)*ran1()) + 1
+
+      call lat%hop(i,ihop,new_row,new_col)
+
+WE ARE HERE!
+
+      print*, new_row,new_col
+      stop 111
+
+
 !                if (occupations(i_new, j_new) == 0) then
 !
 !                    i_old = ads_list(i,1)

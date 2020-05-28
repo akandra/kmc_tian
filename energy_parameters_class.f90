@@ -15,6 +15,12 @@ module energy_parameters_class
     integer, dimension(:,:), allocatable :: int_energy_law_id
     ! Interaction energy (n_species x n_species x n_shells)
     real(dp), dimension(:,:,:),allocatable :: int_energy_pars
+    ! Interaction energy mask (n_species x n_species x n_shells)
+    ! .true. means to skip interaction
+    logical, dimension(:,:,:),allocatable :: int_energy_skip
+    !
+    logical :: is_interaction
+
 
   contains
 
@@ -57,10 +63,13 @@ contains
     allocate(energy_parameters_init%ads_energy(i,n_site_types,n_ads_sites))
     allocate(energy_parameters_init%int_energy_law_id(i,i))
     allocate(energy_parameters_init%int_energy_pars(i,i,n_shells))
+    allocate(energy_parameters_init%int_energy_skip(i,i,n_shells))
 
     energy_parameters_init%ads_energy = default_dp
     energy_parameters_init%int_energy_law_id = default_int
     energy_parameters_init%int_energy_pars = default_dp
+    energy_parameters_init%int_energy_skip = .true.
+    energy_parameters_init%is_interaction  = .false.
 
     !  read energy definitions from the input file
     file_name = control_pars%energy_file_name
@@ -148,14 +157,19 @@ contains
             energy_parameters_init%int_energy_law_id(i1,i2) = i
             energy_parameters_init%int_energy_law_id(i2,i1) = i
             do i=1, n_shells
-              read(words(3+i),*) energy_parameters_init%int_energy_pars(i1,i2,i)
+              if (read_num(words(3+i),energy_parameters_init%int_energy_pars(i1,i2,i)))&
+                energy_parameters_init%int_energy_skip(i1,i2,i) = .false.
+!              read(words(3+i),*) energy_parameters_init%int_energy_pars(i1,i2,i)
               energy_parameters_init%int_energy_pars(i2,i1,i) = &
                                   energy_parameters_init%int_energy_pars(i1,i2,i)
+              energy_parameters_init%int_energy_skip(i2,i1,i) = &
+                                  energy_parameters_init%int_energy_skip(i1,i2,i)
             end do
-            print*, 'int. law: ', energy_parameters_init%int_energy_law_id(i1,i2),&
-                    ' for species 1:', i1,&
-                    ' and species 2:', i2
-            print'(A,3f16.3)', 'int. pars: ', energy_parameters_init%int_energy_pars(i1,i2,:)
+!            print*, 'int. law: ', energy_parameters_init%int_energy_law_id(i1,i2),&
+!                    ' for species 1:', i1,&
+!                    ' and species 2:', i2
+!            print'(A,3e16.8,3L)', 'int. pars: ', energy_parameters_init%int_energy_pars(i1,i2,:)&
+!                                              , energy_parameters_init%int_energy_skip(i1,i2,:)
 
           case('')
             if (buffer == '') then
@@ -173,6 +187,8 @@ contains
 
     end do ! while ios=0
 
+    energy_parameters_init%is_interaction = &
+              any(.not.energy_parameters_init%int_energy_skip)
     ! Check the input consistency
 
   end function

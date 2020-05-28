@@ -1,8 +1,14 @@
 module utilities
 
+  use constants
+
   implicit none
 
 contains
+
+!-----------------------------------------------------
+! Random numbers generators
+!-----------------------------------------------------
 
 function ran1()  !returns random number between 0 - 1
 
@@ -11,6 +17,10 @@ function ran1()  !returns random number between 0 - 1
     ran1 = x
 
 end function ran1
+
+!-----------------------------------------------------
+! Subs and function dealing with strings
+!-----------------------------------------------------
 
 subroutine lower_case(str)
 
@@ -53,6 +63,22 @@ subroutine split_string ( line, words, nw, comment_character )
   enddo
 
 end subroutine
+
+logical function read_num(string, x)
+  implicit none
+
+  character(len=*), intent(in) :: string
+  real(dp), intent(out) :: x
+  integer :: error_code
+
+  read(string,*,iostat=error_code) x
+  read_num = error_code == 0
+
+end function read_num
+
+!-----------------------------------------------------
+! Miscellaneous
+!-----------------------------------------------------
 
 integer function get_index (key, keylist)
   character(*), intent(in)  :: key
