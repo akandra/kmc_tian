@@ -20,7 +20,8 @@ module control_parameters_class
     real(dp):: temperature          ! in K
     character(len=max_string_length) ::&
                    energy_file_name,& ! name of the file with adsorption and interaction energies
-                   cfg_file_name      ! name of the file with initial configuration
+                   cfg_file_name,   & ! name of the file with initial configuration
+                   file_name_base     ! filename base for output files
 
     ! MMC-specific parameters
 
@@ -76,6 +77,7 @@ contains
     control_parameters_init%temperature      = -1.0_dp
     control_parameters_init%energy_file_name = 'none'
     control_parameters_init%cfg_file_name    = 'none'
+    control_parameters_init%file_name_base   = 'none'
     ! MMC-specific parameters
     control_parameters_init%n_mmc_steps      = -1
     control_parameters_init%hist_period      = -1
@@ -85,8 +87,8 @@ contains
     control_parameters_init%t_end            = -1.0_dp
     control_parameters_init%rate_file_name   = 'none'
 
+    control_parameters_init%file_name_base = file_name_base
     !  read control parameters from the input file
-
     call open_for_read(inp_unit, trim(file_name_base)//'.in' )
 
     ios = 0

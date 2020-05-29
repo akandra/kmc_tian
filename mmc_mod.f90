@@ -10,19 +10,31 @@ contains
 
 subroutine metropolis(lat, c_pars, e_pars)
 
-  type(mc_lat), intent(in) :: lat
+  type(mc_lat), intent(inout) :: lat
   type(control_parameters), intent(in) :: c_pars
   type(energy_parameters ), intent(in) :: e_pars
 
 
-  integer :: i, istep, ihop, n_ads_total, new_row, new_col
-  real(dp) :: energy_old
+  integer :: i, istep, ihop
+  integer :: new_row, new_col, old_row, old_col
+  real(dp) :: energy_old, beta, delta_E
 
-!
-!        call open_for_write(outeng_unit,trim(fname)//'.en')
-!        write(outeng_unit,*) 0,&
-!            total_energy(nlat, nads, nnn, occupations, site_type, &
-!                         ads_list, nn_list, ads_energy, int_energy)/eV2K
+  ! inverse thermodynamic temperature
+  beta = 1.0_dp/(kB*c_pars%temperature)
+
+  ! write a state of the lattice to a file
+  call open_for_write(outcfg_unit,trim(c_pars%file_name_base)//'.confs')
+
+  write(outcfg_unit,*) lat%n_rows, lat%n_cols,&
+    "! (number of rows) x  (number of columns)"
+  write(outcfg_unit,*) 0, lat%n_ads_tot(),&
+    "! mmc_step and total number of adsorbates"
+  call lat%print_ads(outcfg_unit)
+
+  ! write total energy of the system
+  call open_for_write(outeng_unit,trim(c_pars%file_name_base)//'.en')
+
+        write(outeng_unit,*) 0, total_energy(lat,e_pars)
 !
 !!        write(*,cfg_fmt) transpose(site_type)
 !!        print*
@@ -37,12 +49,7 @@ subroutine metropolis(lat, c_pars, e_pars)
   !loop over mmc steps
   do istep=1, c_pars%n_mmc_steps
 
-    n_ads_total = 0
-    do i=1,c_pars%n_species
-      n_ads_total = n_ads_total + lat%n_ads(i)
-    end do
-
-    do i=1, n_ads_total
+    do i=1, lat%n_ads_tot()
 
       energy_old = energy(i, lat, e_pars)
 !      print *, energy_old
@@ -53,35 +60,28 @@ subroutine metropolis(lat, c_pars, e_pars)
 
       call lat%hop(i,ihop,new_row,new_col)
 
-WE ARE HERE!
+      if (lat%occupations(new_row,new_col) == 0) then
 
-      print*, new_row,new_col
-      stop 111
+        old_row = lat%ads_list(i)%row
+        old_col = lat%ads_list(i)%col
 
+        lat%occupations(new_row,new_col) = i
+        lat%occupations(old_row,old_col) = 0
+        lat%ads_list(i)%row = new_row
+        lat%ads_list(i)%col = new_col
 
-!                if (occupations(i_new, j_new) == 0) then
-!
-!                    i_old = ads_list(i,1)
-!                    j_old = ads_list(i,2)
-!
-!                    occupations(i_new,j_new) = i
-!                    occupations(i_old,j_old) = 0
-!                    ads_list(i,:) = (/i_new,j_new/)
-!
-!                    delta_E = energy(i, nlat, nads, nnn, occupations, site_type, &
-!                                     ads_list, nn_list, ads_energy, int_energy) &
-!                            - energy_old
-!
-!                    if (exp(- delta_E/temperature) < ran1()) then
-!
-!                        occupations(i_old,j_old) = i
-!                        occupations(i_new,j_new) = 0
-!                        ads_list(i,:) = (/i_old,j_old/)
-!
-!                    end if
-!
-!                end if
-!
+        delta_E = energy(i, lat, e_pars) - energy_old
+
+        if (exp(- beta*delta_E) < ran1()) then
+            ! reject the hop
+          lat%occupations(new_row,new_col) = 0
+          lat%occupations(old_row,old_col) = i
+          lat%ads_list(i)%row = old_row
+          lat%ads_list(i)%col = old_col
+        end if
+
+      end if
+
     enddo
 !
 !!print*,istep, hist_period, mod(istep, hist_period)
@@ -109,24 +109,24 @@ WE ARE HERE!
 !
 !        end if
 !
-!            if (mod(istep, save_period) == 0) then
-!                print*, istep
-!                write(outcfg_unit,cfg_fmt) transpose(occupations)
-!                write(outeng_unit,*) istep-1,&
-!                    total_energy(nlat, nads, nnn, occupations, site_type, &
-!                                 ads_list, nn_list, ads_energy, int_energy)/eV2K
-!
+    if (mod(istep, c_pars%save_period) == 0) then
+
+      print*, istep
+      write(outcfg_unit,*) istep, lat%n_ads_tot()
+      call lat%print_ads(outcfg_unit)
+
+      write(outeng_unit,*) istep, total_energy(lat,e_pars)
+
 !                if (hist_period > 0) then
 !                    write(outhst_unit,*) hist_counter
 !                    write(outhst_unit,ads_fmt) hist
 !                end if
-!           end if
+    end if
 !
-    enddo
-!
-!        close(outeng_unit)
-!
+  enddo
 
+  close(outcfg_unit)
+  close(outeng_unit)
 
 end subroutine metropolis
 

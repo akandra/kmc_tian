@@ -37,6 +37,7 @@ module mc_lat_class
       procedure :: print_st   => mc_lat_print_st
       procedure :: print_ads  => mc_lat_print_ads
       procedure :: hop        => mc_lat_hop_with_pbc
+      procedure :: n_ads_tot  => mc_lat_n_ads_total
 
   end type mc_lat
 
@@ -49,17 +50,17 @@ module mc_lat_class
 
 contains
 
-  function mc_lat_init(control_pars)
+  function mc_lat_init(control_pars) result(lat)
 
     type(control_parameters), intent(in) :: control_pars
-    type(mc_lat) mc_lat_init
+    type(mc_lat) lat
 
-    integer :: n_ads_total, i, j
+    integer :: i, j
     integer :: counter, s_counter, current_species
 
 
-    mc_lat_init%n_rows = control_pars%n_rows
-    mc_lat_init%n_cols = control_pars%n_cols
+    lat%n_rows = control_pars%n_rows
+    lat%n_cols = control_pars%n_cols
 
     ! Adsorption sites on the unit hex cell
     !  T. . . . .B1 . . . . .           1 top       (T)
@@ -75,7 +76,7 @@ contains
 
 
     ! Shellwise number of neighbors for hex lattice
-    mc_lat_init%n_nn = [6,6,6]
+    lat%n_nn = [6,6,6]
 
     ! NN list for the hexagonal structure
     !  11    12*   13*   14
@@ -86,76 +87,68 @@ contains
     !
     !           41    42    43    44
 
-    allocate(mc_lat_init%shell_list(n_shells,maxval(mc_lat_init%n_nn),2))
+    allocate(lat%shell_list(n_shells,maxval(lat%n_nn),2))
     ! Nearest-neigbour (1st) shell (d = 1))
-    mc_lat_init%shell_list(1,1,:) = (/ 0, 1/)
-    mc_lat_init%shell_list(1,2,:) = (/ 1, 0/)
-    mc_lat_init%shell_list(1,3,:) = (/ 1,-1/)
-    mc_lat_init%shell_list(1,4,:) = (/ 0,-1/)
-    mc_lat_init%shell_list(1,5,:) = (/-1, 0/)
-    mc_lat_init%shell_list(1,6,:) = (/-1, 1/)
+    lat%shell_list(1,1,:) = (/ 0, 1/)
+    lat%shell_list(1,2,:) = (/ 1, 0/)
+    lat%shell_list(1,3,:) = (/ 1,-1/)
+    lat%shell_list(1,4,:) = (/ 0,-1/)
+    lat%shell_list(1,5,:) = (/-1, 0/)
+    lat%shell_list(1,6,:) = (/-1, 1/)
     ! Next-Nearest-neigbour (2nd) shell  (d = sqrt(3))
-    mc_lat_init%shell_list(2,1,:) = (/ 1, 1/)
-    mc_lat_init%shell_list(2,2,:) = (/ 2,-1/)
-    mc_lat_init%shell_list(2,3,:) = (/ 1,-2/)
-    mc_lat_init%shell_list(2,4,:) = (/-1,-1/)
-    mc_lat_init%shell_list(2,5,:) = (/-2, 1/)
-    mc_lat_init%shell_list(2,6,:) = (/-1, 2/)
+    lat%shell_list(2,1,:) = (/ 1, 1/)
+    lat%shell_list(2,2,:) = (/ 2,-1/)
+    lat%shell_list(2,3,:) = (/ 1,-2/)
+    lat%shell_list(2,4,:) = (/-1,-1/)
+    lat%shell_list(2,5,:) = (/-2, 1/)
+    lat%shell_list(2,6,:) = (/-1, 2/)
     ! Next-Next-Nearest-neigbour (3rd) shell  (d = 2)
-    mc_lat_init%shell_list(3,1,:) = (/ 0, 2/)
-    mc_lat_init%shell_list(3,2,:) = (/ 2, 0/)
-    mc_lat_init%shell_list(3,3,:) = (/ 2,-2/)
-    mc_lat_init%shell_list(3,4,:) = (/ 0,-2/)
-    mc_lat_init%shell_list(3,5,:) = (/-2, 0/)
-    mc_lat_init%shell_list(3,6,:) = (/-2, 2/)
+    lat%shell_list(3,1,:) = (/ 0, 2/)
+    lat%shell_list(3,2,:) = (/ 2, 0/)
+    lat%shell_list(3,3,:) = (/ 2,-2/)
+    lat%shell_list(3,4,:) = (/ 0,-2/)
+    lat%shell_list(3,5,:) = (/-2, 0/)
+    lat%shell_list(3,6,:) = (/-2, 2/)
 
     ! Check the distances to the neibours
 !    print*, sqrt( &
-!                 ( mc_lat_init%shell_list(2,:,1)*cos(pi/3.0_dp) &
-!                  +mc_lat_init%shell_list(2,:,2)               )**2    &
+!                 ( lat%shell_list(2,:,1)*cos(pi/3.0_dp) &
+!                  +lat%shell_list(2,:,2)               )**2    &
 !                +                                                    &
-!                 ( mc_lat_init%shell_list(2,:,1)*sin(pi/3.0_dp))**2    &
+!                 ( lat%shell_list(2,:,1)*sin(pi/3.0_dp))**2    &
 !        )
 !    stop
 
-    mc_lat_init%n_ads_sites = n_ads_sites
+    lat%n_ads_sites = n_ads_sites
 
-    allocate(mc_lat_init%occupations( control_pars%n_rows,&
-                                      control_pars%n_cols) )
-    allocate(mc_lat_init%site_type  ( control_pars%n_rows,&
-                                      control_pars%n_cols) )
-    allocate(mc_lat_init%n_ads(control_pars%n_species))
+    allocate(lat%occupations(control_pars%n_rows,control_pars%n_cols))
+    allocate(lat%site_type  (control_pars%n_rows,control_pars%n_cols))
+    allocate(lat%n_ads(control_pars%n_species))
     ! Warning: the allocation assumes 1 ads. per unit cell
-    allocate(mc_lat_init%ads_list( control_pars%n_rows*&
-                                   control_pars%n_cols) )
+    allocate(lat%ads_list(control_pars%n_rows*control_pars%n_cols))
 
-    mc_lat_init%occupations = 0
-    mc_lat_init%site_type   = 0
-    mc_lat_init%n_ads       = control_pars%n_ads
-    mc_lat_init%ads_list    = adsorbate(0,0,0,0)
+    lat%occupations = 0
+    lat%site_type   = 0
+    lat%n_ads       = control_pars%n_ads
+    lat%ads_list    = adsorbate(0,0,0,0)
 
     if (control_pars%cfg_file_name=='none') then
-
-      n_ads_total = 0
-      do i=1,size(mc_lat_init%n_ads)
-        n_ads_total = n_ads_total + mc_lat_init%n_ads(i)
-      end do
 
       counter = 0
       s_counter = 0
       current_species = 1
-      loop1: do j=1,mc_lat_init%n_cols
-      do i=1,mc_lat_init%n_rows
+      loop1: do j=1,lat%n_cols
+      do i=1,lat%n_rows
         counter   = counter + 1
         s_counter = s_counter+1
-        if (s_counter>mc_lat_init%n_ads(current_species)) then
+        if (s_counter>lat%n_ads(current_species)) then
           s_counter = 1
           current_species = current_species + 1
         end if
-        mc_lat_init%occupations(i,j) = counter
+        lat%occupations(i,j) = counter
         ! Warning: arbitrary choice for the ads. site (top_id)!
-        mc_lat_init%ads_list(counter) = adsorbate(i,j,top_id,current_species)
-        if (counter == n_ads_total) exit loop1
+        lat%ads_list(counter) = adsorbate(i,j,top_id,current_species)
+        if (counter == lat%n_ads_tot()) exit loop1
       end do
       end do loop1
 
@@ -176,12 +169,12 @@ contains
 
     end if
 
-    mc_lat_init%site_type = terrace_site
+    lat%site_type = terrace_site
     ! Define where steps and corners are
     if ( control_pars%step_period > 0) then
-      do j=1,mc_lat_init%n_cols,control_pars%step_period
-          mc_lat_init%site_type(:,j)   = step_site
-          mc_lat_init%site_type(:,j+1) = corner_site
+      do j=1,lat%n_cols,control_pars%step_period
+          lat%site_type(:,j)   = step_site
+          lat%site_type(:,j+1) = corner_site
       end do
     end if
 
@@ -224,21 +217,28 @@ contains
 !  print the mc_lat occupations matrix
 !
 !------------------------------------------------------------------------------
-  subroutine mc_lat_print_ads (this)
+  subroutine mc_lat_print_ads (this, out_unit)
     class(mc_lat), intent(in) :: this
-    integer                   :: i, n_ads_total
+    integer, optional         :: out_unit
 
-    print '(A)', 'adsorbate list:'
+    integer                   :: i, n_ads_total
+    integer                   :: my_unit
+
+    if (present(out_unit)) then
+      my_unit = out_unit
+    else
+      my_unit = output_unit
+      print '(A)', 'adsorbate list:'
+    end if
+
     n_ads_total = 0
     do i=1,size(this%n_ads)
       n_ads_total = n_ads_total + this%n_ads(i)
     end do
 
     do i=1,n_ads_total
-      write(6,'(5i4)') i, this%ads_list(i)
+      write(my_unit,'(5i4)') i, this%ads_list(i)
     end do
-
-    print *
 
   end subroutine mc_lat_print_ads
 
@@ -259,6 +259,19 @@ contains
                + this%shell_list(1,ihop,2) - 1, this%n_cols) + 1
 
   end subroutine
+
+  integer function mc_lat_n_ads_total(this) result(n_ads_total)
+
+    class(mc_lat), intent(in) :: this
+
+    integer :: i
+
+      n_ads_total = 0
+      do i=1,size(this%n_ads)
+        n_ads_total = n_ads_total + this%n_ads(i)
+      end do
+
+  end function
 
 
 end module mc_lat_class

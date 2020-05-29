@@ -40,7 +40,6 @@ lattice = mc_lat_init(control_pars)
   call lattice%print_ocs
   call lattice%print_ads
 
-
 !
 !! configuration input/output format
 !write(cfg_fmt,'(i6)') nlat
@@ -48,7 +47,6 @@ lattice = mc_lat_init(control_pars)
 !write(ads_fmt,'(i6)') nads
 !ads_fmt = '('//trim(adjustl(ads_fmt))//'i8)'
 !
-!call open_for_write(outcfg_unit,trim(fname)//'.confs')
 !if (hist_period > 0) call open_for_write(outhst_unit,trim(fname)//'.hist')
 !
 
