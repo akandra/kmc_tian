@@ -52,12 +52,16 @@ contains
 
   function mc_lat_init(control_pars) result(lat)
 
-    type(control_parameters), intent(in) :: control_pars
+    type(control_parameters), intent(inout) :: control_pars
     type(mc_lat) lat
 
     integer :: i, j
     integer :: counter, s_counter, current_species
-
+    integer :: n_rows_in, n_cols_in, step_period_in
+    character(len=max_string_length) :: line
+    character(len=max_string_length) :: ads_names_in(100)
+    integer :: nw, n_species_in
+    integer, allocatable :: n_ads_in(:)
 
     lat%n_rows = control_pars%n_rows
     lat%n_cols = control_pars%n_cols
@@ -121,19 +125,22 @@ contains
 
     lat%n_ads_sites = n_ads_sites
 
-    allocate(lat%occupations(control_pars%n_rows,control_pars%n_cols))
-    allocate(lat%site_type  (control_pars%n_rows,control_pars%n_cols))
+    ! Allocate arrays
+    allocate(lat%occupations(control_pars%n_rows,&
+                             control_pars%n_cols))
+    allocate(lat%site_type  (control_pars%n_rows,&
+                             control_pars%n_cols))
     allocate(lat%n_ads(control_pars%n_species))
     ! Warning: the allocation assumes 1 ads. per unit cell
     allocate(lat%ads_list(control_pars%n_rows*control_pars%n_cols))
-
+    ! Initialize arrays
     lat%occupations = 0
     lat%site_type   = 0
     lat%n_ads       = control_pars%n_ads
     lat%ads_list    = adsorbate(0,0,0,0)
 
     if (control_pars%cfg_file_name=='none') then
-
+      ! Populate the lattice
       counter = 0
       s_counter = 0
       current_species = 1
@@ -153,19 +160,41 @@ contains
       end do loop1
 
     else
+      ! Read info from the configuration file
+      call open_for_read(inp_unit,trim(control_pars%cfg_file_name))
+      read(inp_unit,'(A)') line
+      read(inp_unit,*) n_rows_in, n_cols_in, step_period_in
+      read(inp_unit,'(A)') line
+      call split_string (line, ads_names_in, n_species_in)
+      allocate(n_ads_in(n_species_in))
+      read(inp_unit,*) n_ads_in
 
-!        call open_for_read(inp_unit,trim(cfg_fname))
-!        read(inp_unit,*) nlat_old, nads_old
-!        if (nlat_old /= nlat .OR. nads_old /= nads ) &
-!            stop 'Error: inconsistent input and configuration files'
-!        read(inp_unit,cfg_fmt) (occupations(i,:), i=1,nlat)
-!        close(inp_unit)
-!        print*
-!        print*,'    Dear Sir,'
-!        print*,'I would like to humbly notify you that the initial configuration is read from:'
-!        print*, trim(cfg_fname)
-!        print*,'Remaining your humble servant, K.M.C. Code'
-!        print*
+      ! Check consistency with control parameters
+      if (n_rows_in /= control_pars%n_rows .OR.&
+          n_cols_in /= control_pars%n_cols .OR.&
+          step_period_in /= control_pars%step_period) then
+        print*, 'Error! '
+        print*, ' inconsistency in input and configuration files:'
+        print*, ' lattice definition'
+        stop
+      end if
+      if (n_species_in /= control_pars%n_species .OR.&
+          any(n_ads_in /= control_pars%n_ads)) then
+        print*, 'Error! '
+        print*, ' inconsistency in input and configuration files:'
+        print*, ' adsorbates definition'
+        stop
+      end if
+
+      ! Read the configuration
+      read(inp_unit,'(A)') line
+      do i=1,lat%n_ads_tot()
+        read(inp_unit,*) j,lat%ads_list(i)
+        lat%occupations(lat%ads_list(i)%row,&
+                        lat%ads_list(i)%col) = i
+      end do
+
+      close(inp_unit)
 
     end if
 
@@ -237,7 +266,7 @@ contains
     end do
 
     do i=1,n_ads_total
-      write(my_unit,'(5i4)') i, this%ads_list(i)
+      write(my_unit,'(5i10)') i, this%ads_list(i)
     end do
 
   end subroutine mc_lat_print_ads

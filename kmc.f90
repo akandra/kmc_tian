@@ -18,16 +18,8 @@ character(len=max_string_length) file_name_base
 
 
 ! Take a file name base
-! ------------------------------------
-! dja change -- make f2008 complient
-!select case (iargc())
-! ------------------------------------
 select case (command_argument_count())
     case(1)
-! ------------------------------------
-! dja change -- make f2008 complient
-!     call getarg(1,file_name_base)
-! ------------------------------------
       call get_command_argument(1,file_name_base)
     case default
       stop "Wrong number of arguments"
@@ -491,13 +483,19 @@ end select
 !print*
 !print*, 'Number of clock ticks = ', icount2-icount1
 !
-!call open_for_write(outcfg_unit,trim(fname)//'.out')
-!
-!write(outcfg_unit,*) nlat, nads
-!write(outcfg_unit,cfg_fmt) transpose(occupations)
-!
-!close(outcfg_unit)
-!
+call open_for_write(outcfg_unit,trim(control_pars%file_name_base)//'.out')
+
+write(outcfg_unit,'(A10,A10,A15)') "# rows","# cols","step_period"
+write(outcfg_unit,'(3i10)') lattice%n_rows, lattice%n_cols, &
+                            control_pars%step_period
+write(outcfg_unit,'(100A10)') adjustr(control_pars%ads_names)
+write(outcfg_unit,'(100i10)') lattice%n_ads
+write(outcfg_unit,'(5A10)') "#","row","col","ads_site", "species"
+call lattice%print_ads(outcfg_unit)
+
+
+close(outcfg_unit)
+
 !deallocate(cluster_label, cluster_sizes, hist, change_list, nn_new)
 !deallocate(ads_list,nn_pos,nn_list,nn_opps,temp1D,site_type,occupations)
 

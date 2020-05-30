@@ -25,10 +25,14 @@ subroutine metropolis(lat, c_pars, e_pars)
   ! write a state of the lattice to a file
   call open_for_write(outcfg_unit,trim(c_pars%file_name_base)//'.confs')
 
-  write(outcfg_unit,*) lat%n_rows, lat%n_cols,&
-    "! (number of rows) x  (number of columns)"
-  write(outcfg_unit,*) 0, lat%n_ads_tot(),&
-    "! mmc_step and total number of adsorbates"
+  write(outcfg_unit,'(A10,A10,A15)') &
+                "# rows","# cols","step_period"
+  write(outcfg_unit,'(3i10)') lat%n_rows, lat%n_cols, c_pars%step_period
+  write(outcfg_unit,'(A10)') "mmc step"
+  write(outcfg_unit,'(i10)') 0
+  write(outcfg_unit,'(100A10)') adjustr(c_pars%ads_names)
+  write(outcfg_unit,'(100i10)') lat%n_ads
+  write(outcfg_unit,'(5A10)') "#","row","col","ads_site", "species"
   call lat%print_ads(outcfg_unit)
 
   ! write total energy of the system
@@ -112,8 +116,10 @@ subroutine metropolis(lat, c_pars, e_pars)
     if (mod(istep, c_pars%save_period) == 0) then
 
       print*, istep
-      write(outcfg_unit,*) istep, lat%n_ads_tot()
+      write(outcfg_unit,'(/i10)') istep
+      write(outcfg_unit,'(100i10)') lat%n_ads
       call lat%print_ads(outcfg_unit)
+
 
       write(outeng_unit,*) istep, total_energy(lat,e_pars)
 

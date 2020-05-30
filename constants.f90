@@ -33,7 +33,7 @@ module constants
   integer, parameter :: n_ads_sites = 6
   ! List of adsorption sites for the hexagonal lattice
   character(len=3), dimension(n_ads_sites), parameter :: &
-          ads_site_names = ['top','fcc','hcp','br1','br2','br3']
+          ads_site_names = [character(3)::'top','fcc','hcp','br1','br2','br3']
   ! Adsorption site ids
   integer, parameter :: top_id = 1
   integer, parameter :: fcc_id = 2
@@ -60,7 +60,7 @@ module constants
   integer, parameter :: n_reaction_types = 1
   ! List of reaction types
   character(len=10), dimension(n_reaction_types), parameter :: &
-            reaction_names = ['hopping']
+            reaction_names = [character(10)::'hopping']
   ! Reaction ids
   integer, parameter :: hopping_id = 1
 
