@@ -18,9 +18,17 @@ character(len=max_string_length) file_name_base
 
 
 ! Take a file name base
-select case (iargc())
+! ------------------------------------
+! dja change -- make f2008 complient
+!select case (iargc())
+! ------------------------------------
+select case (command_argument_count())
     case(1)
-      call getarg(1,file_name_base)
+! ------------------------------------
+! dja change -- make f2008 complient
+!     call getarg(1,file_name_base)
+! ------------------------------------
+      call get_command_argument(1,file_name_base)
     case default
       stop "Wrong number of arguments"
 end select

@@ -11,7 +11,7 @@ module control_parameters_class
     character(len=3) :: algorithm   ! MC algorithm to use (kmc or mmc)
     integer :: n_rows               ! number of rows
     integer :: n_cols               ! number of columns
-    integer :: step_period      	! = step_density^-1, 0 means no steps
+    integer :: step_period      	  ! = step_density^-1, 0 means no steps
     integer :: n_species            ! number of the adsorbate types
     integer :: save_period          ! period for the output
     character(len=10),&
@@ -44,7 +44,9 @@ module control_parameters_class
 
   interface control_parameters
 
-    module procedure :: control_parameters_init
+    ! dja change to make f2003 complient
+    !module procedure :: control_parameters_init
+    module procedure control_parameters_init
 
   end interface
 

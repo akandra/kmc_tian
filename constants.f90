@@ -21,7 +21,7 @@ module constants
   integer, parameter :: n_site_types = 3
   ! List of site types
   character(len=10), dimension(n_site_types), parameter :: &
-            site_names = ['terrace','step','corner']
+            site_names = [character(10)::'terrace','step','corner']
   ! Site type ids
   integer, parameter :: terrace_site = 1
   integer, parameter :: step_site    = 2
@@ -46,7 +46,7 @@ module constants
 
   ! List of interaction laws
   character(len=10), dimension(2), parameter :: &
-          int_law_names = ['linear','sqrt']
+          int_law_names = [character(10)::'linear','sqrt']
   ! Interaction energy law ids
   integer, parameter :: linear_id = 1
   integer, parameter :: sqrt_id   = 2
@@ -70,7 +70,7 @@ module constants
   integer, parameter :: n_laws = 2
   ! List of laws
   character(len=20), dimension(n_laws), parameter :: &
-            law_names = ['Arrhenius',&
+            law_names = [character(20)::'Arrhenius',&
                          'extArrhenius']
   ! Law ids
   integer, parameter :: Arrhenius_id   = 1
