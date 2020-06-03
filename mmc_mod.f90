@@ -6,7 +6,6 @@ module mmc
   use control_parameters_class
   use energy_parameters_class
   use energy_mod
-  !use cluster_mod
 
   implicit none
 
@@ -21,16 +20,21 @@ subroutine metropolis(lat, c_pars, e_pars)
   type(control_parameters), intent(in) :: c_pars
   type(energy_parameters ), intent(in) :: e_pars
 
-  integer :: i, istep, ihop
+  integer :: i, istep, ihop, species
   integer :: new_row, new_col, old_row, old_col
   real(dp) :: energy_old, beta, delta_E
-
+  character(len=max_string_length) :: n_ads_fmt
   integer, dimension(lat%n_rows,lat%n_cols) :: cluster_label
-  integer :: largest_label
-
+  integer, dimension(maxval(lat%n_ads)) :: cluster_sizes
+  integer :: largest_label, hist_counter
+  integer, dimension(c_pars%n_species,maxval(lat%n_ads)) :: hist
 
   ! inverse thermodynamic temperature
   beta = 1.0_dp/(kB*c_pars%temperature)
+
+  ! Output formats
+  write(n_ads_fmt,'(i10)') lat%n_ads_tot()
+  n_ads_fmt = '('//trim(adjustl(n_ads_fmt))//'i8)'
 
   ! write initial state of the lattice to a file
   call open_for_write(outcfg_unit,trim(c_pars%file_name_base)//'.confs')
@@ -38,16 +42,22 @@ subroutine metropolis(lat, c_pars, e_pars)
   write(outcfg_unit,'(A10,A10,A15)') &
                 "# rows","# cols","step_period"
   write(outcfg_unit,'(3i10)') lat%n_rows, lat%n_cols, c_pars%step_period
-  write(outcfg_unit,'(A10)') "mmc step"
-  write(outcfg_unit,'(i10)') 0
   write(outcfg_unit,'(100A10)') adjustr(c_pars%ads_names)
+  write(outcfg_unit,'(A10,i0)') "mmc step ", 0
   write(outcfg_unit,'(100i10)') lat%n_ads
-  write(outcfg_unit,'(5A10)') "#","row","col","ads_site", "species"
+!  write(outcfg_unit,'(5A10)') "#","row","col","ads_site", "species"
   call lat%print_ads(outcfg_unit)
 
   ! write initial total energy of the system
   call open_for_write(outeng_unit,trim(c_pars%file_name_base)//'.en')
   write(outeng_unit,*) 0, total_energy(lat,e_pars)
+
+  ! open file for saving cluster size histogram
+  if (c_pars%hist_period > 0) &
+    call open_for_write(outhst_unit,trim(c_pars%file_name_base)//'.hist')
+  ! Initialize cluster histogram counters
+  hist_counter = 0
+  hist = 0
 
   !loop over mmc steps
   do istep=1, c_pars%n_mmc_steps
@@ -87,57 +97,47 @@ subroutine metropolis(lat, c_pars, e_pars)
     enddo
 
     if (c_pars%hist_period > 0 .and. mod(istep, c_pars%hist_period) == 0) then
-
-      do i=1,c_pars%n_species
-
-! CONTINUE HERE AND put the hk subrutine to the lattice class
-        !call hoshen_kopelman(lat, i, cluster_label, largest_label)
-        call lat%hoshen_kopelman(i, cluster_label, largest_label)
-
-
-        stop 99
+      hist_counter = hist_counter + 1
+      do species=1,c_pars%n_species
+        call lat%hoshen_kopelman(species, cluster_label, largest_label)
+        call lat%cluster_size(species, cluster_label, cluster_sizes)
+        do i=1,largest_label
+          if (cluster_sizes(i) > 0) &
+            hist(species,cluster_sizes(i)) = hist(species,cluster_sizes(i)) + 1
+        end do
+!        print*,'species =',species, 'largest_label = ',largest_label
+!        print*,'cluster_sizes = ',cluster_sizes
+!        print*,'hist:',hist(species,:)
+!        print*
       end do
-
-!
-!            call count_cluster_sizes(cluster_sizes, cluster_label,&
-!                                                                ads_list, nads, nlat)
-!
-!            hist_counter = hist_counter + 1
-!            do i=1,largest_label
-!                if (cluster_sizes(i) > 0) &
-!                    hist(cluster_sizes(i)) = hist(cluster_sizes(i)) + 1
-!            end do
-!
-!        !print*,largest_label
-!        !print*,cluster_sizes
-!        !print*
-!        !write(*,cfg_fmt) (cluster_label(m,:), m=1,nlat)
-!        !print*
-!        !write(*,cfg_fmt) hist
-!        !
-!
     end if
-!
-    if (mod(istep, c_pars%save_period) == 0) then
 
-      print*, istep
-      write(outcfg_unit,'(/i10)') istep
+    if (mod(istep, c_pars%save_period) == 0) then
+      write(*,'(A,i0)'), 'mmc step = ', istep
+      ! Save configuration
+      write(outcfg_unit,'(A10,i0)') "mmc step ",istep
       write(outcfg_unit,'(100i10)') lat%n_ads
       call lat%print_ads(outcfg_unit)
-
-
+      ! Save energy
       write(outeng_unit,*) istep, total_energy(lat,e_pars)
-
-!                if (hist_period > 0) then
-!                    write(outhst_unit,*) hist_counter
-!                    write(outhst_unit,ads_fmt) hist
-!                end if
+      ! Save cluster size histogram
+      if (c_pars%hist_period > 0) then
+        write(outhst_unit,*) 'counts ', hist_counter
+        do species=1,c_pars%n_species
+          write(outhst_unit,*) species
+          write(outhst_unit,n_ads_fmt) hist(species,:)
+        end do
+! Warning: needs discussion
+!        hist_counter = 0
+!        hist = 0
+      end if
     end if
-!
-  enddo
+
+  enddo ! over mmc steps
 
   close(outcfg_unit)
   close(outeng_unit)
+  if (c_pars%hist_period > 0) close(outhst_unit)
 
 end subroutine metropolis
 
