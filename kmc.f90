@@ -5,7 +5,7 @@ use control_parameters_class
 use energy_parameters_class
 use rates_class
 use mmc
-!use utilities
+use utilities
 
 implicit none
 
@@ -15,6 +15,49 @@ type( energy_parameters) :: energy_pars
 type( rates_type)        :: rates
 
 character(len=max_string_length) file_name_base
+
+!--------------------------------
+! test if we can call lunion
+!--------------------------------
+!subroutine lunion(x, y, labels)
+!
+!  integer, intent(inout) :: x, y
+!  integer, dimension(:), intent(inout) :: labels
+!
+!integer dja_x,dja_y, dja_labels(10)
+!dja_x=1
+!dja_y=1
+!dja_labels=[1,2,3,4,5,6,7,8,9,10]
+!call lunion(dja_x,dja_y,dja_labels)
+!stop 'now'
+! it succeeds if lunion is a "loose" subroutine in hosen_kopelman.f90
+! it fails if lunion is in a contains section in subroutine hosen_kopelman
+
+!--------------------------------------------------------------------
+! test if we can call subroutine mc_lat_print_ocs (this)
+!                     class(mc_lat), intent(in) :: this
+!--------------------------------------------------------------------
+!integer iii
+!call mc_lat_print_ocs(iii)
+!stop 999
+!--------------------------------------------------------------------
+! test if we can access function mc_lat_n_ads_total
+!--------------------------------------------------------------------
+!integer function mc_lat_n_ads_total(this) result(n_ads_total)
+!    class(mc_lat), intent(in) :: this
+!integer iii
+!iii=mc_lat_n_adds_total(iii)
+!stop 999
+! FAILS: error #6404: This name does not have a type, and must have an explicit type.   [MC_LAT_N_ADDS_TOTAL]|
+!
+!----------------------------------------------------------------------
+!  test if we can access function mc_lat_init(control_pars) result(lat)
+!  with the wrong type for the argument
+!----------------------------------------------------------------------
+!integer dja_i
+!lattice = mc_lat_init(dja_i)
+!stop 999
+! Fails: error #6633: The type of the actual argument differs from the type of the dummy argument.   [DJA_I]|
 
 
 ! Take a file name base

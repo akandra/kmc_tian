@@ -1,11 +1,17 @@
 module mmc
 
+  use constants
+  use utilities
   use mc_lat_class
+  use control_parameters_class
   use energy_parameters_class
   use energy_mod
-  use cluster_mod
+  !use cluster_mod
 
   implicit none
+
+  private
+  public::  metropolis
 
 contains
 
@@ -84,8 +90,11 @@ subroutine metropolis(lat, c_pars, e_pars)
 
       do i=1,c_pars%n_species
 
-CONTINUE HERE AND put the hk subrutine to the lattice class
-        call hoshen_kopelman(lat, i, cluster_label, largest_label)
+! CONTINUE HERE AND put the hk subrutine to the lattice class
+        !call hoshen_kopelman(lat, i, cluster_label, largest_label)
+        call lat%hoshen_kopelman(i, cluster_label, largest_label)
+
+
         stop 99
       end do
 

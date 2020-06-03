@@ -1,12 +1,15 @@
 module mc_lat_class
 
   use constants
+  use utilities
   use control_parameters_class
 
   implicit none
-  !public ! for performance
 
-  type, public :: adsorbate
+  private
+  public :: mc_lat_init
+
+  type, private :: adsorbate  ! dja changed from public 2020-06-02
 
     integer :: row
     integer :: col
@@ -38,6 +41,8 @@ module mc_lat_class
       procedure :: print_ads  => mc_lat_print_ads
       procedure :: hop        => mc_lat_hop_with_pbc
       procedure :: n_ads_tot  => mc_lat_n_ads_total
+      procedure :: hoshen_kopelman
+      procedure, nopass, public :: mc_lat_init
 
   end type mc_lat
 
@@ -53,7 +58,7 @@ contains
   function mc_lat_init(control_pars) result(lat)
 
     type(control_parameters), intent(inout) :: control_pars
-    type(mc_lat) lat
+    type(mc_lat)               :: lat
 
     integer :: i, j
     integer :: counter, s_counter, current_species
@@ -302,7 +307,10 @@ contains
 
   end function
 
+  include "hoshen_kopelman.f90"
 
 end module mc_lat_class
+
+
 
 

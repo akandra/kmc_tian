@@ -7,6 +7,9 @@ module rates_class
 
   implicit none
 
+  private
+  public    :: rates_init
+
   type, public :: rates_type
 
     ! Hopping rates (n_species x n_site_type x n_adsorption_sites

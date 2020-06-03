@@ -6,6 +6,9 @@ module control_parameters_class
 
   implicit none
 
+  private
+  public :: control_parameters_init
+
   type, public :: control_parameters
 
     character(len=3) :: algorithm   ! MC algorithm to use (kmc or mmc)

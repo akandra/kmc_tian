@@ -4,6 +4,8 @@ module utilities
 
   implicit none
 
+  public
+
 contains
 
 !-----------------------------------------------------

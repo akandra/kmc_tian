@@ -1,11 +1,13 @@
 module energy_parameters_class
 
-  use constants
+  use utilities
   use control_parameters_class
   use open_file
-  use utilities
 
   implicit none
+
+  private
+  public :: energy_parameters_init
 
   type, public :: energy_parameters
 

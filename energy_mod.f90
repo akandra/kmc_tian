@@ -1,9 +1,14 @@
 module energy_mod
 
+  use constants
   use mc_lat_class
   use energy_parameters_class
 
   implicit none
+
+  private
+  public  :: energy
+  public  :: total_energy
 
 contains
 
