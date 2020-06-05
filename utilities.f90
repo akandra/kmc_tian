@@ -1,6 +1,7 @@
 module utilities
 
   use constants
+  use iso_fortran_env
 
   implicit none
 
@@ -14,11 +15,22 @@ contains
 
 function ran1()  !returns random number between 0 - 1
 
-    real(8) ran1,x
+    real(dp) ran1,x
     call random_number(x) ! built in fortran 90 random number function
     ran1 = x
 
 end function ran1
+
+function irand(i)  !returns integer random number between 1 and i
+
+    integer irand
+    integer i
+    real(dp) x
+
+    call random_number(x) ! built in fortran 90 random number function
+    irand = floor( i*x ) + 1
+
+end function irand
 
 !-----------------------------------------------------
 ! Subs and function dealing with strings
@@ -77,6 +89,43 @@ logical function read_num(string, x)
   read_num = error_code == 0
 
 end function read_num
+
+subroutine progress_bar( percent_done, symbol )
+
+  integer, intent(in)                   :: percent_done
+  character(len=1), intent(in),optional :: symbol
+
+  integer             :: i
+  character(len=1)    :: cr = char(13)
+  character(len=1)    :: symb
+  character(len=56)   :: hdr = "    0   10   20   30   40   50   60   70   80   90  100 "
+  character(len=56)   :: bar = "???%|                                                  |"
+  logical             :: first = .true.
+
+  symb = '*'
+  if(present(symbol)) symb = symbol
+
+  ! construct the percent_done bar
+  write(unit=bar(1:3),fmt="(i3)") percent_done
+  do i=1, 50
+    if(percent_done >= i*2 ) then
+      bar(i+5:i+5)= symb
+    else
+      bar(i+5:i+5)= ' '
+    end if
+  enddo
+
+!    ! output the percent_done bar to the screen
+!    if (first) then
+!      write(output_unit, "(10x, a56)") hdr
+!      first=.false.
+!    end if
+
+  write(output_unit, "(a, 10x, a56)", advance='no') cr, bar
+  flush(output_unit)
+
+end subroutine progress_bar
+
 
 !-----------------------------------------------------
 ! Miscellaneous

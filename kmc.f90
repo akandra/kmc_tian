@@ -77,7 +77,7 @@ rates = rates_init(control_pars)
 !call rates%print_r_hop(control_pars)
 
 !   initialize lattice
-lattice = mc_lat_init(control_pars)
+lattice = mc_lat_init(control_pars, energy_pars)
 
 !  call lattice%print_st
 !  call lattice%print_ocs

@@ -3,6 +3,7 @@ module mc_lat_class
   use constants
   use utilities
   use control_parameters_class
+  use energy_parameters_class
 
   implicit none
 
@@ -18,21 +19,29 @@ module mc_lat_class
 
   end type adsorbate
 
+  type, private :: v_list
+
+    integer, dimension(:),allocatable :: list
+
+  end type
+
 
   type, public :: mc_lat
 
     integer :: n_rows       ! number of rows    in 2D lattice
     integer :: n_cols       ! number of columns in 2D lattice
-    integer :: n_ads_sites ! number of adsorbtion site in the unit cell
+    integer :: n_max_ads_sites ! number of adsorbtion site in the unit cell
 
     integer, dimension(:,:), allocatable  :: occupations  !  n_rows x n_cols
     integer, dimension(:,:), allocatable  :: site_type    !  n_rows x n_cols
     ! shellwise number of neighbors
     integer, dimension(n_shells) :: n_nn
     integer, dimension(:,:,:), allocatable  :: shell_list
-
-    integer, dimension(:), allocatable :: n_ads  ! initial number of adsorbates
+    ! initial number of adsorbates and adsorbates list
+    integer, dimension(:), allocatable :: n_ads
     type(adsorbate), dimension(:), allocatable  :: ads_list
+    ! Available adsorbtion sites list (n_species x n_max_site_types x (n_avail_ads_sites))
+    type(v_list), dimension(:,:), allocatable :: avail_ads_sites
 
     contains
 
@@ -56,17 +65,18 @@ module mc_lat_class
 
 contains
 
-  function mc_lat_init(control_pars) result(lat)
+  function mc_lat_init(control_pars, energy_pars) result(lat)
 
     type(control_parameters), intent(inout) :: control_pars
+    type(energy_parameters),     intent(in) :: energy_pars
     type(mc_lat)               :: lat
 
-    integer :: i, j
+    integer :: i, j, k
     integer :: counter, s_counter, current_species
     integer :: n_rows_in, n_cols_in, step_period_in
     character(len=max_string_length) :: line
     character(len=max_string_length) :: ads_names_in(100)
-    integer :: nw, n_species_in
+    integer :: nw, n_species_in, n_site_types, ads_site
     integer, allocatable :: n_ads_in(:)
 
     lat%n_rows = control_pars%n_rows
@@ -129,7 +139,7 @@ contains
 !        )
 !    stop
 
-    lat%n_ads_sites = n_ads_sites
+    lat%n_max_ads_sites = n_max_ads_sites
 
     ! Allocate arrays
     allocate(lat%occupations(control_pars%n_rows,&
@@ -141,9 +151,50 @@ contains
     allocate(lat%ads_list(control_pars%n_rows*control_pars%n_cols))
     ! Initialize arrays
     lat%occupations = 0
-    lat%site_type   = 0
     lat%n_ads       = control_pars%n_ads
     lat%ads_list    = adsorbate(0,0,0,0)
+
+    lat%site_type = terrace_site
+    ! Define where steps and corners are
+    if ( control_pars%step_period > 0) then
+      do j=1,lat%n_cols,control_pars%step_period
+          lat%site_type(:,j)   = step_site
+          lat%site_type(:,j+1) = corner_site
+      end do
+      n_site_types = n_max_site_types
+    else
+      n_site_types = 1
+    end if
+
+    allocate(lat%avail_ads_sites(control_pars%n_species,n_site_types))
+
+    do i=1,control_pars%n_species
+    do j=1,n_site_types
+      counter = 0
+      do k=1,n_max_ads_sites
+        if (energy_pars%ads_energy(i,j,k) < energy_pars%undefined_energy) then
+          counter = counter + 1
+        end if
+      end do
+      allocate(lat%avail_ads_sites(i,j)%list(counter))
+      counter = 0
+      do k=1,n_max_ads_sites
+        if (energy_pars%ads_energy(i,j,k) < energy_pars%undefined_energy) then
+          counter = counter + 1
+          lat%avail_ads_sites(i,j)%list(counter) = k
+        end if
+      end do
+    end do
+    end do
+
+!    do i=1,control_pars%n_species
+!    do j=1,n_site_types
+!      print'(4A)','species = ',control_pars%ads_names(i),'site type =',site_names(j)
+!      print*,'list = ',(ads_site_names(lat%avail_ads_sites(i,j)%list(k)), &
+!                          k=1,size(lat%avail_ads_sites(i,j)%list))
+!    end do
+!    end do
+!    stop 333
 
     if (control_pars%cfg_file_name=='none') then
       ! Populate the lattice
@@ -159,8 +210,9 @@ contains
           current_species = current_species + 1
         end if
         lat%occupations(i,j) = counter
-        ! Warning: arbitrary choice for the ads. site (top_id)!
-        lat%ads_list(counter) = adsorbate(i,j,top_id,current_species)
+        ! Warning: arbitrary choice for the ads. site (the 1st available)!
+        ads_site = lat%avail_ads_sites(current_species,lat%site_type(i,j))%list(1)
+        lat%ads_list(counter) = adsorbate(i,j,ads_site,current_species)
         if (counter == lat%n_ads_tot()) exit loop1
       end do
       end do loop1
@@ -202,15 +254,6 @@ contains
 
       close(inp_unit)
 
-    end if
-
-    lat%site_type = terrace_site
-    ! Define where steps and corners are
-    if ( control_pars%step_period > 0) then
-      do j=1,lat%n_cols,control_pars%step_period
-          lat%site_type(:,j)   = step_site
-          lat%site_type(:,j+1) = corner_site
-      end do
     end if
 
   end function
@@ -282,16 +325,23 @@ contains
 !  applies pbc
 !
 !------------------------------------------------------------------------------
-  subroutine mc_lat_hop_with_pbc(this,i,ihop, row, col)
+  subroutine mc_lat_hop_with_pbc(this,i,ihop, row, col, ads_site)
 
     class(mc_lat), intent(in) :: this
     integer, intent(in)  :: i, ihop
-    integer, intent(out) :: row, col
+    integer, intent(out) :: row, col, ads_site
+    integer :: list_size, id, site_type
+
 
     row = modulo(this%ads_list(i)%row &
                + this%shell_list(1,ihop,1) - 1, this%n_rows) + 1
     col = modulo(this%ads_list(i)%col &
                + this%shell_list(1,ihop,2) - 1, this%n_cols) + 1
+
+    id = this%ads_list(i)%id
+    site_type = this%site_type(row,col)
+    list_size = size( this%avail_ads_sites(id,site_type)%list )
+    ads_site = this%avail_ads_sites(id,site_type)%list(irand(list_size))
 
   end subroutine
 
@@ -322,6 +372,7 @@ contains
 
   integer :: i, j, m, n, nnn2, row, col, row_new,col_new
   integer :: itemp, ip, jp, i_ads, i_ads_nn
+  integer :: ads_site
 
   integer, dimension(this%n_ads(species)) :: labels
   integer, dimension(this%n_nn(1)/2) :: scanned_nn_occs, row_nn, col_nn
@@ -344,7 +395,7 @@ contains
       do m=1,nnn2
 
         ! Take previously scan neighbours
-        call this%hop(i_ads,nnn2+m,row_nn(m),col_nn(m))
+        call this%hop(i_ads,nnn2+m,row_nn(m),col_nn(m), ads_site)
         i_ads_nn = this%occupations(row_nn(m), col_nn(m))
         if ( i_ads_nn > 0 .and. this%ads_list(i_ads_nn)%id == species ) then
             scanned_nn_occs(m) = 1
@@ -424,7 +475,7 @@ contains
     ip = cluster_label(row,1)
     if (ip > 0) then
       do m=1,nnn2
-        call this%hop(this%occupations(row,1),nnn2+m,row_new,col_new)
+        call this%hop(this%occupations(row,1),nnn2+m,row_new,col_new, ads_site)
         jp = cluster_label(row_new,col_new)
         if (jp > 0) call lunion(ip,jp,labels)
       end do
@@ -435,7 +486,7 @@ contains
     ip = cluster_label(1,col)
     if (ip > 0) then
       do m=1,nnn2
-        call this%hop(this%occupations(1,col),nnn2+m,row_new,col_new)
+        call this%hop(this%occupations(1,col),nnn2+m,row_new,col_new, ads_site)
         jp = cluster_label(row_new,col_new)
         if (jp > 0) call lunion(ip,jp,labels)
       end do

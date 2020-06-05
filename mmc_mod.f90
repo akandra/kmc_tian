@@ -21,7 +21,7 @@ subroutine metropolis(lat, c_pars, e_pars)
   type(energy_parameters ), intent(in) :: e_pars
 
   integer :: i, istep, ihop, species
-  integer :: new_row, new_col, old_row, old_col
+  integer :: new_row, new_col, new_ads_site, old_row, old_col, old_ads_site
   real(dp) :: energy_old, beta, delta_E
   character(len=max_string_length) :: n_ads_fmt
   integer, dimension(lat%n_rows,lat%n_cols) :: cluster_label
@@ -59,6 +59,8 @@ subroutine metropolis(lat, c_pars, e_pars)
   hist_counter = 0
   hist = 0
 
+  write(*,'(20X,A)'), "K.M.C. Code's progress report:"
+
   !loop over mmc steps
   do istep=1, c_pars%n_mmc_steps
 
@@ -70,17 +72,23 @@ subroutine metropolis(lat, c_pars, e_pars)
       ! And we doubt that we ever need something else
       ihop = floor(lat%n_nn(1)*ran1()) + 1
 
-      call lat%hop(i,ihop,new_row,new_col)
+      call lat%hop(i,ihop,new_row,new_col,new_ads_site)
+
+!      print*, 'ads. no. = ',i,'row = ', new_row,'col = ', new_col,&
+!              'ads. site = ', ads_site_names(new_ads_site)
+!      pause
 
       if (lat%occupations(new_row,new_col) == 0) then
 
         old_row = lat%ads_list(i)%row
         old_col = lat%ads_list(i)%col
+        old_ads_site = lat%ads_list(i)%site
 
         lat%occupations(new_row,new_col) = i
         lat%occupations(old_row,old_col) = 0
         lat%ads_list(i)%row = new_row
         lat%ads_list(i)%col = new_col
+        lat%ads_list(i)%site = new_ads_site
 
         delta_E = energy(i, lat, e_pars) - energy_old
 
@@ -90,6 +98,7 @@ subroutine metropolis(lat, c_pars, e_pars)
           lat%occupations(old_row,old_col) = i
           lat%ads_list(i)%row = old_row
           lat%ads_list(i)%col = old_col
+          lat%ads_list(i)%site = old_ads_site
         end if
 
       end if
@@ -113,7 +122,8 @@ subroutine metropolis(lat, c_pars, e_pars)
     end if
 
     if (mod(istep, c_pars%save_period) == 0) then
-      write(*,'(A,i0)'), 'mmc step = ', istep
+      call progress_bar(100*istep/c_pars%n_mmc_steps)
+!      write(*,'(A,i0)'), 'mmc step = ', istep
       ! Save configuration
       write(outcfg_unit,'(A10,i0)') "mmc step ",istep
       write(outcfg_unit,'(100i10)') lat%n_ads

@@ -19,9 +19,9 @@ module constants
   !-------- Site type info ---------!
 
   ! Number of site types
-  integer, parameter :: n_site_types = 3
+  integer, parameter :: n_max_site_types = 3
   ! List of site types
-  character(len=10), dimension(n_site_types), parameter :: &
+  character(len=10), dimension(n_max_site_types), parameter :: &
             site_names = [character(10)::'terrace','step','corner']
   ! Site type ids
   integer, parameter :: terrace_site = 1
@@ -31,9 +31,9 @@ module constants
   !-------- Adsorption sites info ---------!
 
   ! Maximum number of adsorption sites in the unit cell
-  integer, parameter :: n_ads_sites = 6
+  integer, parameter :: n_max_ads_sites = 6
   ! List of adsorption sites for the hexagonal lattice
-  character(len=3), dimension(n_ads_sites), parameter :: &
+  character(len=3), dimension(n_max_ads_sites), parameter :: &
           ads_site_names = [character(3)::'top','fcc','hcp','br1','br2','br3']
   ! Adsorption site ids
   integer, parameter :: top_id = 1

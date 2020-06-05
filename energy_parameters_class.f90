@@ -22,6 +22,8 @@ module energy_parameters_class
     logical, dimension(:,:,:),allocatable :: int_energy_skip
     !
     logical :: is_interaction
+    ! Default value for undefined energy
+    real(dp) :: undefined_energy
 
 
   contains
@@ -62,7 +64,7 @@ contains
     real(dp), parameter:: default_dp  = huge(0.0_dp)
 
     i = control_pars%n_species
-    allocate(energy_parameters_init%ads_energy(i,n_site_types,n_ads_sites))
+    allocate(energy_parameters_init%ads_energy(i,n_max_site_types,n_max_ads_sites))
     allocate(energy_parameters_init%int_energy_law_id(i,i))
     allocate(energy_parameters_init%int_energy_pars(i,i,n_shells))
     allocate(energy_parameters_init%int_energy_skip(i,i,n_shells))
@@ -72,6 +74,7 @@ contains
     energy_parameters_init%int_energy_pars = default_dp
     energy_parameters_init%int_energy_skip = .true.
     energy_parameters_init%is_interaction  = .false.
+    energy_parameters_init%undefined_energy = default_dp
 
     !  read energy definitions from the input file
     file_name = control_pars%energy_file_name

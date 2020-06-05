@@ -59,8 +59,8 @@ contains
     real(dp), parameter:: default_dp  = -1.0_dp
 
     allocate(rates_init%r_hop( control_pars%n_species,&
-                               n_site_types, n_ads_sites,&
-                               n_site_types, n_ads_sites) )
+                               n_max_site_types, n_max_ads_sites,&
+                               n_max_site_types, n_max_ads_sites) )
 
     rates_init%r_hop = default_dp
 
@@ -200,11 +200,11 @@ contains
       print '(/A)','---------------------------'
       print '( A,A)','species: ', control_pars%ads_names(i)
       print '(A)', '---------------------------'
-      do i1=1,n_site_types
-      do i2=1,n_ads_sites
-      do i3=1,n_site_types
+      do i1=1,n_max_site_types
+      do i2=1,n_max_ads_sites
+      do i3=1,n_max_site_types
         print'(A,A,2X,A,6e12.3)', site_names(i1), ads_site_names(i2), site_names(i3),&
-                (this%r_hop(i,i1,i2,i3,i4), i4=1,n_ads_sites)
+                (this%r_hop(i,i1,i2,i3,i4), i4=1,n_max_ads_sites)
       end do
       end do
       end do
