@@ -59,7 +59,8 @@ subroutine metropolis(lat, c_pars, e_pars)
   hist_counter = 0
   hist = 0
 
-  write(*,'(20X,A)'), "K.M.C. Code's progress report:"
+  write(*,'(20X,A)'), "M.M.C. Code's progress report:"
+  call progress_bar(0)
 
   !loop over mmc steps
   do istep=1, c_pars%n_mmc_steps
@@ -137,9 +138,8 @@ subroutine metropolis(lat, c_pars, e_pars)
           write(outhst_unit,*) species
           write(outhst_unit,n_ads_fmt) hist(species,:)
         end do
-! Warning: needs discussion
-!        hist_counter = 0
-!        hist = 0
+        hist_counter = 0
+        hist = 0
       end if
     end if
 

@@ -203,8 +203,16 @@ contains
       do i1=1,n_max_site_types
       do i2=1,n_max_ads_sites
       do i3=1,n_max_site_types
-        print'(A,A,2X,A,6e12.3)', site_names(i1), ads_site_names(i2), site_names(i3),&
-                (this%r_hop(i,i1,i2,i3,i4), i4=1,n_max_ads_sites)
+      do i4=1,n_max_ads_sites
+        if (this%r_hop(i,i1,i2,i3,i4)< 0.0_dp) then
+          cycle
+        else
+          write(*,'(A,A,2X,A,A,6e12.3)') &
+              site_names(i1), ads_site_names(i2), &
+              site_names(i3), ads_site_names(i4), &
+              this%r_hop(i,i1,i2,i3,i4)
+        end if
+      end do
       end do
       end do
       end do

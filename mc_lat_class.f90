@@ -341,7 +341,11 @@ contains
     id = this%ads_list(i)%id
     site_type = this%site_type(row,col)
     list_size = size( this%avail_ads_sites(id,site_type)%list )
-    ads_site = this%avail_ads_sites(id,site_type)%list(irand(list_size))
+    if ( list_size > 1 ) then
+      ads_site = this%avail_ads_sites(id,site_type)%list(irand(list_size))
+    else
+      ads_site = this%avail_ads_sites(id,site_type)%list(1)
+    end if
 
   end subroutine
 
