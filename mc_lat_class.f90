@@ -30,7 +30,7 @@ module mc_lat_class
 
     integer :: n_rows       ! number of rows    in 2D lattice
     integer :: n_cols       ! number of columns in 2D lattice
-    integer :: n_max_ads_sites ! number of adsorbtion site in the unit cell
+    integer :: n_max_ads_sites ! number of adsorbtion sites in the unit cell
 
     integer, dimension(:,:), allocatable  :: occupations  !  n_rows x n_cols
     integer, dimension(:,:), allocatable  :: site_type    !  n_rows x n_cols
@@ -49,6 +49,7 @@ module mc_lat_class
       procedure :: print_st   => mc_lat_print_st
       procedure :: print_ads  => mc_lat_print_ads
       procedure :: hop        => mc_lat_hop_with_pbc
+      procedure :: neighbor   => mc_lat_neighbor_with_pbc
       procedure :: n_ads_tot  => mc_lat_n_ads_total
       procedure :: hoshen_kopelman
       procedure :: cluster_size => count_cluster_sizes
@@ -346,6 +347,19 @@ contains
     else
       ads_site = this%avail_ads_sites(id,site_type)%list(1)
     end if
+
+  end subroutine
+
+  subroutine mc_lat_neighbor_with_pbc(this,i,ihop, row, col)
+
+    class(mc_lat), intent(in) :: this
+    integer, intent(in)  :: i, ihop
+    integer, intent(out) :: row, col
+
+    row = modulo(this%ads_list(i)%row &
+               + this%shell_list(1,ihop,1) - 1, this%n_rows) + 1
+    col = modulo(this%ads_list(i)%col &
+               + this%shell_list(1,ihop,2) - 1, this%n_cols) + 1
 
   end subroutine
 
