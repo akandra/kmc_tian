@@ -47,7 +47,8 @@ contains
 
     type(control_parameters), intent(inout) :: control_pars
 
-     integer :: i, ios, nwords, line_number, i1, i2
+    integer :: i, ios, nwords, line_number, i1, i2
+
     character(len=max_string_length) :: buffer
     character(len=max_string_length) :: words(100)
     character(len=len(trim(control_pars%energy_file_name))) :: file_name
@@ -59,6 +60,7 @@ contains
     integer           :: parse_state_default      =0
     integer           :: parse_state_adsorption   =1
     integer           :: parse_state_interaction  =2
+
 
     integer,  parameter:: default_int = 0
     real(dp), parameter:: default_dp  = huge(0.0_dp)
@@ -102,15 +104,15 @@ contains
 
           case('adsorption')
             if (parse_state /= parse_state_default) &
-              call error(file_name, line_number, buffer, &
+              call error_message(file_name, line_number, buffer, &
                          "invalid ending of the adsorption/interaction section")
             parse_state = parse_state_adsorption
-            if (nwords/=2) call error(file_name, line_number, buffer, &
+            if (nwords/=2) call error_message(file_name, line_number, buffer, &
                                "adsorption key must have 1 parameter")
 
             read(words(2),'(A)') current_species_name
             current_species_id = get_index(current_species_name, control_pars%ads_names )
-            if (current_species_id == 0) call error(file_name, line_number, buffer, &
+            if (current_species_id == 0) call error_message(file_name, line_number, buffer, &
                                                   "inconsistent adsorbate definition")
 !            print*, 'name     =', current_species_name
 !            print*, 'id       =', current_species_id
@@ -118,16 +120,16 @@ contains
 
           case ('terrace','step','corner')
             if (parse_state /= parse_state_adsorption) &
-              call error(file_name, line_number, buffer, "invalid site type statement")
+              call error_message(file_name, line_number, buffer, "invalid site type statement")
 
             i1 = get_index(words(1),    site_names)
             i2 = get_index(words(2),ads_site_names)
 
             if ( i1==0 .or. i2==0 ) &
-                call error(file_name, line_number, buffer, &
+                call error_message(file_name, line_number, buffer, &
                              "wrong species name in the adsorption section")
             if (energy_parameters_init%ads_energy(current_species_id,i1,i2 ) /= default_dp)&
-                call error(file_name, line_number, buffer, "duplicated entry")
+                call error_message(file_name, line_number, buffer, "duplicated entry")
 
             read(words(3),*) energy_parameters_init%ads_energy(current_species_id,i1,i2 )
 !              print*, 'species  ' ,current_species_id, &
@@ -140,25 +142,25 @@ contains
 
           case('interaction')
             if (parse_state /= parse_state_default) &
-              call error(file_name, line_number, buffer, &
+              call error_message(file_name, line_number, buffer, &
                          "invalid ending of the adsorption/interaction section")
             parse_state = parse_state_interaction
-            if (nwords/=1) call error(file_name, line_number, buffer, &
+            if (nwords/=1) call error_message(file_name, line_number, buffer, &
                                "interaction key must have no parameters")
 
           case('linear','sqrt')
             if (parse_state /= parse_state_interaction) &
-              call error(file_name, line_number, buffer, &
+              call error_message(file_name, line_number, buffer, &
                         "invalid interaction law statement")
-            if (nwords/=3+n_shells) call error(file_name, line_number, buffer, &
+            if (nwords/=3+n_shells) call error_message(file_name, line_number, buffer, &
                               "interaction law key must have (3 + n_shells) parameters")
             i1 = get_index(words(2),control_pars%ads_names)
             i2 = get_index(words(3),control_pars%ads_names)
             i  = get_index(words(1),int_law_names)
-            if ( i1==0 .or. i2==0 ) call error(file_name, line_number, buffer, &
+            if ( i1==0 .or. i2==0 ) call error_message(file_name, line_number, buffer, &
                               "wrong species name in the interaction law")
             if (energy_parameters_init%int_energy_law_id(i1,i2) /= default_int)&
-                call error(file_name, line_number, buffer, "duplicated entry for species")
+                call error_message(file_name, line_number, buffer, "duplicated entry for species")
             energy_parameters_init%int_energy_law_id(i1,i2) = i
             energy_parameters_init%int_energy_law_id(i2,i1) = i
             do i=1, n_shells
@@ -186,7 +188,7 @@ contains
 
           case default
 !            print*, 'unprocessed line: ', trim(buffer)
-            call error(file_name, line_number, buffer, "unknown key")
+            call error_message(file_name, line_number, buffer, "unknown key")
 
         end select
 

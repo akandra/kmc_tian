@@ -46,7 +46,7 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
   real(dp) :: energy_old, energy_new
 
   ! Create a rate structure
-  r = rates_init(c_pars)
+  r = rates_init(c_pars, lat, e_pars)
   call r%print_r_hop(c_pars)
 
   ! inverse thermodynamic temperature
@@ -81,7 +81,7 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
   hist_counter = 0
   hist = 0
 
-  write(*,'(20X,A)'), "B.K.L. Code's progress report:"
+  write(*,'(20X,A)') "B.K.L. Code's progress report:"
   call progress_bar(0)
 
   ! Allocate rates array
@@ -170,7 +170,7 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
 
             ! Calculate energy of i in new position
             energy_new = energy(i, lat, e_pars)
-We Are Here!
+!We Are Here!
             ! Apply detailed balance when
             ! energy in the old position < energy in the new position
             if (energy_old < energy_new) then
@@ -189,7 +189,8 @@ We Are Here!
             print '(A,e18.4,A,e18.4)',' E_old = ', energy_old, ' E_new = ',energy_new
             print *,' r_hop = ',r%r_hop(id, st_old, ast_old, st_new, ast_new),&
                                       ' rate = ', rates(i,m)%list(iads)
-            pause
+            write(*,*) 'pause'
+            read(*,*)
 
           end do ! iads
 

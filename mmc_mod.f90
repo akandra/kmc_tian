@@ -59,7 +59,7 @@ subroutine metropolis(lat, c_pars, e_pars)
   hist_counter = 0
   hist = 0
 
-  write(*,'(20X,A)'), "M.M.C. Code's progress report:"
+  write(*,'(20X,A)') "M.M.C. Code's progress report:"
   call progress_bar(0)
 
   !loop over mmc steps
