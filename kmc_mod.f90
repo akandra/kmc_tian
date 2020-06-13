@@ -33,8 +33,8 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
 
   real(dp) :: beta
   character(len=max_string_length) :: n_ads_fmt
-  integer :: itraj, step_bin, ibin
-  integer :: i,m,iads
+  integer :: itraj, step_bin, ibin, k_change
+  integer :: i,m,ads,m_nn, n_nn, n_nn2
   integer :: kmc_nsteps
   integer :: largest_label, hist_counter
   integer, dimension(c_pars%n_species,maxval(lat%n_ads)) :: hist
@@ -44,6 +44,10 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
   integer :: row, col, site, id
   integer, dimension(lat%n_nn(1)) :: nn_row, nn_col
   real(dp) :: energy_old, energy_new
+  real(dp) :: time, total_rate, u, rate_acc
+  real(dp) :: delta_t, time_new
+  integer, dimension(lat%n_nn(1),lat%n_nn(1)/2) :: nn_new
+  integer, dimension(2*lat%n_nn(1)) :: change_list
 
   ! Create a rate structure
   r = rates_init(c_pars, lat, e_pars)
@@ -53,6 +57,15 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
   beta = 1.0_dp/(kB*c_pars%temperature)
   ! total number of adsorbates
   n_ads_total = lat%n_ads_tot()
+  !
+  n_nn  = lat%n_nn(1)
+  n_nn2 = n_nn/2
+  ! List of additional nn directions to scan after hop
+  do m=1,n_nn
+  do i=1,n_nn2
+    nn_new(m,i) = modulo( m+i-n_nn2, n_nn ) + 1
+  end do
+  end do
 
   ! Output formats
   write(n_ads_fmt,'(i10)') lat%n_ads_tot()
@@ -85,13 +98,13 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
   call progress_bar(0)
 
   ! Allocate rates array
-  allocate( rates(n_ads_total,lat%n_nn(1)) )
+  allocate( rates(n_ads_total,n_nn) )
   do i=1,n_ads_total
-    row  = lat%ads_list(i)%row
-    col  = lat%ads_list(i)%col
+    row = lat%ads_list(i)%row
+    col = lat%ads_list(i)%col
     site = lat%site_type(row,col)
-    id   = lat%ads_list(i)%id
-    do m=1,lat%n_nn(1)
+    id  = lat%ads_list(i)%id
+    do m=1,n_nn
       allocate( rates(i,m)%list(size(lat%avail_ads_sites(id,site)%list)) )
     end do
   end do
@@ -124,8 +137,6 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
 !
 !            end if
 
-    call lat%print_ocs
-
     ! Construct rates array
     do i=1,n_ads_total
 
@@ -143,7 +154,7 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
       lat%occupations(row_old,col_old) = 0
 
       ! Loop over possible new positions of particle i
-      do m=1,lat%n_nn(1)
+      do m=1,n_nn
 
         ! Get position and site type of neighbour m
         call lat%neighbor(i, m, row_new, col_new)
@@ -162,35 +173,35 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
           lat%occupations(row_new,col_new) = i
 
           ! Loop over adsorption site
-          do iads = 1, size(lat%avail_ads_sites(id,st_new)%list)
+          do ads = 1, size(lat%avail_ads_sites(id,st_new)%list)
 
             ! Move particle i to adsorption site list(iads)
-            ast_new = lat%avail_ads_sites(id,st_new)%list(iads)
+            ast_new = lat%avail_ads_sites(id,st_new)%list(ads)
             lat%ads_list(i)%site = ast_new
 
             ! Calculate energy of i in new position
             energy_new = energy(i, lat, e_pars)
-!We Are Here!
+
             ! Apply detailed balance when
             ! energy in the old position < energy in the new position
             if (energy_old < energy_new) then
-                rates(i,m)%list(iads) = r%r_hop(id, st_old, ast_old, st_new, ast_new)!&
-                    !*exp( -beta*(energy_new - energy_old) )
-                print*
-                print*, 'id ',id, ' old site ',st_old,' old ads. site ', ast_old
-                print*, ' new site ',st_new,' new ads. site ', ast_new
-                print*, 'rate ',r%r_hop(id, st_old, ast_old, st_new, ast_new)
+                rates(i,m)%list(ads) = r%r_hop(id, st_old, ast_old, st_new, ast_new)&
+                    *exp( -beta*(energy_new - energy_old) )
+!                print*
+!                print*, 'id ',id, ' old site ',st_old,' old ads. site ', ast_old
+!                print*, ' new site ',st_new,' new ads. site ', ast_new
+!                print*, 'rate ',r%r_hop(id, st_old, ast_old, st_new, ast_new)
             else
-                rates(i,m)%list(iads) = r%r_hop(id, st_old, ast_old, st_new, ast_new)
-                print*, id,st_old, ast_old, st_new, ast_new,r%r_hop(id, st_old, ast_old, st_new, ast_new)
+                rates(i,m)%list(ads) = r%r_hop(id, st_old, ast_old, st_new, ast_new)
+!                print*, id,st_old, ast_old, st_new, ast_new,r%r_hop(id, st_old, ast_old, st_new, ast_new)
             end if
 
-            print '(A,i4,A,i4,A,i4)', 'ads ',i,' neighbor ',m,' ads. site ',lat%ads_list(i)%site
-            print '(A,e18.4,A,e18.4)',' E_old = ', energy_old, ' E_new = ',energy_new
-            print *,' r_hop = ',r%r_hop(id, st_old, ast_old, st_new, ast_new),&
-                                      ' rate = ', rates(i,m)%list(iads)
-            write(*,*) 'pause'
-            read(*,*)
+!            print '(A,i4,A,i4,A,i4)', 'ads ',i,' neighbor ',m,' ads. site ',lat%ads_list(i)%site
+!            print '(A,e18.4,A,e18.4)',' E_old = ', energy_old, ' E_new = ',energy_new
+!            print *,' r_hop = ',r%r_hop(id, st_old, ast_old, st_new, ast_new),&
+!                                      ' rate = ', rates(i,m)%list(iads)
+!            write(*,*) 'pause'
+!            read(*,*)
 
           end do ! iads
 
@@ -211,33 +222,49 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
 
     call lat%print_ocs
 !    do i = 1,n_ads_total
-!    do m = 1,lat%n_nn(1)
+!    do m = 1,n_nn
 !      print*, i,m,(rates(i,m)%list(iads),iads=1,size(rates(i,m)%list))
 !    end do
 !    end do
-stop 110
+!    stop 110
 
-!            ! start time propagation
-!            time = big_bang
-!            do while (time<t_end)
-!
-!                total_rate = sum(rates)  ! calculate total rate
-!                u = ran1()*total_rate    ! random number to select a process
-!
-!                rate_acc = 0.d0
-!                extloop: do i_ads=1,nads    ! determine reaction channel
-!                         do i_nn=1,nnn
-!                            rate_acc = rate_acc + rates(i_ads,i_nn)
-!                            if (u < rate_acc) exit extloop
-!                        end do
-!                end do extloop
-!
-!                delta_t = -log(ran1())/total_rate   ! when does a hop occur?
-!                time_new = time + delta_t
-!                kmc_nsteps = kmc_nsteps + 1
-!
-!                if (time_new > t_end) time_new = t_end
-!
+    ! start time propagation
+    time = big_bang
+    do while (time<c_pars%t_end)
+
+      ! calculate total rate
+      total_rate = 0.0_dp
+      do ads=1,n_ads_total
+      do m=1,n_nn
+        total_rate = total_rate + sum(rates(ads,m)%list)
+      end do
+      end do
+      !      print*, total_rate
+
+      ! random number to select a process
+      u = ran1()*total_rate
+
+      ! determine reaction channel (adsorbate, direction, ads. site)
+      !                            (      ads,      m_nn,   ast_new)
+      rate_acc = 0.0_dp
+      extloop: do ads=1,n_ads_total
+        do m_nn=1,n_nn
+        do ast_new=1,size(rates(ads,m_nn)%list) ! Warning: check timing of size calculation
+          rate_acc = rate_acc + rates(ads,m_nn)%list(ast_new)
+          if (u < rate_acc) exit extloop
+        end do
+        end do
+      end do extloop
+
+      delta_t = -log(ran1())/total_rate   ! when does a hop occur?
+      time_new = time + delta_t
+      kmc_nsteps = kmc_nsteps + 1
+!      print*, 'ran. number is ', u/total_rate, 'rate_acc is ',rate_acc
+!      print*, 'reaction channel is:', 'ads = ',ads, 'dir = ',m_nn, 'ads. site is ',site
+!      stop 321
+
+!      if (time_new > t_end) time_new = t_end
+
 !                if(n_bins > 0) then
 !
 !
@@ -268,63 +295,69 @@ stop 110
 !
 !                end if
 !
-!                time = time_new ! time shift
-!
-!                ! Update rate constants
-!                ! Particle i_ads is going to hop in direction i_nn
-!
-!                change_list = 0
-!                k_change = 1
-!                ! Put the hopping particle into the list
-!                change_list(k_change) = i_ads
-!
-!                ! scan over old neighbors
-!                do m=1,nnn
-!                    ! (i,j) is a position of neighbor m
-!                    i = modulo(ads_list(i_ads,1) + nn_list(m,1)-1,nlat) + 1
-!                    j = modulo(ads_list(i_ads,2) + nn_list(m,2)-1,nlat) + 1
-!
-!                    if (occupations(i,j) > 0) then
-!                        k_change = k_change + 1
-!                        change_list(k_change) = occupations(i,j)
-!                    end if
-!
-!                end do
-!
-!                ! a new position of particle i_ads after a hop to a neighbor i_nn
-!                i_new = modulo(ads_list(i_ads,1) + nn_list(i_nn,1)-1,nlat) + 1
-!                j_new = modulo(ads_list(i_ads,2) + nn_list(i_nn,2)-1,nlat) + 1
-!                ! scan over additional new neighbors
-!                do m=1,nnn/2
-!
-!                    ! (i,j) is a position of neighbor m
-!                    i = modulo(i_new + nn_list(nn_new(i_nn,m),1)-1,nlat) + 1
-!                    j = modulo(j_new + nn_list(nn_new(i_nn,m),2)-1,nlat) + 1
-!
-!                    if (occupations(i,j) > 0) then
-!                        k_change = k_change + 1
-!                        change_list(k_change) = occupations(i,j)
-!                    end if
-!
-!                end do
-!
-!!                print*,i_ads, i_nn
-!!                print(cfg_fmt), transpose(occupations)
-!!                print*
-!!                print'(6e16.4)', (rates(i,:)/r_hop,i=1,nads)
-!                !print*,k
-!!                print*,change_list
-!                !stop 15
-!
-!                ! Update occupations and ads. list
-!                occupations(ads_list(i_ads,1),ads_list(i_ads,2)) = 0
-!                occupations(i_new,j_new) = i_ads
-!                ads_list(i_ads,:) = (/i_new,j_new/)
-!
-!                ! Update rate array
-!                ! see building up the rate array above
-!                ! with i replaced by change_list(i)
-!
+      time = time_new ! time shift
+
+!------------ Update rate constants
+!   Particle (ads) is going to hop in direction (m_nn) to ads. site (site)
+
+      ! create a list of adsorbates affected by hop
+      change_list = 0
+      k_change = 1
+      ! Put the hopping particle iads into the list
+      change_list(k_change) = ads
+
+      ! scan over old neighbors
+      do m=1,n_nn
+        ! position of neighbor m
+        call lat%neighbor(ads,m,row,col)
+        if (lat%occupations(row,col) > 0) then
+          k_change = k_change + 1
+          change_list(k_change) = lat%occupations(row,col)
+        end if
+      end do
+
+      ! a new position of particle (ads) after a hop to a neighbor (m_nn)
+      call lat%neighbor(ads,m_nn,row_new,col_new)
+
+      ! Make a hop:
+      ! Delete an adsorbate from its old position
+      lat%occupations(lat%ads_list(ads)%row, lat%ads_list(ads)%col) = 0
+      ! Put the adsorbate in a new position
+      lat%ads_list(ads)%row  = row_new
+      lat%ads_list(ads)%col  = col_new
+      lat%ads_list(ads)%site = ast_new
+      ! Update adsorbate position
+      lat%occupations(row_new, col_new) = ads
+
+      ! scan over additional new neighbors
+      do m=1,n_nn2
+        ! position of neighbor nn_new(m_nn,m)
+        call lat%neighbor( ads, nn_new(m_nn,m), row,col)
+        if (lat%occupations(row,col) > 0) then
+          k_change = k_change + 1
+          change_list(k_change) = lat%occupations(row,col)
+        end if
+      end do
+
+      print*,ads, m_nn, &
+        ads_site_names(lat%avail_ads_sites(lat%ads_list(ads)%id,&
+                            lat%site_type(row_new, col_new))%list(ast_new))
+!      call lat%print_ocs
+!      do i=1,n_ads_total
+!      do m=1,n_nn
+!        print'(2i,10e16.4)', i,m,rates(i,m)%list
+!      end do
+!      end do
+!      print*,k_change
+!      print*,change_list
+!      stop 15
+
+We are here there and everywere
+
+      ! Update rate array
+      ! see building up the rate array above
+      ! with i replaced by change_list(i)
+
 !                do kk=1,k_change
 !
 !                    i = change_list(kk)
@@ -404,7 +437,7 @@ stop 110
 !
 !                end do
 !
-!            end do ! over time
+    end do ! over time
 !!-------------------------------------------------------------
 !
 !            if (n_bins > 0) then

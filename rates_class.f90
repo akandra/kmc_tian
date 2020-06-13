@@ -13,10 +13,10 @@ module rates_class
   public    :: rates_init, rates_type
 
   type :: rates_type
-    ! Hopping rates (   n_species
-    !                   .  n_adsorption_sites
+    ! Hopping rates (   n_species                   ->which species
+    !                   .  n_adsorption_sites       ->where from
     !                   .  .  n_site_type
-    !                   .  .  .  n_adsorption_sites
+    !                   .  .  .  n_adsorption_sites ->where to
     !                   .  .  .  .  n_site_type )
     !                   .  .  .  .  .
     real(dp), dimension(:, :, :, :, :), allocatable :: r_hop
@@ -217,7 +217,7 @@ contains
     else
       print *
       print *, 'passed check that energies are defined for all rates'
-      pause
+!      pause
     end if
 
 
@@ -318,7 +318,7 @@ contains
     else
       print '(/A)', 'passed requited rates consistency check'
       print*
-      stop 'debugging stop'
+!      stop 'debugging stop'
 
     end if
 
