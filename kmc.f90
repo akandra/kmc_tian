@@ -37,14 +37,15 @@ lat = mc_lat_init(c_pars, e_pars)
 !  call lat%print_ads
 
 select case (c_pars%algorithm)
-!
-  case ('mmc')
 
+  case ('mmc')
     call metropolis(lat, c_pars, e_pars)
 
   case ('bkl')
-
     call Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
+
+  case default
+    stop 'Error: mc algorithm not defined'
 
 end select
 

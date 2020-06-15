@@ -83,13 +83,13 @@ subroutine metropolis(lat, c_pars, e_pars)
 
         old_row = lat%ads_list(i)%row
         old_col = lat%ads_list(i)%col
-        old_ads_site = lat%ads_list(i)%site
+        old_ads_site = lat%ads_list(i)%ast
 
         lat%occupations(new_row,new_col) = i
         lat%occupations(old_row,old_col) = 0
         lat%ads_list(i)%row = new_row
         lat%ads_list(i)%col = new_col
-        lat%ads_list(i)%site = new_ads_site
+        lat%ads_list(i)%ast = new_ads_site
 
         delta_E = energy(i, lat, e_pars) - energy_old
 
@@ -99,7 +99,7 @@ subroutine metropolis(lat, c_pars, e_pars)
           lat%occupations(old_row,old_col) = i
           lat%ads_list(i)%row = old_row
           lat%ads_list(i)%col = old_col
-          lat%ads_list(i)%site = old_ads_site
+          lat%ads_list(i)%ast = old_ads_site
         end if
 
       end if

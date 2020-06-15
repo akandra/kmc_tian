@@ -4,6 +4,7 @@ module rates_class
   use control_parameters_class
   use mc_lat_class
   use energy_parameters_class
+  use energy_mod
   use open_file
   use utilities
 
@@ -12,7 +13,17 @@ module rates_class
   private
   public    :: rates_init, rates_type
 
+  type :: v_list_dp
+
+    real(dp), dimension(:), allocatable :: list
+
+  end type
+
+
   type :: rates_type
+    ! adsorbate-specific rates (n_adsorbates x n_neighbors)
+    type(v_list_dp), dimension(:,:), allocatable :: rates
+
     ! Hopping rates (   n_species                   ->which species
     !                   .  n_adsorption_sites       ->where from
     !                   .  .  n_site_type
@@ -23,7 +34,9 @@ module rates_class
     !
     ! TODO
     ! Reaction rates
+
   contains
+    procedure :: construct_rates
     procedure ::  print_r_hop
 
   end type
@@ -45,7 +58,7 @@ contains
     type(mc_lat)            , intent(in)    :: lat
     type(energy_parameters) , intent(in)    :: e_pars
 
-    integer :: i, ios, nwords, line_number, i1, i2, i3, i4
+    integer :: i, ios, nwords, line_number, i1, i2, i3, i4, m
 
     integer :: species, st1, st2, ast1, ast2
     logical :: e_defined1, e_defined2, r_defined, undefined_rate, undefined_energy
@@ -67,6 +80,20 @@ contains
 
     integer,  parameter   :: default_int = 0
     real(dp), parameter   :: default_rate  = -1.0_dp
+
+    integer :: row, col, site, id
+
+    ! Allocate rates array
+    allocate( rates_init%rates(lat%n_ads_tot(),lat%n_nn(1)) )
+    do i=1,lat%n_ads_tot()
+      row = lat%ads_list(i)%row
+      col = lat%ads_list(i)%col
+      site = lat%lst(row,col)
+      id  = lat%ads_list(i)%id
+      do m=1,lat%n_nn(1)
+        allocate( rates_init%rates(i,m)%list(size(lat%avail_ads_sites(id,site)%list)) )
+      end do
+    end do
 
     allocate(rates_init%r_hop( c_pars%n_species,&
                                n_max_site_types, n_max_ads_sites,&
@@ -324,7 +351,99 @@ contains
 
   end function rates_init
 
+!-----------------------------------------------------------------------------
+  subroutine construct_rates(this, ads, lat, e_pars, beta)
+!-----------------------------------------------------------------------------
+    class(rates_type), intent(inout) :: this
+    integer, intent(in) :: ads
+    class(mc_lat), intent(inout) :: lat
+    class(energy_parameters), intent(in) :: e_pars
+    real(dp), intent(in) :: beta
 
+    integer :: id, m, iads
+    integer :: row_old, col_old, lst_old, ast_old
+    integer :: row_new, col_new, lst_new, ast_new
+    real(dp) :: energy_old, energy_new
+
+    ! energy for particle ads in its old position
+    energy_old = energy(ads, lat, e_pars)
+
+    ! Save the old configuration
+    row_old = lat%ads_list(ads)%row
+    col_old = lat%ads_list(ads)%col
+    lst_old = lat%lst(row_old,col_old)
+    ast_old = lat%ads_list(ads)%ast
+    id      = lat%ads_list(ads)%id
+
+    ! Delete particle ads from the old position
+    ! we do it here since we never work with occupations inside the following loop
+    lat%occupations(row_old,col_old) = 0
+
+    ! Loop over possible new positions of particle ads
+    do m=1,lat%n_nn(1)
+
+      ! Get position and site type of neighbour m
+      call lat%neighbor(ads, m, row_new, col_new)
+      lst_new  = lat%lst(row_new, col_new)
+
+      ! Check if the cell is free
+      if (lat%occupations(row_new, col_new) > 0) then
+
+        this%rates(ads,m)%list = 0.0d0
+
+      else
+
+        ! Put particle ads to site m
+        lat%ads_list(ads)%row = row_new
+        lat%ads_list(ads)%col = col_new
+        lat%occupations(row_new,col_new) = ads
+
+        ! Loop over adsorption site
+        do iads = 1, size(lat%avail_ads_sites(id,lst_new)%list)
+
+          ! Move particle ads to adsorption site list(iads)
+          ast_new = lat%avail_ads_sites(id,lst_new)%list(iads)
+          lat%ads_list(ads)%ast = ast_new
+
+          ! Calculate energy of ads in new position
+          energy_new = energy(ads, lat, e_pars)
+
+          ! Apply detailed balance when
+          ! energy in the old position < energy in the new position
+          if (energy_old < energy_new) then
+              this%rates(ads,m)%list(iads) = this%r_hop(id, lst_old, ast_old, lst_new, ast_new)&
+                  *exp( -beta*(energy_new - energy_old) )
+!                print*
+!                print*, 'id ',id, ' old site ',lst_old,' old ads. site ', ast_old
+!                print*, ' new site ',lst_new,' new ads. site ', ast_new
+!                print*, 'rate ',this%r_hop(id, lst_old, ast_old, lst_new, ast_new)
+          else
+              this%rates(ads,m)%list(iads) = this%r_hop(id, lst_old, ast_old, lst_new, ast_new)
+!                print*, id,lst_old, ast_old, lst_new, ast_new,this%r_hop(id, lst_old, ast_old, lst_new, ast_new)
+          end if
+
+!            print '(A,i4,A,i4,A,i4)', 'ads ',ads,' neighbor ',m,' ads. site ',lat%ads_list(ads)%ast
+!            print '(A,e18.4,A,e18.4)',' E_old = ', energy_old, ' E_new = ',energy_new
+!            print *,' r_hop = ',this%r_hop(id, lst_old, ast_old, lst_new, ast_new),&
+!                                      ' rate = ', this%rates(ads,m)%list(iads)
+!            write(*,*) 'pause'
+!            read(*,*)
+
+        end do ! iads
+
+        ! Return particle ads to the old position
+        lat%ads_list(ads)%row = row_old
+        lat%ads_list(ads)%col = col_old
+        lat%ads_list(ads)%ast = ast_old
+        lat%occupations(row_new,col_new) = 0
+
+      end if ! occupations
+
+    end do ! m
+
+    lat%occupations(row_old,col_old) = ads
+
+  end subroutine construct_rates
 !------------------------------------------------------------------------------
   subroutine print_r_hop(this, c_pars)
 !------------------------------------------------------------------------------

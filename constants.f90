@@ -85,8 +85,7 @@ module constants
   integer, parameter :: outhst_unit  = 12
 
   ! Internal program constants
-  integer, parameter :: n_seed = 13
-  integer, parameter :: randseed(n_seed) = [7,5,3,11,9,1,17,2,9,6,4,5,8]
+  integer, parameter :: randseed(13) = [7,5,3,11,9,1,17,2,9,6,4,5,8]
   integer, parameter :: max_string_length    = 1000
   real(dp), parameter :: tolerance           = 1.0e-9_dp
 

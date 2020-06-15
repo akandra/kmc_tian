@@ -25,10 +25,10 @@ real(dp) function energy(ref, lat, e_pars)
 
   ref_row  = lat%ads_list(ref)%row
   ref_col  = lat%ads_list(ref)%col
-  ref_site = lat%ads_list(ref)%site
+  ref_site = lat%ads_list(ref)%ast
   ref_id   = lat%ads_list(ref)%id
 
-  energy_acc = e_pars%ads_energy(ref_id, lat%site_type(ref_row,ref_col), ref_site)
+  energy_acc = e_pars%ads_energy(ref_id, lat%lst(ref_row,ref_col), ref_site)
 
   if (e_pars%is_interaction) then
 
@@ -79,11 +79,11 @@ real(dp) function total_energy(lat, e_pars)
 
     ref_row  = lat%ads_list(ref)%row
     ref_col  = lat%ads_list(ref)%col
-    ref_site = lat%ads_list(ref)%site
+    ref_site = lat%ads_list(ref)%ast
     ref_id   = lat%ads_list(ref)%id
 
     energy_acc = energy_acc + &
-                 e_pars%ads_energy(ref_id, lat%site_type(ref_row,ref_col), ref_site)
+                 e_pars%ads_energy(ref_id, lat%lst(ref_row,ref_col), ref_site)
 
     if (e_pars%is_interaction) then
 

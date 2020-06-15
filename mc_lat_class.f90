@@ -12,10 +12,10 @@ module mc_lat_class
 
   type, private :: adsorbate  ! dja changed from public 2020-06-02
 
-    integer :: row
-    integer :: col
-    integer :: site
-    integer :: id
+    integer :: row  ! lattice row     occupied by an adsorbate
+    integer :: col  ! lattice column  occupied by an adsorbate
+    integer :: ast  ! adsorption site occupied by an adsorbate
+    integer :: id   ! adsorbate species
 
   end type adsorbate
 
@@ -33,7 +33,8 @@ module mc_lat_class
     integer :: n_max_ads_sites ! number of adsorbtion sites in the unit cell
 
     integer, dimension(:,:), allocatable  :: occupations  !  n_rows x n_cols
-    integer, dimension(:,:), allocatable  :: site_type    !  n_rows x n_cols
+    ! array of lattice site types
+    integer, dimension(:,:), allocatable  :: lst          !  n_rows x n_cols
     ! shellwise number of neighbors
     integer, dimension(n_shells) :: n_nn
     integer, dimension(:,:,:), allocatable  :: shell_list
@@ -145,7 +146,7 @@ contains
     ! Allocate arrays
     allocate(lat%occupations(control_pars%n_rows,&
                              control_pars%n_cols))
-    allocate(lat%site_type  (control_pars%n_rows,&
+    allocate(lat%lst  (control_pars%n_rows,&
                              control_pars%n_cols))
     allocate(lat%n_ads(control_pars%n_species))
     ! Warning: the allocation assumes 1 ads. per unit cell
@@ -155,12 +156,12 @@ contains
     lat%n_ads       = control_pars%n_ads
     lat%ads_list    = adsorbate(0,0,0,0)
 
-    lat%site_type = terrace_site
+    lat%lst = terrace_site
     ! Define where steps and corners are
     if ( control_pars%step_period > 0) then
       do j=1,lat%n_cols,control_pars%step_period
-          lat%site_type(:,j)   = step_site
-          lat%site_type(:,j+1) = corner_site
+          lat%lst(:,j)   = step_site
+          lat%lst(:,j+1) = corner_site
       end do
       n_site_types = n_max_site_types
     else
@@ -212,7 +213,7 @@ contains
         end if
         lat%occupations(i,j) = counter
         ! Warning: arbitrary choice for the ads. site (the 1st available)!
-        ads_site = lat%avail_ads_sites(current_species,lat%site_type(i,j))%list(1)
+        ads_site = lat%avail_ads_sites(current_species,lat%lst(i,j))%list(1)
         lat%ads_list(counter) = adsorbate(i,j,ads_site,current_species)
         if (counter == lat%n_ads_tot()) exit loop1
       end do
@@ -286,7 +287,7 @@ contains
 
     print '(A)',' site type matrix:'
     do i=1,this%n_rows
-      write(6,'(100i4)') (this%site_type(i,j), j=1,this%n_cols)
+      write(6,'(100i4)') (this%lst(i,j), j=1,this%n_cols)
     end do
     print *
   end subroutine mc_lat_print_st
@@ -340,7 +341,7 @@ contains
                + this%shell_list(1,ihop,2) - 1, this%n_cols) + 1
 
     id = this%ads_list(i)%id
-    site_type = this%site_type(row,col)
+    site_type = this%lst(row,col)
     list_size = size( this%avail_ads_sites(id,site_type)%list )
     if ( list_size > 1 ) then
       ads_site = this%avail_ads_sites(id,site_type)%list(irand(list_size))
