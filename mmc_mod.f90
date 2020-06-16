@@ -124,7 +124,6 @@ subroutine metropolis(lat, c_pars, e_pars)
 
     if (mod(istep, c_pars%save_period) == 0) then
       call progress_bar(100*istep/c_pars%n_mmc_steps)
-!      write(*,'(A,i0)'), 'mmc step = ', istep
       ! Save configuration
       write(outcfg_unit,'(A10,i0)') "mmc step ",istep
       write(outcfg_unit,'(100i10)') lat%n_ads
@@ -144,6 +143,13 @@ subroutine metropolis(lat, c_pars, e_pars)
     end if
 
   enddo ! over mmc steps
+
+  ! Save the last configuration
+  if (mod(c_pars%n_mmc_steps, c_pars%save_period) /= 0) then
+    write(outcfg_unit,'(A10,i0)') "mmc step ",c_pars%n_mmc_steps
+    write(outcfg_unit,'(100i10)') lat%n_ads
+    call lat%print_ads(outcfg_unit)
+  end if
 
   close(outcfg_unit)
   close(outeng_unit)

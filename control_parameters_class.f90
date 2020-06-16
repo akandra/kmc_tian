@@ -69,6 +69,7 @@ contains
     character(len=max_string_length) :: words(100)
 
     real(dp),allocatable :: coverage(:)
+    integer :: default_int = huge(0)
 
 
 
@@ -78,7 +79,7 @@ contains
     control_parameters_init%n_cols           = -1
     control_parameters_init%step_period      = -1
     control_parameters_init%n_species        = -1
-    control_parameters_init%save_period      = -1
+    control_parameters_init%save_period      = default_int
     control_parameters_init%temperature      = -1.0_dp
     control_parameters_init%energy_file_name = 'none'
     control_parameters_init%cfg_file_name    = 'none'
@@ -88,13 +89,13 @@ contains
     control_parameters_init%hist_period      = -1
     ! kMC-specific parameters
     control_parameters_init%n_trajs          = -1
-    control_parameters_init%n_bins           = -1
+    control_parameters_init%n_bins           = default_int
     control_parameters_init%t_end            = -1.0_dp
     control_parameters_init%rate_file_name   = 'none'
 
     control_parameters_init%file_name_base = file_name_base
     !  read control parameters from the input file
-    call open_for_read(inp_unit, trim(file_name_base)//'.in' )
+    call open_for_read(inp_unit, trim(file_name_base)//'.control' )
 
     ios = 0
     do while (ios == 0)
@@ -171,7 +172,7 @@ contains
             if (nwords/=2) stop err // "start_conf must have 1 parameter."
             read(words(2),*) control_parameters_init%cfg_file_name
 
-          case('save_period')
+          case('mmc_save_period')
             if (nwords/=2) stop err // "save_period must have 1 parameter."
             read(words(2),*) control_parameters_init%save_period
 
@@ -225,6 +226,28 @@ contains
     ! Calculate number of adsorbate particles
     control_parameters_init%n_ads = nint(coverage*control_parameters_init%n_rows&
                                                  *control_parameters_init%n_cols)
+
+    select case (control_parameters_init%algorithm)
+
+    case('mmc')
+      ! Set mmc_save_period to the proper value
+      if (control_parameters_init%save_period == 0 )&
+        control_parameters_init%save_period = control_parameters_init%n_mmc_steps + 1
+      if (control_parameters_init%save_period == default_int )&
+        stop err // "mmc_save_period is undefined."
+      if (control_parameters_init%save_period < 0 )&
+        stop err // "mmc_save_period is negative."
+
+    case('bkl')
+      ! Check kmc_nbins
+      if (control_parameters_init%n_bins == 0 ) control_parameters_init%n_bins = 1
+      if (control_parameters_init%n_bins == default_int )&
+        stop err // "kmc_nbins is undefined."
+      if (control_parameters_init%n_bins < 0 )&
+        stop err // "kmc_nbins is negative."
+
+
+    end select
 
   end function
 

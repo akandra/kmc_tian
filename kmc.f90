@@ -26,15 +26,9 @@ end select
 
 ! Read simulation parameters
 c_pars = control_parameters_init(file_name_base)
-!print*, control_pars
 e_pars = energy_parameters_init(c_pars)
-!print*, energy_pars
 !   initialize lattice
 lat = mc_lat_init(c_pars, e_pars)
-
-!  call lat%print_st
-!  call lat%print_ocs
-!  call lat%print_ads
 
 select case (c_pars%algorithm)
 
@@ -48,17 +42,5 @@ select case (c_pars%algorithm)
     stop 'Error: mc algorithm not defined'
 
 end select
-
-call open_for_write(outcfg_unit,trim(c_pars%file_name_base)//'.out')
-
-write(outcfg_unit,'(A10,A10,A15)') "# rows","# cols","step_period"
-write(outcfg_unit,'(3i10)') lat%n_rows, lat%n_cols, c_pars%step_period
-write(outcfg_unit,'(100A10)') adjustr(c_pars%ads_names)
-write(outcfg_unit,'(100i10)') lat%n_ads
-write(outcfg_unit,'(5A10)') "#","row","col","ads_site", "species"
-call lat%print_ads(outcfg_unit)
-
-
-close(outcfg_unit)
 
 end program

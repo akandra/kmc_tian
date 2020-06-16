@@ -7,6 +7,11 @@ module utilities
 
   public
 
+  interface progress_bar
+    module procedure int_bar, real_bar, realdp_bar, &
+                     intdual_bar, real_dual_bar, realdp_dual_bar
+  end interface
+
 contains
 
   !-----------------------------------------------------
@@ -98,8 +103,13 @@ contains
 
   end function read_num
 
-  subroutine progress_bar( percent_done, symbol )
+!------------------------------------------------------------------------------
+!                 Progress bar of various flavors
+!------------------------------------------------------------------------------
 
+!------------------------------------------------------------------------------
+  subroutine int_bar( percent_done, symbol )
+!------------------------------------------------------------------------------
     integer, intent(in)                   :: percent_done
     character(len=1), intent(in),optional :: symbol
 
@@ -108,7 +118,6 @@ contains
     character(len=1)    :: symb
     character(len=56)   :: hdr = "    0   10   20   30   40   50   60   70   80   90  100 "
     character(len=56)   :: bar = "???%|                                                  |"
-    logical             :: first = .true.
 
     symb = '*'
     if(present(symbol)) symb = symbol
@@ -123,17 +132,108 @@ contains
       end if
     enddo
 
-  !    ! output the percent_done bar to the screen
-  !    if (first) then
-  !      write(output_unit, "(10x, a56)") hdr
-  !      first=.false.
-  !    end if
-
-    write(output_unit, "(a, 10x, a56)", advance='no') cr, bar
+  ! output the percent_done bar to the screen
+     write(output_unit, "(a, 10x, a56)", advance='no') cr, bar
     flush(output_unit)
 
-  end subroutine progress_bar
+  end subroutine int_bar
 
+!------------------------------------------------------------------------------
+  subroutine intdual_bar( label1, prog1, label2, prog2 )
+!------------------------------------------------------------------------------
+
+    integer, intent(in)          :: prog1, prog2
+    character(*), intent(in)     :: label1, label2
+
+    integer           :: i
+    character(len=1)  :: cr = char(13)
+    character(len=1)  :: symb = '*'
+    character(len=31) :: bar1 = "???%|                         |"
+    character(len=31) :: bar2 = "???%|                         |"
+
+
+    ! construct the percent_done bars
+    write(unit=bar1(1:3),fmt="(i3)") prog1
+    write(unit=bar2(1:3),fmt="(i3)") prog2
+    do i=1, 25
+      if(prog1 >= i*4 ) then
+        bar1(i+5:i+5)= symb
+      else
+        bar2(i+5:i+5)= ' '
+      end if
+
+      if(prog2 >= i*4 ) then
+        bar2(i+5:i+5)= symb
+      else
+        bar2(i+5:i+5)= ' '
+      end if
+    enddo
+
+    ! write the bars to the screen
+    write(output_unit, "(a,  a, 1x,  a31, 5x, a, 1x,  a31)", advance='no') &
+                         cr, label1, bar1,    label2, bar2
+    flush(output_unit)
+
+  end subroutine intdual_bar
+
+
+
+!------------------------------------------------------------------------------
+  subroutine real_bar( percent_done, symbol )
+!------------------------------------------------------------------------------
+    real, intent(in)                      :: percent_done
+    character(len=1), intent(in),optional :: symbol
+
+    if (present(symbol)) then
+      call progress_bar( int(percent_done), symbol )
+    else
+      call progress_bar( int(percent_done) )
+    endif
+
+  end subroutine real_bar
+
+
+!------------------------------------------------------------------------------
+  subroutine realdp_bar( percent_done, symbol )
+!------------------------------------------------------------------------------
+    real(dp), intent(in)                      :: percent_done
+    character(len=1), intent(in),optional :: symbol
+
+    if (present(symbol)) then
+      call progress_bar( int(percent_done), symbol )
+    else
+      call progress_bar( int(percent_done) )
+    endif
+
+  end subroutine realdp_bar
+
+
+
+!------------------------------------------------------------------------------
+  subroutine real_dual_bar(label1, realprog1, label2, realprog2)
+!------------------------------------------------------------------------------
+    real , intent(in)            :: realprog1, realprog2
+    character(*), intent(in)     :: label1, label2
+    integer                      :: p1, p2
+
+    p1 = int(realprog1)
+    p2 = int(realprog2)
+
+    call intdual_bar(label1, p1, label2, p2)
+  end subroutine
+
+  !------------------------------------------------------------------------------
+  subroutine realdp_dual_bar(label1, realprog1, label2, realprog2)
+!------------------------------------------------------------------------------
+    real(dp) , intent(in)            :: realprog1, realprog2
+    character(*), intent(in)     :: label1, label2
+    integer                      :: p1, p2
+
+    p1 = int(realprog1)
+    p2 = int(realprog2)
+
+    call intdual_bar(label1, p1, label2, p2)
+  end subroutine
 
 !------------------------------------------------------------------------------
 !                 Miscellaneous

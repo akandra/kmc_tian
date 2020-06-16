@@ -24,20 +24,19 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
   type( rates_type)        :: r
 
   real(dp) :: beta
-  character(len=max_string_length) :: n_ads_fmt
-  integer :: itraj, step_bin, ibin, k_change
-  integer :: i,m,ads,m_nn, n_nn, n_nn2, iads
+  character(len=max_string_length) :: buffer, n_ads_fmt
+  integer :: itraj, ibin, ibin_new, k_change
+  integer :: i,m,ads,m_nn, n_nn, n_nn2, iads, species
   integer :: kmc_nsteps
-  integer :: largest_label, hist_counter
+  integer, dimension(lat%n_rows,lat%n_cols) :: cluster_label
+  integer, dimension(maxval(lat%n_ads)) :: cluster_sizes
+  integer :: largest_label
   integer, dimension(c_pars%n_species,maxval(lat%n_ads)) :: hist
   integer :: n_ads_total
-  integer :: row_old, col_old, st_old, ast_old
-  integer :: row_new, col_new, st_new, ast_new
-  integer :: row, col, site, id
-  integer, dimension(lat%n_nn(1)) :: nn_row, nn_col
+  integer :: row, col, row_new, col_new, lst_new, ast_new, id
   real(dp) :: energy_old, energy_new
   real(dp) :: time, total_rate, u, rate_acc
-  real(dp) :: delta_t, time_new
+  real(dp) :: delta_t, time_new, step_bin
   integer, dimension(lat%n_nn(1),lat%n_nn(1)/2) :: nn_new
   integer, dimension(2*lat%n_nn(1)) :: change_list
 
@@ -59,44 +58,14 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
   end do
   end do
 
-  ! Output formats
-  write(n_ads_fmt,'(i10)') lat%n_ads_tot()
-  n_ads_fmt = '('//trim(adjustl(n_ads_fmt))//'i8)'
-
-  ! write initial state of the lattice to a file
-  call open_for_write(outcfg_unit,trim(c_pars%file_name_base)//'.confs')
-
-  write(outcfg_unit,'(A10,A10,A15)') &
-                "# rows","# cols","step_period"
-  write(outcfg_unit,'(3i10)') lat%n_rows, lat%n_cols, c_pars%step_period
-  write(outcfg_unit,'(100A10)') adjustr(c_pars%ads_names)
-  write(outcfg_unit,'(A10,i0)') "bkl step ", 0
-  write(outcfg_unit,'(100i10)') lat%n_ads
-!  write(outcfg_unit,'(5A10)') "#","row","col","ads_site", "species"
-  call lat%print_ads(outcfg_unit)
-
-  ! write initial total energy of the system
-  call open_for_write(outeng_unit,trim(c_pars%file_name_base)//'.en')
-  write(outeng_unit,*) 0, total_energy(lat,e_pars)
-
-  ! open file for saving cluster size histogram
-  if (c_pars%hist_period > 0) &
-    call open_for_write(outhst_unit,trim(c_pars%file_name_base)//'.hist')
-  ! Initialize cluster histogram counters
-  hist_counter = 0
-  hist = 0
-
   ! time binning for distributions
-  if (c_pars%n_bins > 0) step_bin = c_pars%t_end/c_pars%n_bins
+  step_bin = c_pars%t_end/c_pars%n_bins
 
+  write(*,'(20X,A)') "B.K.L. Code's progress report:"
+  ! Loop over trajectories
   do itraj=1, c_pars%n_trajs
 
-    print*
-    print*, 'Running trajectory no.',itraj
-    print*
-    write(*,'(20X,A)') "B.K.L. Code's progress report:"
-    call progress_bar(0)
-
+    call progress_bar( 'overall', 100*itraj/c_pars%n_trajs , '   current trajectory', 0)
 
     ibin = 1
     kmc_nsteps = 0
@@ -104,23 +73,29 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
     ! initialize random number generator
     call random_seed(put=itraj*randseed*42)
 
-    !write(buffer,'(i6.6)') itraj
-!            if (n_bins > 0) then
-!
-!                call open_for_write(outeng_unit,trim(fname)//trim(buffer)//'.en')
-!                write(outeng_unit,*) big_bang ,&
-!                    total_energy(nlat, nads, nnn, occupations, site_type, &
-!                                 ads_list, nn_list, ads_energy, int_energy)/eV2K
-!
-!                call open_for_write(outhst_unit,trim(fname)//trim(buffer)//'.csz')
-!                write(outhst_unit,*) t_end, n_bins
-!
-!            end if
+    write(buffer,'(i6.6)') itraj
+
+    ! write initial state of the lattice to a file
+    call open_for_write(outcfg_unit,trim(c_pars%file_name_base)//trim(buffer)//'.confs')
+    write(outcfg_unit,'(A10,A10,A15)') &
+                  "# rows","# cols","step_period"
+    write(outcfg_unit,'(3i10)') lat%n_rows, lat%n_cols, c_pars%step_period
+    write(outcfg_unit,'(100A10)') adjustr(c_pars%ads_names)
+    write(outcfg_unit,'(A6,1pe12.3)') "time ",0.0_dp
+    write(outcfg_unit,'(100i10)') lat%n_ads
+    call lat%print_ads(outcfg_unit)
+    ! write initial total energy of the system
+    call open_for_write(outeng_unit,trim(c_pars%file_name_base)//trim(buffer)//'.en')
+    write(outeng_unit,'(1pe12.3,1pe12.3)') 0.0_dp, total_energy(lat,e_pars)
+    ! open file for saving cluster size histogram
+    call open_for_write(outhst_unit,trim(c_pars%file_name_base)//trim(buffer)//'.hist')
+    ! Initialize cluster histogram
+    hist = 0
 
     ! Construct rates array
     do i=1,n_ads_total
       call r%construct_rates(i, lat, e_pars, beta)
-    end do ! i
+    end do
 
 !    call lat%print_ocs
 !    do i = 1,n_ads_total
@@ -147,13 +122,13 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
       ! random number to select a process
       u = ran1()*total_rate
 
-      ! determine reaction channel (adsorbate, direction, ads. site)
-      !                            (      ads,      m_nn,   ast_new)
+      ! determine reaction channel (adsorbate, direction, ads. site of available ones)
+      !                            (      ads,      m_nn,                        iads)
       rate_acc = 0.0_dp
       extloop: do ads=1,n_ads_total
         do m_nn=1,n_nn
-        do ast_new=1,size(r%rates(ads,m_nn)%list) ! Warning: check timing of size calculation
-          rate_acc = rate_acc + r%rates(ads,m_nn)%list(ast_new)
+        do iads=1,size(r%rates(ads,m_nn)%list) ! Warning: check timing of size calculation
+          rate_acc = rate_acc + r%rates(ads,m_nn)%list(iads)
           if (u < rate_acc) exit extloop
         end do
         end do
@@ -162,45 +137,52 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
       delta_t = -log(ran1())/total_rate   ! when does a hop occur?
       time_new = time + delta_t
       kmc_nsteps = kmc_nsteps + 1
-      call progress_bar(int(100*time_new/c_pars%t_end))
+      call progress_bar( 'overall', 100*itraj/c_pars%n_trajs , &
+                          '   current trajectory', int(100*time_new/c_pars%t_end))
 
 !      print*, 'ran. number is ', u/total_rate, 'rate_acc is ',rate_acc
 !      print*, 'reaction channel is:', 'ads = ',ads, 'dir = ',m_nn, 'ads. site is ',ast_new
 !      print*, 'rate  is ',rates(ads,m_nn)%list(ast_new)
 !      stop 321
 
-!      if (time_new > t_end) time_new = t_end
+      if (time_new > c_pars%t_end) time_new = c_pars%t_end
 
-!                if(n_bins > 0) then
-!
-!
-!                    ibin_new = int(time_new/step_bin) + 1
-!
-!                    if (ibin_new - ibin > 0 ) then
-!                        call hoshen_kopelman(cluster_label, largest_label, occupations, ads_list, &
-!                                                nn_list, nads, nlat, nnn)
-!                        call count_cluster_sizes(cluster_sizes, cluster_label,&
-!                                                                ads_list, nads, nlat)
-!                        hist = 0
-!                        do i=1,largest_label
-!                            if (cluster_sizes(i) > 0) &
-!                                hist(cluster_sizes(i)) = hist(cluster_sizes(i)) + 1
-!                        end do
-!
-!                        write(outhst_unit,*) ibin
-!                        write(outhst_unit,ads_fmt) hist
-!
-!!                        write(6,cfg_fmt) (occupations(i,:), i=1,nlat)
-!                        write(outeng_unit,*) time,&
-!                            total_energy(nlat, nads, nnn, occupations, site_type, &
-!                                         ads_list, nn_list, ads_energy, int_energy)/eV2K
-!
-!                    end if
-!
-!                    ibin = ibin_new
-!
-!                end if
-!
+      ibin_new = int(time_new/step_bin) + 1
+
+      if (ibin_new - ibin > 0 ) then
+
+        !-----Save configuration
+        write(outcfg_unit,'(A6,1pe12.3)') "time ",ibin*step_bin
+        write(outcfg_unit,'(100i10)') lat%n_ads
+        call lat%print_ads(outcfg_unit)
+
+        !-----Save energy
+        write(outeng_unit,'(1pe12.3,1pe12.3)') ibin*step_bin, total_energy(lat,e_pars)
+
+        !-----Save histogram with cluster sizes
+        ! Output formats
+        write(n_ads_fmt,'(i10)') lat%n_ads_tot()
+        n_ads_fmt = '('//trim(adjustl(n_ads_fmt))//'i8)'
+        ! Calculate histogram
+        do species=1,c_pars%n_species
+          call lat%hoshen_kopelman(species, cluster_label, largest_label)
+          call lat%cluster_size(species, cluster_label, cluster_sizes)
+          do i=1,largest_label
+            if (cluster_sizes(i) > 0) &
+              hist(species,cluster_sizes(i)) = hist(species,cluster_sizes(i)) + 1
+          end do
+        end do
+        ! Save cluster size histogram
+        write(outhst_unit,'(A6,1pe12.3)') "time ",ibin*step_bin
+        do species=1,c_pars%n_species
+          write(outhst_unit,*) species
+          write(outhst_unit,n_ads_fmt) hist(species,:)
+        end do
+        hist = 0
+
+      end if
+
+      ibin = ibin_new
       time = time_new ! time shift
 
 !------------ Update rate constants
@@ -224,6 +206,9 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
 
       ! a new position of particle (ads) after a hop to a neighbor (m_nn)
       call lat%neighbor(ads,m_nn,row_new,col_new)
+      id = lat%ads_list(ads)%id
+      lst_new = lat%lst(row_new,col_new)
+      ast_new = lat%avail_ads_sites(id,lst_new)%list(iads)
 
       ! Make a hop:
       ! Delete an adsorbate from its old position
@@ -265,22 +250,13 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
       end do
 
     end do ! over time
-!!-------------------------------------------------------------
-!
-!            if (n_bins > 0) then
-!                close(outeng_unit)
-!                close(outhst_unit)
-!            end if
-!
-!            print*,'Number of kmc-steps is ', kmc_nsteps
-!            print*
-!
+!-------------------------------------------------------------
+
+    close(outcfg_unit)
+    close(outeng_unit)
+    close(outhst_unit)
+
   end do ! over trajectories
-
-  close(outcfg_unit)
-  close(outeng_unit)
-
-  if (c_pars%hist_period > 0) close(outhst_unit)
 
 end subroutine Bortz_Kalos_Lebowitz
 
