@@ -73,7 +73,7 @@ contains
     type(energy_parameters),     intent(in) :: energy_pars
     type(mc_lat)               :: lat
 
-    integer :: i, j, k
+    integer :: i, j, k, ios
     integer :: counter, s_counter, current_species
     integer :: n_rows_in, n_cols_in, step_period_in
     character(len=max_string_length) :: line
@@ -224,11 +224,6 @@ contains
       call open_for_read(inp_unit,trim(control_pars%cfg_file_name))
       read(inp_unit,'(A)') line
       read(inp_unit,*) n_rows_in, n_cols_in, step_period_in
-      read(inp_unit,'(A)') line
-      call split_string (line, ads_names_in, n_species_in)
-      allocate(n_ads_in(n_species_in))
-      read(inp_unit,*) n_ads_in
-
       ! Check consistency with control parameters
       if (n_rows_in /= control_pars%n_rows .OR.&
           n_cols_in /= control_pars%n_cols .OR.&
@@ -238,23 +233,39 @@ contains
         print*, ' lattice definition'
         stop
       end if
-      if (n_species_in /= control_pars%n_species .OR.&
-          any(n_ads_in /= control_pars%n_ads)) then
-        print*, 'Error! '
-        print*, ' inconsistency in input and configuration files:'
-        print*, ' adsorbates definition'
-        stop
-      end if
 
-      ! Read the configuration
       read(inp_unit,'(A)') line
-      do i=1,lat%n_ads_tot()
-        read(inp_unit,*) j,lat%ads_list(i)
-        lat%occupations(lat%ads_list(i)%row,&
-                        lat%ads_list(i)%col) = i
-      end do
+      call split_string (line, ads_names_in, n_species_in)
+      allocate(n_ads_in(n_species_in))
+
+      ios = 0
+      do while (ios == 0)
+        read(inp_unit, '(A)', iostat=ios) line
+        if (ios /= 0) exit
+        read(inp_unit,*) n_ads_in
+        ! Check consistency with control parameters
+        if (n_species_in /= control_pars%n_species .OR.&
+            any(n_ads_in /= control_pars%n_ads)) then
+          print*, 'Error! '
+          print*, ' inconsistency in input and configuration files:'
+          print*, ' adsorbates definition'
+          stop
+        end if
+        ! Read the configuration
+        do i=1,lat%n_ads_tot()
+          read(inp_unit, *, iostat=ios) j,lat%ads_list(i)
+          if (ios /= 0) then
+            stop "Error in control file: premature end of the final configuration"
+          end if
+        end do
+      end do ! ios
 
       close(inp_unit)
+
+      ! Fill the lattice with adsorbates
+      do i=1,lat%n_ads_tot()
+        lat%occupations(lat%ads_list(i)%row, lat%ads_list(i)%col) = i
+      end do
 
     end if
 
