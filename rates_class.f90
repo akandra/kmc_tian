@@ -15,14 +15,20 @@ module rates_class
 
   type :: v_list_dp
 
-    real(dp), dimension(:), allocatable :: list
+    real(dp), dimension(:), allocatable :: list ! n_avail_ads_sites
 
   end type
 
+  type :: ads_rate_type
+
+    type(v_list_dp), dimension(:), allocatable :: hop ! n_neighbors
+    real(dp) :: des
+
+  end type
 
   type :: rates_type
-    ! adsorbate-specific rates (n_adsorbates x n_neighbors)
-    type(v_list_dp), dimension(:,:), allocatable :: rates
+    ! adsorbate-specific rates (n_adsorbates)
+    type(ads_rate_type), dimension(:), allocatable :: rates
 
     ! Hopping rates (   n_species                   ->which species
     !                   .  n_adsorption_sites       ->where from
@@ -31,6 +37,12 @@ module rates_class
     !                   .  .  .  .  n_site_type )
     !                   .  .  .  .  .
     real(dp), dimension(:, :, :, :, :), allocatable :: r_hop
+
+    ! Desorption rates ( n_species                   ->which species
+    !                    .  n_adsorption_sites       ->where from
+    !                    .  .  n_site_type     )
+    !                    .  .  .
+    real(dp),  dimension(:, :, :), allocatable :: r_des
     !
     ! TODO
     ! Reaction rates

@@ -244,8 +244,9 @@ contains
         if (ios /= 0) exit
         read(inp_unit,*) n_ads_in
         ! Check consistency with control parameters
-        if (n_species_in /= control_pars%n_species .OR.&
-            any(n_ads_in /= control_pars%n_ads)) then
+        if (n_species_in /= control_pars%n_species &
+        !.OR. any(n_ads_in /= control_pars%n_ads) --- Get rid of that line when our wisdom get improved
+          ) then
           print*, 'Error! '
           print*, ' inconsistency in input and configuration files:'
           print*, ' adsorbates definition'
