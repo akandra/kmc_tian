@@ -6,7 +6,7 @@ module kmc
   use control_parameters_class
   use energy_parameters_class
   use energy_mod
-  use rates_class
+  use rates_hopping_class
 
   implicit none
 
@@ -21,7 +21,7 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
   type(control_parameters), intent(inout) :: c_pars
   type(energy_parameters ), intent(in) :: e_pars
 
-  type( rates_type)        :: r
+  type(hopping_rates_type) :: r_hop
 
   real(dp) :: beta
   character(len=max_string_length) :: buffer, n_ads_fmt
@@ -29,9 +29,11 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
   integer :: i,m,ads,m_nn, n_nn, n_nn2, iads, species
   integer :: kmc_nsteps
   integer, dimension(lat%n_rows,lat%n_cols) :: cluster_label
-  integer, dimension(maxval(lat%n_ads)) :: cluster_sizes
+  ! Warning: size of cluster_sizes and hist array are too large
+  !          consider a way to decrease them
+  integer, dimension(lat%n_rows*lat%n_cols) :: cluster_sizes
   integer :: largest_label
-  integer, dimension(c_pars%n_species,maxval(lat%n_ads)) :: hist
+  integer, dimension(c_pars%n_species,lat%n_rows*lat%n_cols) :: hist
   integer :: n_ads_total
   integer :: row, col, row_new, col_new, lst_new, ast_new, id
   real(dp) :: energy_old, energy_new
@@ -41,8 +43,8 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
   integer, dimension(2*lat%n_nn(1)) :: change_list
 
   ! Create a rate structure
-  r = rates_init(c_pars, lat, e_pars)
-  call r%print_r_hop(c_pars)
+  r_hop = hopping_rates_init(c_pars, lat, e_pars)
+  call r_hop%print(c_pars)
 
   ! inverse thermodynamic temperature
   beta = 1.0_dp/(kB*c_pars%temperature)
@@ -94,13 +96,13 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
 
     ! Construct rates array
     do i=1,n_ads_total
-      call r%construct_rates(i, lat, e_pars, beta)
+      call r_hop%construct(i, lat, e_pars, beta)
     end do
 
 !    call lat%print_ocs
 !    do i = 1,n_ads_total
 !    do m = 1,n_nn
-!      print*, i,m,(r%rates(i,m)%list(iads)==r1%rates(i,m)%list(iads) ,iads=1,size(r%rates(i,m)%list))
+!      print*, i,m,(r_hop%rates(i,m)%list(iads)==r1%rates(i,m)%list(iads) ,iads=1,size(r%rates(i,m)%list))
 !
 !    end do
 !    end do
@@ -114,7 +116,7 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
       total_rate = 0.0_dp
       do ads=1,n_ads_total
       do m=1,n_nn
-        total_rate = total_rate + sum(r%rates(ads,m)%list)
+        total_rate = total_rate + sum(r_hop%rates(ads,m)%list)
       end do
       end do
       !      print*, total_rate
@@ -127,8 +129,8 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
       rate_acc = 0.0_dp
       extloop: do ads=1,n_ads_total
         do m_nn=1,n_nn
-        do iads=1,size(r%rates(ads,m_nn)%list) ! Warning: check timing of size calculation
-          rate_acc = rate_acc + r%rates(ads,m_nn)%list(iads)
+        do iads=1,size(r_hop%rates(ads,m_nn)%list) ! Warning: check timing of size calculation
+          rate_acc = rate_acc + r_hop%rates(ads,m_nn)%list(iads)
           if (u < rate_acc) exit extloop
         end do
         end do
@@ -161,7 +163,7 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
 
         !-----Save histogram with cluster sizes
         ! Output formats
-        write(n_ads_fmt,'(i10)') lat%n_ads_tot()
+        write(n_ads_fmt,'(i10)') n_ads_total
         n_ads_fmt = '('//trim(adjustl(n_ads_fmt))//'i8)'
         ! Calculate histogram
         do species=1,c_pars%n_species
@@ -246,7 +248,7 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
 
       ! Update rate array for the affected adsorbates
       do i=1,k_change
-        call r%construct_rates(change_list(i), lat, e_pars, beta)
+        call r_hop%construct(change_list(i), lat, e_pars, beta)
       end do
 
     end do ! over time

@@ -3,7 +3,7 @@ program kmc_tian
 use mc_lat_class
 use control_parameters_class
 use energy_parameters_class
-use rates_class
+use rates_hopping_class
 use mmc
 use kmc
 use utilities

@@ -1,4 +1,4 @@
-module rates_class
+module rates_hopping_class
 
   use constants
   use control_parameters_class
@@ -11,7 +11,7 @@ module rates_class
   implicit none
 
   private
-  public    :: rates_init, rates_type
+  public    :: hopping_rates_init, hopping_rates_type
 
   type :: v_list_dp
 
@@ -19,52 +19,40 @@ module rates_class
 
   end type
 
-  type :: ads_rate_type
+  type :: hopping_rates_type
 
-    type(v_list_dp), dimension(:), allocatable :: hop ! n_neighbors
-    real(dp) :: des
+    ! Hopping Rates
+    !                          n_adsorbate              -> which particle
+    !                          .  n_neighbor            -> where to
+    !                          .  .
+    type(v_list_dp), dimension(:, :), allocatable :: rates
 
-  end type
-
-  type :: rates_type
-    ! adsorbate-specific rates (n_adsorbates)
-    type(ads_rate_type), dimension(:), allocatable :: rates
-
-    ! Hopping rates (   n_species                   ->which species
-    !                   .  n_adsorption_sites       ->where from
-    !                   .  .  n_site_type
-    !                   .  .  .  n_adsorption_sites ->where to
-    !                   .  .  .  .  n_site_type )
+    !               (   n_species                       -> which species
+    !                   .  n_site_type                  -> where from
+    !                   .  .  n_adsorption_sites
+    !                   .  .  .  n_site_type            -> where to
+    !                   .  .  .  .  n_adsorption_sites )
     !                   .  .  .  .  .
-    real(dp), dimension(:, :, :, :, :), allocatable :: r_hop
-
-    ! Desorption rates ( n_species                   ->which species
-    !                    .  n_adsorption_sites       ->where from
-    !                    .  .  n_site_type     )
-    !                    .  .  .
-    real(dp),  dimension(:, :, :), allocatable :: r_des
-    !
-    ! TODO
-    ! Reaction rates
+    real(dp), dimension(:, :, :, :, :), allocatable :: process
 
   contains
-    procedure :: construct_rates
-    procedure ::  print_r_hop
+    procedure :: construct
+    procedure ::  print
 
   end type
 
 
-  interface rates_type
+  interface hopping_rates_type
 
-    module procedure :: rates_init
+    module procedure :: hopping_rates_init
 
   end interface
 
 contains
 !------------------------------------------------------------------------------
-  function rates_init(c_pars, lat, e_pars)
+  function hopping_rates_init(c_pars, lat, e_pars)
 !------------------------------------------------------------------------------
-    type(rates_type) rates_init
+    type(hopping_rates_type) hopping_rates_init
 
     type(control_parameters), intent(inout) :: c_pars
     type(mc_lat)            , intent(in)    :: lat
@@ -96,22 +84,22 @@ contains
     integer :: row, col, site, id
 
     ! Allocate rates array
-    allocate( rates_init%rates(lat%n_ads_tot(),lat%n_nn(1)) )
+    allocate( hopping_rates_init%rates(lat%n_rows*lat%n_cols,lat%n_nn(1)) )
     do i=1,lat%n_ads_tot()
       row = lat%ads_list(i)%row
       col = lat%ads_list(i)%col
       site = lat%lst(row,col)
       id  = lat%ads_list(i)%id
       do m=1,lat%n_nn(1)
-        allocate( rates_init%rates(i,m)%list(size(lat%avail_ads_sites(id,site)%list)) )
+        allocate( hopping_rates_init%rates(i,m)%list(size(lat%avail_ads_sites(id,site)%list)) )
       end do
     end do
 
-    allocate(rates_init%r_hop( c_pars%n_species,&
-                               n_max_site_types, n_max_ads_sites,&
-                               n_max_site_types, n_max_ads_sites) )
+    allocate(hopping_rates_init%process( c_pars%n_species,&
+                                 n_max_site_types, n_max_ads_sites,&
+                                 n_max_site_types, n_max_ads_sites) )
 
-    rates_init%r_hop = default_rate
+    hopping_rates_init%process = default_rate
 
     !  read rate definitions from the input file
     file_name = c_pars%rate_file_name
@@ -174,7 +162,7 @@ contains
                              "wrong species name in the hopping section")
 
                 ! check for duplicate entry
-                if (rates_init%r_hop(current_species_id,i1,i2,i3,i4 ) /= default_rate)&
+                if (hopping_rates_init%process(current_species_id,i1,i2,i3,i4 ) /= default_rate)&
                   call error_message(file_name, line_number, buffer, "duplicated entry (check symetry duplicates)")
 
                 ! check energy is defined for initial and final site_type and ads_site
@@ -195,11 +183,11 @@ contains
                                               "Arrhenius must have 2 parameters")
                     read(words(5),*) pars(1)
                     read(words(6),*) pars(2)
-                    rates_init%r_hop(current_species_id,i1,i2,i3,i4 ) = &
+                    hopping_rates_init%process(current_species_id,i1,i2,i3,i4 ) = &
                                 arrhenius(c_pars%temperature, pars(1:2))
                     ! symmetrize
-                    rates_init%r_hop(current_species_id,i3,i4,i1,i2 ) = &
-                    rates_init%r_hop(current_species_id,i1,i2,i3,i4 )
+                    hopping_rates_init%process(current_species_id,i3,i4,i1,i2 ) = &
+                    hopping_rates_init%process(current_species_id,i1,i2,i3,i4 )
 
                   case (extArrhenius_id)
                     if (nwords/=7) call error_message(file_name, line_number, buffer,&
@@ -207,11 +195,11 @@ contains
                     read(words(5),*) pars(1)
                     read(words(6),*) pars(2)
                     read(words(7),*) pars(3)
-                    rates_init%r_hop(current_species_id,i1,i2,i3,i4 ) = &
+                    hopping_rates_init%process(current_species_id,i1,i2,i3,i4 ) = &
                                 extArrhenius(c_pars%temperature, pars(1:3))
                     ! symmetrize
-                    rates_init%r_hop(current_species_id,i3,i4,i1,i2 ) = &
-                    rates_init%r_hop(current_species_id,i1,i2,i3,i4 )
+                    hopping_rates_init%process(current_species_id,i3,i4,i1,i2 ) = &
+                    hopping_rates_init%process(current_species_id,i1,i2,i3,i4 )
 
                   case default
                     call error_message(file_name, line_number, buffer, "This cannot happen! Check the code!")
@@ -240,7 +228,8 @@ contains
             end if
 
           case default
-            call error_message(file_name, line_number, buffer, "unknown key")
+            if (get_index(words(1),reaction_names) == 0)&
+              call error_message(file_name, line_number, buffer, "unknown key")
 
         end select
 
@@ -281,7 +270,7 @@ contains
 
       e_defined1 = e_pars%ads_energy(species, st1, ast1) /= e_pars%undefined_energy
       e_defined2 = e_pars%ads_energy(species, st2, ast2) /= e_pars%undefined_energy
-      r_defined  = rates_init%r_hop (species, st1, ast1, st2, ast2) /= default_rate
+      r_defined  = hopping_rates_init%process (species, st1, ast1, st2, ast2) /= default_rate
 
       if ( (e_defined1 .and. e_defined2) .and. (.not. r_defined)) then
         if (.not. undefined_rate) then
@@ -321,7 +310,7 @@ contains
 !
 !      e_defined1 = e_pars%ads_energy(species, st1, ast1) /= e_pars%undefined_energy
 !      e_defined2 = e_pars%ads_energy(species, st2, ast2) /= e_pars%undefined_energy
-!      r_defined  = rates_init%r_hop (species, st1, ast1, st2, ast2) /= default_rate
+!      r_defined  = hopping_rates_init%process (species, st1, ast1, st2, ast2) /= default_rate
 !
 !      if ( r_defined .and. .not. (e_defined1 .and. e_defined2)) then
 !
@@ -361,12 +350,12 @@ contains
 
     end if
 
-  end function rates_init
+  end function hopping_rates_init
 
 !-----------------------------------------------------------------------------
-  subroutine construct_rates(this, ads, lat, e_pars, beta)
+  subroutine construct(this, ads, lat, e_pars, beta)
 !-----------------------------------------------------------------------------
-    class(rates_type), intent(inout) :: this
+    class(hopping_rates_type), intent(inout) :: this
     integer, intent(in) :: ads
     class(mc_lat), intent(inout) :: lat
     class(energy_parameters), intent(in) :: e_pars
@@ -410,7 +399,7 @@ contains
         lat%ads_list(ads)%col = col_new
         lat%occupations(row_new,col_new) = ads
 
-        ! Loop over adsorption site
+        ! Loop over adsorption sites
         do iads = 1, size(lat%avail_ads_sites(id,lst_new)%list)
 
           ! Move particle ads to adsorption site list(iads)
@@ -423,20 +412,20 @@ contains
           ! Apply detailed balance when
           ! energy in the old position < energy in the new position
           if (energy_old < energy_new) then
-              this%rates(ads,m)%list(iads) = this%r_hop(id, lst_old, ast_old, lst_new, ast_new)&
+              this%rates(ads,m)%list(iads) = this%process(id, lst_old, ast_old, lst_new, ast_new)&
                   *exp( -beta*(energy_new - energy_old) )
 !                print*
 !                print*, 'id ',id, ' old site ',lst_old,' old ads. site ', ast_old
 !                print*, ' new site ',lst_new,' new ads. site ', ast_new
-!                print*, 'rate ',this%r_hop(id, lst_old, ast_old, lst_new, ast_new)
+!                print*, 'rate ',this%process(id, lst_old, ast_old, lst_new, ast_new)
           else
-              this%rates(ads,m)%list(iads) = this%r_hop(id, lst_old, ast_old, lst_new, ast_new)
-!                print*, id,lst_old, ast_old, lst_new, ast_new,this%r_hop(id, lst_old, ast_old, lst_new, ast_new)
+              this%rates(ads,m)%list(iads) = this%process(id, lst_old, ast_old, lst_new, ast_new)
+!                print*, id,lst_old, ast_old, lst_new, ast_new,this%process(id, lst_old, ast_old, lst_new, ast_new)
           end if
 
 !            print '(A,i4,A,i4,A,i4)', 'ads ',ads,' neighbor ',m,' ads. site ',lat%ads_list(ads)%ast
 !            print '(A,e18.4,A,e18.4)',' E_old = ', energy_old, ' E_new = ',energy_new
-!            print *,' r_hop = ',this%r_hop(id, lst_old, ast_old, lst_new, ast_new),&
+!            print *,' r_hop = ',this%process(id, lst_old, ast_old, lst_new, ast_new),&
 !                                      ' rate = ', this%rates(ads,m)%list(iads)
 !            write(*,*) 'pause'
 !            read(*,*)
@@ -455,18 +444,19 @@ contains
 
     lat%occupations(row_old,col_old) = ads
 
-  end subroutine construct_rates
+  end subroutine construct
+
 !------------------------------------------------------------------------------
-  subroutine print_r_hop(this, c_pars)
+  subroutine print(this, c_pars)
 !------------------------------------------------------------------------------
-    class(rates_type), intent(in) :: this
+    class(hopping_rates_type), intent(in) :: this
 
     class(control_parameters), intent(in) :: c_pars
 
     integer :: i, i1, i2, i3, i4
 
     print*, 'Hopping Rates:'
-    do i=1,size(this%r_hop,1)
+    do i=1,size(this%process,1)
       print '(/A)','---------------------------'
       print '( A,A)','species: ', c_pars%ads_names(i)
       print '(A)', '---------------------------'
@@ -474,13 +464,13 @@ contains
       do i2=1,n_max_ads_sites
       do i3=1,n_max_site_types
       do i4=1,n_max_ads_sites
-        if (this%r_hop(i,i1,i2,i3,i4)< 0.0_dp) then
+        if (this%process(i,i1,i2,i3,i4)< 0.0_dp) then
           cycle
         else
           write(*,'(A,A,2X,A,A,6e12.3)') &
               site_names(i1), ads_site_names(i2), &
               site_names(i3), ads_site_names(i4), &
-              this%r_hop(i,i1,i2,i3,i4)
+              this%process(i,i1,i2,i3,i4)
         end if
       end do
       end do
@@ -489,7 +479,7 @@ contains
     end do
     print*
 
-  end subroutine print_r_hop
+  end subroutine print
 
 !-----------------------------------------------------------------------------
 !             Temperature dependence law subroutines
@@ -525,4 +515,4 @@ contains
 
   end function extArrhenius
 
-end module rates_class
+end module rates_hopping_class
