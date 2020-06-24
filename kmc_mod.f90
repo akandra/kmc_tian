@@ -67,7 +67,7 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
   ! Loop over trajectories
   do itraj=1, c_pars%n_trajs
 
-    call progress_bar( 'overall', 100*itraj/c_pars%n_trajs , '   current trajectory', 0)
+    call progress_bar( 'current trajectory ', 0* 100*itraj/c_pars%n_trajs , '   total', 0)
 
     ibin = 1
     kmc_nsteps = 0
@@ -139,8 +139,14 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
       delta_t = -log(ran1())/total_rate   ! when does a hop occur?
       time_new = time + delta_t
       kmc_nsteps = kmc_nsteps + 1
-      call progress_bar( 'overall', 100*itraj/c_pars%n_trajs , &
-                          '   current trajectory', int(100*time_new/c_pars%t_end))
+
+      call progress_bar(                  &
+          'current trajectory',           &
+          int(100*time_new/c_pars%t_end), &
+          '   total',                     &
+          ! total =  % completed trajs + contribution form current trajctory
+          100*(itraj-1)/c_pars%n_trajs + int(100.*time_new/(c_pars%t_end*c_pars%n_trajs)))
+
 
 !      print*, 'ran. number is ', u/total_rate, 'rate_acc is ',rate_acc
 !      print*, 'reaction channel is:', 'ads = ',ads, 'dir = ',m_nn, 'ads. site is ',ast_new

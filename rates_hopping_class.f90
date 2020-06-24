@@ -74,7 +74,10 @@ contains
     integer               :: current_law_id
 
     integer               :: parse_state
-    integer, parameter    :: parse_state_default = 0
+    integer, parameter    :: parse_state_ignore  = -1
+    integer, parameter    :: parse_state_default =  0
+    integer, parameter    :: parse_state_hopping =  1
+
 
     real(dp), dimension(3):: pars = 0.0_dp
 
@@ -110,6 +113,8 @@ contains
     line_number = 0
     undefined_energy = .false.
 
+
+
     do while (ios == 0)
 
       read(inp_unit, '(A)', iostat=ios) buffer
@@ -125,12 +130,13 @@ contains
         call split_string(buffer, words, nwords)
 
         select case (words(1)) ! take a keyword
-
-          case('hopping')
+!------------------------------------------------------------------------------
+          case('hopping')                               ! select case (words(1)
+!------------------------------------------------------------------------------
             if (parse_state /= parse_state_default) &
               call error_message(file_name, line_number, buffer, &
                          "invalid ending of the reaction section")
-            parse_state = get_index('hopping',reaction_names)
+            parse_state = parse_state_hopping
             if (nwords/=3) call error_message(file_name, line_number, buffer, &
                                "hopping key must have 2 parameters")
 
@@ -146,9 +152,16 @@ contains
 !            print*, 'id       =', current_species_id
 !            print*, c_pars%ads_names
 
-          case ('terrace','step','corner')
+!------------------------------------------------------------------------------
+          case ('terrace','step','corner')              ! select case(words(1))
+!------------------------------------------------------------------------------
+
 
             select case (parse_state)
+
+              case(parse_state_ignore)
+                ! ignore
+                 print *, 'warning ignoring line', line_number, buffer
 
               case(hopping_id)
 
@@ -202,7 +215,7 @@ contains
                     hopping_rates_init%process(current_species_id,i1,i2,i3,i4 )
 
                   case default
-                    call error_message(file_name, line_number, buffer, "This cannot happen! Check the code!")
+                    call error_message(file_name, line_number, buffer, "This should not happen! Check the code!")
 
                 end select
 
@@ -218,8 +231,9 @@ contains
 
             end select
 
-
-          case('')
+!------------------------------------------------------------------------------
+          case('')                                      ! select case(words(1))
+!------------------------------------------------------------------------------
             if (buffer == '') then
               parse_state = parse_state_default
 !              print*, 'blank line '
@@ -227,24 +241,26 @@ contains
 !              print*, 'comment: ', trim(buffer)
             end if
 
-          case default
-            if (get_index(words(1),reaction_names) == 0)&
+!------------------------------------------------------------------------------
+          case default                                  ! select case(words(1))
+!------------------------------------------------------------------------------
+            if ( parse_state == parse_state_default .and. get_index(words(1),reaction_names) /= 0 ) &
+              parse_state = parse_state_ignore
+
+            if (parse_state /= parse_state_ignore) &
               call error_message(file_name, line_number, buffer, "unknown key")
 
-        end select
+        end select                                      ! select case(words(1))
 
     end do ! while ios=0
 
     if (undefined_energy) then
       print *
       write(*, '(A)') 'warnings issued because of extraneous lines in rates file'
-      write(*, '(A)', advance='no') 'do you want to continue (y/n): '
-      read(*, '(A)') answer
-      if ('y'/=lower_case(answer)) stop 998
 
     else
       print *
-      print *, 'passed check that energies are defined for all rates'
+      write(*, '(A)') 'passed check that energies are defined for all rates'
 !      pause
     end if
 

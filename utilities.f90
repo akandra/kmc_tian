@@ -159,7 +159,7 @@ contains
       if(prog1 >= i*4 ) then
         bar1(i+5:i+5)= symb
       else
-        bar2(i+5:i+5)= ' '
+        bar1(i+5:i+5)= ' '
       end if
 
       if(prog2 >= i*4 ) then
