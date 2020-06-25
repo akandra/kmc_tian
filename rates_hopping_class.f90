@@ -37,7 +37,7 @@ module rates_hopping_class
 
   contains
     procedure :: construct
-    procedure ::  print
+    procedure :: print
 
   end type
 
@@ -76,7 +76,7 @@ contains
     integer               :: parse_state
     integer, parameter    :: parse_state_ignore  = -1
     integer, parameter    :: parse_state_default =  0
-    integer, parameter    :: parse_state_hopping =  1
+    integer, parameter    :: parse_state_hopping =  hopping_id
 
 
     real(dp), dimension(3):: pars = 0.0_dp
@@ -161,7 +161,7 @@ contains
 
               case(parse_state_ignore)
                 ! ignore
-                 print *, 'warning ignoring line', line_number, buffer
+                ! print *, 'warning ignoring line', line_number, buffer
 
               case(hopping_id)
 
@@ -172,7 +172,7 @@ contains
 
                 if ( i1==0 .or. i2==0 .or. i3==0 .or. i4==0) &
                   call error_message(file_name, line_number, buffer, &
-                             "wrong species name in the hopping section")
+                             "wrong site name in the hopping section")
 
                 ! check for duplicate entry
                 if (hopping_rates_init%process(current_species_id,i1,i2,i3,i4 ) /= default_rate)&
@@ -253,6 +253,8 @@ contains
         end select                                      ! select case(words(1))
 
     end do ! while ios=0
+
+    close(inp_unit)
 
     if (undefined_energy) then
       print *

@@ -7,6 +7,7 @@ module kmc
   use energy_parameters_class
   use energy_mod
   use rates_hopping_class
+  use rates_desorption_class
 
   implicit none
 
@@ -21,7 +22,8 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
   type(control_parameters), intent(inout) :: c_pars
   type(energy_parameters ), intent(in) :: e_pars
 
-  type(hopping_rates_type) :: r_hop
+  type(   hopping_rates_type) :: r_hop
+  type(desorption_rates_type) :: r_des
 
   real(dp) :: beta
   character(len=max_string_length) :: buffer, n_ads_fmt
@@ -43,9 +45,12 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
   integer, dimension(2*lat%n_nn(1)) :: change_list
 
   ! Create a rate structure
-  r_hop = hopping_rates_init(c_pars, lat, e_pars)
+  r_hop =    hopping_rates_init(c_pars, lat, e_pars)
+  r_des = desorption_rates_init(c_pars, lat, e_pars)
   call r_hop%print(c_pars)
+  call r_des%print(c_pars)
 
+stop 222
   ! inverse thermodynamic temperature
   beta = 1.0_dp/(kB*c_pars%temperature)
   ! total number of adsorbates

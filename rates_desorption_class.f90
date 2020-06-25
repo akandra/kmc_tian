@@ -11,72 +11,48 @@ module rates_desorption_class
   implicit none
 
   private
-  public    :: rates_init, rates_type
+  public    :: desorption_rates_init, desorption_rates_type
 
-  type :: v_list_dp
+  type :: desorption_rates_type
 
-    real(dp), dimension(:), allocatable :: list ! n_avail_ads_sites
-
-  end type
-
-  type :: rates_type
-
-    ! Hopping Rates ------------------------------------------
-    !
-    ! Rates (                  n_adsorbate                      -> which particle
-    !                          .  n_neighbor   )                -> where to
-    !                          .  .
-    type(v_list_dp), dimension(:, :), allocatable :: rates_hop
+    ! Desorption Rates
+    !                          n_adsorbate              -> which particle
+    !                          .
+    real(dp), dimension(:), allocatable :: rates
 
     !               (   n_species                       -> which species
     !                   .  n_site_type                  -> where from
-    !                   .  .  n_adsorption_sites
-    !                   .  .  .  n_site_type            -> where to
-    !                   .  .  .  .  n_adsorption_sites )
-    !                   .  .  .  .  .
-    real(dp), dimension(:, :, :, :, :), allocatable :: r_hop
-
-    ! Desorption rates ----------------------------------------
-    !
-    ! Rates (           n_adsorbate                      -> which particle
-    !                   .
-    real(dp), dimension(:), allocatable :: rates_des
-    ! Desorption rates ( n_species                      -> which species
-    !                    .  n_site_type                 -> where from
-    !                    .  .  n_adsorption_sites
-    !                    .  .  .
-    real(dp),  dimension(:, :, :), allocatable :: r_des
-    !
-    ! TODO
-    ! Reaction rates
+    !                   .  .  n_adsorption_sites )
+    !                   .  .  .
+    real(dp), dimension(:, :, :), allocatable :: process
 
   contains
-    procedure :: construct_rates
-    procedure ::  print_r_hop
+    procedure :: construct
+    procedure :: print
 
   end type
 
 
-  interface rates_type
+  interface desorption_rates_type
 
-    module procedure :: rates_init
+    module procedure :: desorption_rates_init
 
   end interface
 
 contains
 !------------------------------------------------------------------------------
-  function rates_init(c_pars, lat, e_pars)
+  function desorption_rates_init(c_pars, lat, e_pars)
 !------------------------------------------------------------------------------
-    type(rates_type) rates_init
+    type(desorption_rates_type) desorption_rates_init
 
     type(control_parameters), intent(inout) :: c_pars
     type(mc_lat)            , intent(in)    :: lat
     type(energy_parameters) , intent(in)    :: e_pars
 
-    integer :: i, ios, nwords, line_number, i1, i2, i3, i4, m
+    integer :: i, ios, nwords, line_number, i1, i2, m
 
-    integer :: species, st1, st2, ast1, ast2
-    logical :: e_defined1, e_defined2, r_defined, undefined_rate, undefined_energy
+    integer :: species, st1, ast1
+    logical :: e_defined1, r_defined, undefined_rate, undefined_energy
 
     character(len=max_string_length)                :: buffer
     character(len=max_string_length)                :: words(100)
@@ -89,7 +65,10 @@ contains
     integer               :: current_law_id
 
     integer               :: parse_state
-    integer, parameter    :: parse_state_default = 0
+    integer, parameter    :: parse_state_ignore     = -1
+    integer, parameter    :: parse_state_default    =  0
+    integer, parameter    :: parse_state_desorption =  desorption_id
+
 
     real(dp), dimension(3):: pars = 0.0_dp
 
@@ -99,22 +78,11 @@ contains
     integer :: row, col, site, id
 
     ! Allocate rates array
-    allocate( rates_init%rates(lat%n_ads_tot(),lat%n_nn(1)) )
-    do i=1,lat%n_ads_tot()
-      row = lat%ads_list(i)%row
-      col = lat%ads_list(i)%col
-      site = lat%lst(row,col)
-      id  = lat%ads_list(i)%id
-      do m=1,lat%n_nn(1)
-        allocate( rates_init%rates(i,m)%list(size(lat%avail_ads_sites(id,site)%list)) )
-      end do
-    end do
+    allocate( desorption_rates_init%rates(lat%n_rows*lat%n_cols) )
+    allocate( desorption_rates_init%process( c_pars%n_species,&
+                                 n_max_site_types, n_max_ads_sites) )
 
-    allocate(rates_init%r_hop( c_pars%n_species,&
-                               n_max_site_types, n_max_ads_sites,&
-                               n_max_site_types, n_max_ads_sites) )
-
-    rates_init%r_hop = default_rate
+    desorption_rates_init%process = default_rate
 
     !  read rate definitions from the input file
     file_name = c_pars%rate_file_name
@@ -124,6 +92,8 @@ contains
     parse_state = parse_state_default
     line_number = 0
     undefined_energy = .false.
+
+
 
     do while (ios == 0)
 
@@ -140,19 +110,21 @@ contains
         call split_string(buffer, words, nwords)
 
         select case (words(1)) ! take a keyword
+!------------------------------------------------------------------------------
+          case('desorption')                               ! select case (words(1)
+!------------------------------------------------------------------------------
 
-          case('hopping')
             if (parse_state /= parse_state_default) &
               call error_message(file_name, line_number, buffer, &
                          "invalid ending of the reaction section")
-            parse_state = get_index('hopping',reaction_names)
+            parse_state = parse_state_desorption
             if (nwords/=3) call error_message(file_name, line_number, buffer, &
-                               "hopping key must have 2 parameters")
+                               "desorption key must have 2 parameters")
 
             read(words(2),'(A)') current_species_name
             current_species_id = get_index(current_species_name, c_pars%ads_names )
             if (current_species_id == 0) call error_message(file_name, line_number, buffer, &
-                                                  "inconsistent hopping definition")
+                                                  "inconsistent desorption definition")
 
             current_law_id = get_index(words(3), law_names )
             if (current_law_id == 0) call error_message(file_name, line_number, buffer, &
@@ -161,28 +133,32 @@ contains
 !            print*, 'id       =', current_species_id
 !            print*, c_pars%ads_names
 
-          case ('terrace','step','corner')
+!------------------------------------------------------------------------------
+          case ('terrace','step','corner')              ! select case(words(1))
+!------------------------------------------------------------------------------
+
 
             select case (parse_state)
 
-              case(hopping_id)
+              case(parse_state_ignore)
+                ! ignore
+                ! print *, 'warning ignoring line', line_number, buffer
+
+              case(desorption_id)
 
                 i1 = get_index(words(1),    site_names)
                 i2 = get_index(words(2),ads_site_names)
-                i3 = get_index(words(3),    site_names)
-                i4 = get_index(words(4),ads_site_names)
 
-                if ( i1==0 .or. i2==0 .or. i3==0 .or. i4==0) &
+                if ( i1==0 .or. i2==0) &
                   call error_message(file_name, line_number, buffer, &
-                             "wrong species name in the hopping section")
+                             "wrong site name in the desorption section")
 
                 ! check for duplicate entry
-                if (rates_init%r_hop(current_species_id,i1,i2,i3,i4 ) /= default_rate)&
-                  call error_message(file_name, line_number, buffer, "duplicated entry (check symetry duplicates)")
+                if (desorption_rates_init%process(current_species_id,i1,i2 ) /= default_rate)&
+                  call error_message(file_name, line_number, buffer, "duplicated entry")
 
-                ! check energy is defined for initial and final site_type and ads_site
-                if( e_pars%ads_energy(current_species_id, i1, i2) == e_pars%undefined_energy .or. &
-                    e_pars%ads_energy(current_species_id, i3, i4) == e_pars%undefined_energy ) then
+                ! check energy is defined for initial site_type and ads_site
+                if( e_pars%ads_energy(current_species_id, i1, i2) == e_pars%undefined_energy) then
 
                     call error_message(file_name, line_number, buffer, &
                                        "rate defined for site with undefined adsorption energy", &
@@ -194,47 +170,41 @@ contains
                 select case (current_law_id)
 
                   case (Arrhenius_id)
-                    if (nwords/=6) call error_message(file_name, line_number, buffer,&
+                    if (nwords/=4) call error_message(file_name, line_number, buffer,&
                                               "Arrhenius must have 2 parameters")
-                    read(words(5),*) pars(1)
-                    read(words(6),*) pars(2)
-                    rates_init%r_hop(current_species_id,i1,i2,i3,i4 ) = &
+                    read(words(3),*) pars(1)
+                    read(words(4),*) pars(2)
+                    desorption_rates_init%process(current_species_id,i1,i2 ) = &
                                 arrhenius(c_pars%temperature, pars(1:2))
-                    ! symmetrize
-                    rates_init%r_hop(current_species_id,i3,i4,i1,i2 ) = &
-                    rates_init%r_hop(current_species_id,i1,i2,i3,i4 )
 
                   case (extArrhenius_id)
-                    if (nwords/=7) call error_message(file_name, line_number, buffer,&
+                    if (nwords/=5) call error_message(file_name, line_number, buffer,&
                                               "extArrhenius must have 3 parameters")
-                    read(words(5),*) pars(1)
-                    read(words(6),*) pars(2)
-                    read(words(7),*) pars(3)
-                    rates_init%r_hop(current_species_id,i1,i2,i3,i4 ) = &
+                    read(words(3),*) pars(1)
+                    read(words(4),*) pars(2)
+                    read(words(5),*) pars(3)
+                    desorption_rates_init%process(current_species_id,i1,i2 ) = &
                                 extArrhenius(c_pars%temperature, pars(1:3))
-                    ! symmetrize
-                    rates_init%r_hop(current_species_id,i3,i4,i1,i2 ) = &
-                    rates_init%r_hop(current_species_id,i1,i2,i3,i4 )
 
                   case default
-                    call error_message(file_name, line_number, buffer, "This cannot happen! Check the code!")
+                    call error_message(file_name, line_number, buffer, "This should not happen! Check the code!")
 
                 end select
 
-!                 print*, 'reaction: ', reaction_names(parse_state),&
-!                        ' for species:', current_species_name
-!                 print*, 'law: ', law_names(current_law_id),&
-!                        ' from:', site_names(i1),ads_site_names(i2),&
-!                        ' to:'  , site_names(i3),ads_site_names(i4)
-!                print'(A,3f16.3)', 'with pars: ', pars
+                 print*, 'reaction: ', reaction_names(parse_state),&
+                        ' for species:', current_species_name
+                 print*, 'law: ', law_names(current_law_id),&
+                        ' from:', site_names(i1),ads_site_names(i2)
+                print'(A,3f16.3)', 'with pars: ', pars
 
               case default
                 call error_message(file_name, line_number, buffer, "invalid site type statement")
 
             end select
 
-
-          case('')
+!------------------------------------------------------------------------------
+          case('')                                      ! select case(words(1))
+!------------------------------------------------------------------------------
             if (buffer == '') then
               parse_state = parse_state_default
 !              print*, 'blank line '
@@ -242,23 +212,28 @@ contains
 !              print*, 'comment: ', trim(buffer)
             end if
 
-          case default
-            call error_message(file_name, line_number, buffer, "unknown key")
+!------------------------------------------------------------------------------
+          case default                                  ! select case(words(1))
+!------------------------------------------------------------------------------
+            if ( parse_state == parse_state_default .and. get_index(words(1),reaction_names) /= 0 ) &
+              parse_state = parse_state_ignore
 
-        end select
+            if (parse_state /= parse_state_ignore) &
+              call error_message(file_name, line_number, buffer, "unknown key")
+
+        end select                                      ! select case(words(1))
 
     end do ! while ios=0
+
+    close(inp_unit)
 
     if (undefined_energy) then
       print *
       write(*, '(A)') 'warnings issued because of extraneous lines in rates file'
-      write(*, '(A)', advance='no') 'do you want to continue (y/n): '
-      read(*, '(A)') answer
-      if ('y'/=lower_case(answer)) stop 998
 
     else
       print *
-      print *, 'passed check that energies are defined for all rates'
+      write(*, '(A)') 'passed check that energies are defined for all rates'
 !      pause
     end if
 
@@ -279,14 +254,11 @@ contains
     do species   = 1, c_pars%n_species
     do st1       = 1, n_max_site_types
     do ast1      = 1, n_max_ads_sites
-    do st2       = st1, n_max_site_types
-    do ast2      = 1, n_max_ads_sites
 
       e_defined1 = e_pars%ads_energy(species, st1, ast1) /= e_pars%undefined_energy
-      e_defined2 = e_pars%ads_energy(species, st2, ast2) /= e_pars%undefined_energy
-      r_defined  = rates_init%r_hop (species, st1, ast1, st2, ast2) /= default_rate
+      r_defined  = desorption_rates_init%process (species, st1, ast1) /= default_rate
 
-      if ( (e_defined1 .and. e_defined2) .and. (.not. r_defined)) then
+      if ( e_defined1 .and. (.not. r_defined)) then
         if (.not. undefined_rate) then
           undefined_rate = .true.
           print*
@@ -296,66 +268,26 @@ contains
           print *
           print '(A)',  '      Missing definitions:'
           print*
-          !             123451234567890xx123xxxxxx1234567890xx123xxxxxx1xxxxxx1
-          print '(6x, A)', 'ads  lat_site    ads_site lat_site    ads_site'
+          !             123451234567890xx123xxxxxx1234567890xx123
+          print '(6x, A)', 'ads  lat_site    ads_site'
 
         end if
 
-        print '(6x, a5, A10, 2x, a3, 6x, a10, 2x, a3, 6x, L1, 7x, L1, 7x, L1)' ,            &
+        print '(6x, a5, A10, 2x, a3, 6x, a10, 2x, a3, 6x, L1)' ,            &
                 c_pars%ads_names(species),             &
-                site_names(st1), ads_site_names(ast1), &
-                site_names(st2), ads_site_names(ast2)
-                !e_defined1, e_defined2, r_defined
+                site_names(st1), ads_site_names(ast1)
+        print*, e_defined1, r_defined
       end if
 
     end do
     end do
     end do
-    end do
-    end do
-
-!    ! check for extraneous rates (rate defined but energy not defined)
-!    undefined_energy = .false.
-!    do species   = 1, c_pars%n_species
-!    do st1       = 1, n_max_site_types
-!    do ast1      = 1, n_max_ads_sites
-!    do st2       = st1, n_max_site_types  ! check: do we have to explicitly check lower part of matrix?
-!    do ast2      = 1, n_max_ads_sites
-!
-!      e_defined1 = e_pars%ads_energy(species, st1, ast1) /= e_pars%undefined_energy
-!      e_defined2 = e_pars%ads_energy(species, st2, ast2) /= e_pars%undefined_energy
-!      r_defined  = rates_init%r_hop (species, st1, ast1, st2, ast2) /= default_rate
-!
-!      if ( r_defined .and. .not. (e_defined1 .and. e_defined2)) then
-!
-!        if (.not. undefined_energy) then
-!          undefined_energy = .true.
-!          print*
-!          print '(A)', 'Dear Sir, Madam extraneous rate definition error message'
-!          print*
-!          !             123451234567890xx123xxxxxx1234567890xx123xxxxxx1xxxxxx1
-!          print '(A)', 'ads  lat_site    ads_site lat_site    ads_site'
-!        end if
-!
-!        print '(a5, A10, 2x, a3, 6x, a10, 2x, a3, 6x, L1, 7x, L1, 7x, L1)' ,            &
-!                c_pars%ads_names(species),             &
-!                site_names(st1), ads_site_names(ast1), &
-!                site_names(st2), ads_site_names(ast2)
-!                !e_defined1, e_defined2, r_defined
-!      end if
-!
-!
-!    end do
-!    end do
-!    end do
-!    end do
-!    end do
 
     if(undefined_rate) then
       print '(/6x, A)', 'Please supply the required rates'
       print '(/6x, A)', 'As always, I remain your humble servant, kMC Code'
       print *
-      stop 997
+      stop '997 - desorption rates class'
 
     else
       print '(/A)', 'passed requited rates consistency check'
@@ -364,135 +296,69 @@ contains
 
     end if
 
-  end function rates_init
+  end function desorption_rates_init
 
 !-----------------------------------------------------------------------------
-  subroutine construct_rates(this, ads, lat, e_pars, beta)
+  subroutine construct(this, ads, lat, e_pars, beta)
 !-----------------------------------------------------------------------------
-    class(rates_type), intent(inout) :: this
+    class(desorption_rates_type), intent(inout) :: this
     integer, intent(in) :: ads
     class(mc_lat), intent(inout) :: lat
     class(energy_parameters), intent(in) :: e_pars
     real(dp), intent(in) :: beta
 
-    integer :: id, m, iads
-    integer :: row_old, col_old, lst_old, ast_old
-    integer :: row_new, col_new, lst_new, ast_new
-    real(dp) :: energy_old, energy_new
+    integer :: id
+    integer :: row, col, lst, ast
 
-    ! energy for particle ads in its old position
-    energy_old = energy(ads, lat, e_pars)
+    row = lat%ads_list(ads)%row
+    col = lat%ads_list(ads)%col
+    lst = lat%lst(row,col)
+    ast = lat%ads_list(ads)%ast
+    id  = lat%ads_list(ads)%id
 
-    ! Save the old configuration
-    row_old = lat%ads_list(ads)%row
-    col_old = lat%ads_list(ads)%col
-    lst_old = lat%lst(row_old,col_old)
-    ast_old = lat%ads_list(ads)%ast
-    id      = lat%ads_list(ads)%id
+    this%rates(ads) = this%process(id, lst, ast)&
+                    *exp( beta*( energy(ads,lat,e_pars) - e_pars%ads_energy(id,lst,ast) ))
+!   print*
+!   print*, 'id ',id, ' lst ',lst,' ads. site ', ast
+!   print*, 'rate ',this%process(id, lst, ast)
 
-    ! Delete particle ads from the old position
-    ! we do it here since we never work with occupations inside the following loop
-    lat%occupations(row_old,col_old) = 0
+!   print '(A,i4)', 'ads ',ads
+!   print '(A,e18.4)',' Energy = ', energy(ads,lat,e_pars)
+!   print *,' rate = ', this%rates(ads)
+!   write(*,*) 'pause'
+!   read(*,*)
 
-    ! Loop over possible new positions of particle ads
-    do m=1,lat%n_nn(1)
 
-      ! Get position and site type of neighbour m
-      call lat%neighbor(ads, m, row_new, col_new)
-      lst_new  = lat%lst(row_new, col_new)
+  end subroutine construct
 
-      ! Check if the cell is free
-      if (lat%occupations(row_new, col_new) > 0) then
-
-        this%rates(ads,m)%list = 0.0d0
-
-      else
-
-        ! Put particle ads to site m
-        lat%ads_list(ads)%row = row_new
-        lat%ads_list(ads)%col = col_new
-        lat%occupations(row_new,col_new) = ads
-
-        ! Loop over adsorption site
-        do iads = 1, size(lat%avail_ads_sites(id,lst_new)%list)
-
-          ! Move particle ads to adsorption site list(iads)
-          ast_new = lat%avail_ads_sites(id,lst_new)%list(iads)
-          lat%ads_list(ads)%ast = ast_new
-
-          ! Calculate energy of ads in new position
-          energy_new = energy(ads, lat, e_pars)
-
-          ! Apply detailed balance when
-          ! energy in the old position < energy in the new position
-          if (energy_old < energy_new) then
-              this%rates(ads,m)%list(iads) = this%r_hop(id, lst_old, ast_old, lst_new, ast_new)&
-                  *exp( -beta*(energy_new - energy_old) )
-!                print*
-!                print*, 'id ',id, ' old site ',lst_old,' old ads. site ', ast_old
-!                print*, ' new site ',lst_new,' new ads. site ', ast_new
-!                print*, 'rate ',this%r_hop(id, lst_old, ast_old, lst_new, ast_new)
-          else
-              this%rates(ads,m)%list(iads) = this%r_hop(id, lst_old, ast_old, lst_new, ast_new)
-!                print*, id,lst_old, ast_old, lst_new, ast_new,this%r_hop(id, lst_old, ast_old, lst_new, ast_new)
-          end if
-
-!            print '(A,i4,A,i4,A,i4)', 'ads ',ads,' neighbor ',m,' ads. site ',lat%ads_list(ads)%ast
-!            print '(A,e18.4,A,e18.4)',' E_old = ', energy_old, ' E_new = ',energy_new
-!            print *,' r_hop = ',this%r_hop(id, lst_old, ast_old, lst_new, ast_new),&
-!                                      ' rate = ', this%rates(ads,m)%list(iads)
-!            write(*,*) 'pause'
-!            read(*,*)
-
-        end do ! iads
-
-        ! Return particle ads to the old position
-        lat%ads_list(ads)%row = row_old
-        lat%ads_list(ads)%col = col_old
-        lat%ads_list(ads)%ast = ast_old
-        lat%occupations(row_new,col_new) = 0
-
-      end if ! occupations
-
-    end do ! m
-
-    lat%occupations(row_old,col_old) = ads
-
-  end subroutine construct_rates
 !------------------------------------------------------------------------------
-  subroutine print_r_hop(this, c_pars)
+  subroutine print(this, c_pars)
 !------------------------------------------------------------------------------
-    class(rates_type), intent(in) :: this
+    class(desorption_rates_type), intent(in) :: this
 
     class(control_parameters), intent(in) :: c_pars
 
-    integer :: i, i1, i2, i3, i4
+    integer :: i, i1, i2
 
-    print*, 'Hopping Rates:'
-    do i=1,size(this%r_hop,1)
+    print*, 'Desorption Rates:'
+    do i=1,c_pars%n_species
       print '(/A)','---------------------------'
       print '( A,A)','species: ', c_pars%ads_names(i)
       print '(A)', '---------------------------'
       do i1=1,n_max_site_types
       do i2=1,n_max_ads_sites
-      do i3=1,n_max_site_types
-      do i4=1,n_max_ads_sites
-        if (this%r_hop(i,i1,i2,i3,i4)< 0.0_dp) then
+        if (this%process(i,i1,i2)< 0.0_dp) then
           cycle
         else
-          write(*,'(A,A,2X,A,A,6e12.3)') &
-              site_names(i1), ads_site_names(i2), &
-              site_names(i3), ads_site_names(i4), &
-              this%r_hop(i,i1,i2,i3,i4)
+          write(*,'(A,A,e12.3)') &
+              site_names(i1), ads_site_names(i2), this%process(i,i1,i2)
         end if
-      end do
-      end do
       end do
       end do
     end do
     print*
 
-  end subroutine print_r_hop
+  end subroutine print
 
 !-----------------------------------------------------------------------------
 !             Temperature dependence law subroutines
