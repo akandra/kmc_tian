@@ -47,10 +47,9 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
   ! Create a rate structure
   r_hop =    hopping_rates_init(c_pars, lat, e_pars)
   r_des = desorption_rates_init(c_pars, lat, e_pars)
-  call r_hop%print(c_pars)
-  call r_des%print(c_pars)
+!  call r_hop%print(c_pars)
+!  call r_des%print(c_pars)
 
-stop 222
   ! inverse thermodynamic temperature
   beta = 1.0_dp/(kB*c_pars%temperature)
   ! total number of adsorbates
@@ -99,19 +98,19 @@ stop 222
     ! Initialize cluster histogram
     hist = 0
 
-    ! Construct rates array
-    do i=1,n_ads_total
-      call r_hop%construct(i, lat, e_pars, beta)
-    end do
-
-!    call lat%print_ocs
-!    do i = 1,n_ads_total
-!    do m = 1,n_nn
-!      print*, i,m,(r_hop%rates(i,m)%list(iads)==r1%rates(i,m)%list(iads) ,iads=1,size(r%rates(i,m)%list))
-!
-!    end do
-!    end do
-!    stop 110
+    !-------- Construct rates arrays
+    ! Hopping
+    if (r_hop%is_defined) then
+      do i=1,n_ads_total
+        call r_hop%construct(i, lat, e_pars, beta)
+      end do
+    end if
+    ! Desorption
+    if (r_des%is_defined) then
+      do i=1,n_ads_total
+        call r_des%construct(i, lat, e_pars, beta)
+      end do
+    end if
 
     ! start time propagation
     time = big_bang
@@ -119,11 +118,20 @@ stop 222
 
       ! calculate total rate
       total_rate = 0.0_dp
-      do ads=1,n_ads_total
-      do m=1,n_nn
-        total_rate = total_rate + sum(r_hop%rates(ads,m)%list)
-      end do
-      end do
+
+      if (r_hop%is_defined) then
+        do ads=1,n_ads_total
+        do m=1,n_nn
+          total_rate = total_rate + sum(r_hop%rates(ads,m)%list)
+        end do
+        end do
+      end if
+
+      if (r_des%is_defined) then
+        do ads=1,n_ads_total
+          total_rate = total_rate + sum(r_des%rates(ads))
+        end do
+      end if
       !      print*, total_rate
 
       ! random number to select a process
@@ -132,14 +140,24 @@ stop 222
       ! determine reaction channel (adsorbate, direction, ads. site of available ones)
       !                            (      ads,      m_nn,                        iads)
       rate_acc = 0.0_dp
-      extloop: do ads=1,n_ads_total
-        do m_nn=1,n_nn
-        do iads=1,size(r_hop%rates(ads,m_nn)%list) ! Warning: check timing of size calculation
-          rate_acc = rate_acc + r_hop%rates(ads,m_nn)%list(iads)
-          if (u < rate_acc) exit extloop
+-----WE ARE HERE
+      if (r_hop%is_defined) then
+        extloop: do ads=1,n_ads_total
+          do m_nn=1,n_nn
+          do iads=1,size(r_hop%rates(ads,m_nn)%list) ! Warning: check timing of size calculation
+            rate_acc = rate_acc + r_hop%rates(ads,m_nn)%list(iads)
+            if (u < rate_acc) exit extloop
+          end do
+          end do
+        end do extloop
+      end if
+
+      if (r_des%is_defined) then
+        do ads=1,n_ads_total
+          rate_acc = rate_acc + r_des%rates(ads)
+          if (u < rate_acc) exit
         end do
-        end do
-      end do extloop
+      end if
 
       delta_t = -log(ran1())/total_rate   ! when does a hop occur?
       time_new = time + delta_t

@@ -15,6 +15,7 @@ module rates_desorption_class
 
   type :: desorption_rates_type
 
+    logical :: is_defined = .false.
     ! Desorption Rates
     !                          n_adsorbate              -> which particle
     !                          .
@@ -113,6 +114,7 @@ contains
 !------------------------------------------------------------------------------
           case('desorption')                               ! select case (words(1)
 !------------------------------------------------------------------------------
+            desorption_rates_init%is_defined = .true.
 
             if (parse_state /= parse_state_default) &
               call error_message(file_name, line_number, buffer, &
@@ -191,11 +193,11 @@ contains
 
                 end select
 
-                 print*, 'reaction: ', reaction_names(parse_state),&
-                        ' for species:', current_species_name
-                 print*, 'law: ', law_names(current_law_id),&
-                        ' from:', site_names(i1),ads_site_names(i2)
-                print'(A,3f16.3)', 'with pars: ', pars
+!                 print*, 'reaction: ', reaction_names(parse_state),&
+!                        ' for species:', current_species_name
+!                 print*, 'law: ', law_names(current_law_id),&
+!                        ' from:', site_names(i1),ads_site_names(i2)
+!                print'(A,3f16.3)', 'with pars: ', pars
 
               case default
                 call error_message(file_name, line_number, buffer, "invalid site type statement")
@@ -232,8 +234,8 @@ contains
       write(*, '(A)') 'warnings issued because of extraneous lines in rates file'
 
     else
-      print *
-      write(*, '(A)') 'passed check that energies are defined for all rates'
+!      print *
+      write(*, '(A)') 'desorption: passed check that energies are defined for all rates'
 !      pause
     end if
 
@@ -262,12 +264,12 @@ contains
         if (.not. undefined_rate) then
           undefined_rate = .true.
           print*
-          print '(A)',  '--- Dear Sir, Madam:'
-          print '(A)',  '      It is my duty to inform you that there are missing rate definitions in'
-          print '(2A)', '      the file ', file_name
-          print *
-          print '(A)',  '      Missing definitions:'
-          print*
+!          print '(A)',  '--- Dear Sir, Madam:'
+!          print '(A)',  '      It is my duty to inform you that there are missing rate definitions in'
+          print '(A)',  'desorption: missing rate definitions in the file ', file_name
+!          print *
+          print '(A)',  ' Missing definitions:'
+!          print*
           !             123451234567890xx123xxxxxx1234567890xx123
           print '(6x, A)', 'ads  lat_site    ads_site'
 
@@ -276,7 +278,7 @@ contains
         print '(6x, a5, A10, 2x, a3, 6x, a10, 2x, a3, 6x, L1)' ,            &
                 c_pars%ads_names(species),             &
                 site_names(st1), ads_site_names(ast1)
-        print*, e_defined1, r_defined
+!        print*, e_defined1, r_defined
       end if
 
     end do
@@ -284,13 +286,13 @@ contains
     end do
 
     if(undefined_rate) then
-      print '(/6x, A)', 'Please supply the required rates'
-      print '(/6x, A)', 'As always, I remain your humble servant, kMC Code'
+      print '(A)', ' Do nothing if you are ok with that.'
+!      print '(/6x, A)', 'As always, I remain your humble servant, kMC Code'
       print *
-      stop '997 - desorption rates class'
+!      stop '997 - desorption rates class'
 
     else
-      print '(/A)', 'passed requited rates consistency check'
+      print '(/A)', 'desorption: passed required rates consistency check'
       print*
 !      stop 'debugging stop'
 

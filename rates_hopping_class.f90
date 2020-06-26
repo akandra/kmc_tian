@@ -21,6 +21,7 @@ module rates_hopping_class
 
   type :: hopping_rates_type
 
+    logical :: is_defined = .false.
     ! Hopping Rates
     !                          n_adsorbate              -> which particle
     !                          .  n_neighbor            -> where to
@@ -133,6 +134,8 @@ contains
 !------------------------------------------------------------------------------
           case('hopping')                               ! select case (words(1)
 !------------------------------------------------------------------------------
+            hopping_rates_init%is_defined = .true.
+
             if (parse_state /= parse_state_default) &
               call error_message(file_name, line_number, buffer, &
                          "invalid ending of the reaction section")
@@ -257,12 +260,9 @@ contains
     close(inp_unit)
 
     if (undefined_energy) then
-      print *
-      write(*, '(A)') 'warnings issued because of extraneous lines in rates file'
-
+      write(*, '(A)') 'hopping: warnings issued because of extraneous lines in rates file'
     else
-      print *
-      write(*, '(A)') 'passed check that energies are defined for all rates'
+      write(*, '(A)') 'hopping: passed check that energies are defined for all rates'
 !      pause
     end if
 
@@ -294,10 +294,10 @@ contains
         if (.not. undefined_rate) then
           undefined_rate = .true.
           print*
-          print '(A)',  '--- Dear Sir, Madam:'
-          print '(A)',  '      It is my duty to inform you that there are missing rate definitions in'
-          print '(2A)', '      the file ', file_name
-          print *
+!          print '(A)',  '--- Dear Sir, Madam:'
+!          print '(A)',  '      It is my duty to inform you that there are missing rate definitions in'
+          print '(A)',  'hopping: missing rate definitions in the file ', file_name
+!          print *
           print '(A)',  '      Missing definitions:'
           print*
           !             123451234567890xx123xxxxxx1234567890xx123xxxxxx1xxxxxx1
@@ -357,12 +357,12 @@ contains
 
     if(undefined_rate) then
       print '(/6x, A)', 'Please supply the required rates'
-      print '(/6x, A)', 'As always, I remain your humble servant, kMC Code'
+ !     print '(/6x, A)', 'As always, I remain your humble servant, kMC Code'
       print *
       stop 997
 
     else
-      print '(/A)', 'passed requited rates consistency check'
+      print '(/A)', 'hopping: passed required rates consistency check'
       print*
 !      stop 'debugging stop'
 
