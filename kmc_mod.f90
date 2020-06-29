@@ -52,7 +52,7 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
   ! Create a rate structure
   r_hop =    hopping_rates_init(c_pars, lat, e_pars)
   r_des = desorption_rates_init(c_pars, lat, e_pars)
-!  call r_hop%print(c_pars)
+  call r_hop%print(c_pars)
 !  call r_des%print(c_pars)
 
   ! inverse thermodynamic temperature
@@ -124,8 +124,6 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
     time = big_bang
     do while (time<c_pars%t_end)
 
-write(*,*) lat%n_ads_tot(), time
-
       ! -------- calculate total rate
       total_rate(hopping_id) = 0.0_dp
       ! total rate for hopping reactions
@@ -144,44 +142,56 @@ write(*,*) lat%n_ads_tot(), time
         end do
       end if
 
-      ! random number to select a process
-      u = ran1()*total_rate(n_reaction_types)
-      ! determine the type of reaction
-      do reaction_id=1,n_reaction_types
-        if (u < total_rate(reaction_id)) exit
-      end do
+      if (total_rate(n_reaction_types) > 0.0_dp) then
 
-      select case (reaction_id)
+        ! random number to select a process
+        u = ran1()*total_rate(n_reaction_types)
+        ! determine the type of reaction
+        do reaction_id=1,n_reaction_types
+          if (u < total_rate(reaction_id)) exit
+        end do
 
-        case(hopping_id)
-          ! determine hopping channel (adsorbate, direction, ads. site of available ones)
-          !                           (      ads,      m_nn,                        iads)
-          rate_acc = 0.0_dp
-          extloop: do ads=1,n_ads_total
-            do m_nn=1,n_nn
-            do iads=1,size(r_hop%rates(ads,m_nn)%list) ! Warning: check timing of size calculation
-              rate_acc = rate_acc + r_hop%rates(ads,m_nn)%list(iads)
-              if (u < rate_acc) exit extloop
+        select case (reaction_id)
+
+          case(hopping_id)
+            ! determine hopping channel (adsorbate, direction, ads. site of available ones)
+            !                           (      ads,      m_nn,                        iads)
+            rate_acc = 0.0_dp
+            extloop: do ads=1,n_ads_total
+              do m_nn=1,n_nn
+              do iads=1,size(r_hop%rates(ads,m_nn)%list) ! Warning: check timing of size calculation
+                rate_acc = rate_acc + r_hop%rates(ads,m_nn)%list(iads)
+                if (u < rate_acc) exit extloop
+              end do
+              end do
+            end do extloop
+
+          case(desorption_id)
+
+            ! determine desorption channel (adsorbate)
+            !                              (      ads)
+            rate_acc = total_rate(hopping_id)
+            do ads=1,n_ads_total
+              rate_acc = rate_acc + r_des%rates(ads)
+              if (u < rate_acc) exit
             end do
-            end do
-          end do extloop
 
-        case(desorption_id)
+          case default
+            print*
+            print*, "reaction id is ", reaction_id
+            print*, "number of reactions is ", n_reaction_types
+            stop 'kMC step: must never occur!'
 
-          ! determine desorption channel (adsorbate)
-          !                              (      ads)
-          rate_acc = total_rate(hopping_id)
-          do ads=1,n_ads_total
-            rate_acc = rate_acc + r_des%rates(ads)
-            if (u < rate_acc) exit
-          end do
+        end select
 
-        case default
-          stop 'kMC step: must never occur!'
+      else
+        ! No processes left
+        print*
+        print *, 'total rate is zero: exiting kMC loop'
+        print*
+        exit
 
-      end select
-
-
+      end if
 
       delta_t = -log(ran1())/total_rate(n_reaction_types)   ! when does a hop occur?
       time_new = time + delta_t
@@ -213,26 +223,34 @@ write(*,*) lat%n_ads_tot(), time
         !-----Save energy
         write(outeng_unit,'(1pe12.3,1pe12.3)') ibin*step_bin, total_energy(lat,e_pars)
 
-        !-----Save histogram with cluster sizes
-        ! Output formats
-        write(n_ads_fmt,'(i10)') n_ads_total
-        n_ads_fmt = '('//trim(adjustl(n_ads_fmt))//'i8)'
-        ! Calculate histogram
-        do species=1,c_pars%n_species
-          call lat%hoshen_kopelman(species, cluster_label, largest_label)
-          call lat%cluster_size(species, cluster_label, cluster_sizes)
-          do i=1,largest_label
-            if (cluster_sizes(i) > 0) &
-              hist(species,cluster_sizes(i)) = hist(species,cluster_sizes(i)) + 1
+        if (n_ads_total>0) then
+          !-----Save histogram with cluster sizes
+          ! Output formats
+          write(n_ads_fmt,'(i10)') n_ads_total
+          n_ads_fmt = '('//trim(adjustl(n_ads_fmt))//'i8)'
+
+          ! Calculate histogram
+          do species=1,c_pars%n_species
+            call lat%hoshen_kopelman(species, cluster_label, largest_label)
+            call lat%cluster_size(species, cluster_label, cluster_sizes)
+            do i=1,largest_label
+              if (cluster_sizes(i) > 0) &
+                hist(species,cluster_sizes(i)) = hist(species,cluster_sizes(i)) + 1
+            end do
           end do
-        end do
-        ! Save cluster size histogram
-        write(outhst_unit,'(A6,1pe12.3)') "time ",ibin*step_bin
-        do species=1,c_pars%n_species
-          write(outhst_unit,*) species
-          write(outhst_unit,n_ads_fmt) hist(species,:)
-        end do
-        hist = 0
+          ! Save cluster size histogram
+          write(outhst_unit,'(A6,1pe12.3)') "time ",ibin*step_bin
+          do species=1,c_pars%n_species
+            write(outhst_unit,*) species
+            write(outhst_unit,n_ads_fmt) hist(species,:)
+          end do
+          hist = 0
+
+        else
+          ! No histogram output when no adsorbates
+          write(outhst_unit,'(A6,1pe12.3)') "time ",ibin*step_bin
+
+        end if
 
       end if
 
@@ -333,10 +351,13 @@ write(*,*) lat%n_ads_tot(), time
           lat%occupations(lat%ads_list(ads)%row, lat%ads_list(ads)%col) = 0
           ! Adjust the number of adsorbates in the lat structure
           lat%n_ads(lat%ads_list(ads)%id) = lat%n_ads(lat%ads_list(ads)%id) - 1
-          ! Put the last adsorbate in place of ads
-          lat%ads_list(ads) = lat%ads_list(n_ads_total)
-          ! Update the adsorbate number in the lattece
-          lat%occupations(lat%ads_list(ads)%row, lat%ads_list(ads)%col) = ads
+          ! Rearrange adsorbates except when the last adsorbate desorbs
+          if (ads < n_ads_total) then
+            ! Put the last adsorbate in place of ads
+            lat%ads_list(ads) = lat%ads_list(n_ads_total)
+            ! Update the adsorbate number in the lattece
+            lat%occupations(lat%ads_list(ads)%row, lat%ads_list(ads)%col) = ads
+          end if
 
           ! Update rate array for the affected adsorbates
           do i=1,k_change
@@ -352,10 +373,12 @@ write(*,*) lat%n_ads_tot(), time
           ! Adjust the local variable for the number of adsorbates
           n_ads_total = n_ads_total - 1
 
-!call lat%print_ocs
-!call lat%print_ads
-!print*,ads
-!pause
+call lat%print_ocs
+call lat%print_ads
+print*,ads
+print*, lat%n_ads
+
+pause
 
       end select
 

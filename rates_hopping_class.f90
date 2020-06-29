@@ -187,7 +187,7 @@ contains
 
                     call error_message(file_name, line_number, buffer, &
                                        "rate defined for site with undefined adsorption energy", &
-                                       stop=.false., warning=.true.)
+                                       stop=.false., warning=.false.)
 
                     undefined_energy = .true.
                 end if
@@ -260,7 +260,8 @@ contains
     close(inp_unit)
 
     if (undefined_energy) then
-      write(*, '(A)') 'hopping: warnings issued because of extraneous lines in rates file'
+      write(*, '(A)') 'hopping: error, rates defined for sites with undefined energies'
+      stop 996
     else
       write(*, '(A)') 'hopping: passed check that energies are defined for all rates'
 !      pause
@@ -317,43 +318,6 @@ contains
     end do
     end do
     end do
-
-!    ! check for extraneous rates (rate defined but energy not defined)
-!    undefined_energy = .false.
-!    do species   = 1, c_pars%n_species
-!    do st1       = 1, n_max_site_types
-!    do ast1      = 1, n_max_ads_sites
-!    do st2       = st1, n_max_site_types  ! check: do we have to explicitly check lower part of matrix?
-!    do ast2      = 1, n_max_ads_sites
-!
-!      e_defined1 = e_pars%ads_energy(species, st1, ast1) /= e_pars%undefined_energy
-!      e_defined2 = e_pars%ads_energy(species, st2, ast2) /= e_pars%undefined_energy
-!      r_defined  = hopping_rates_init%process (species, st1, ast1, st2, ast2) /= default_rate
-!
-!      if ( r_defined .and. .not. (e_defined1 .and. e_defined2)) then
-!
-!        if (.not. undefined_energy) then
-!          undefined_energy = .true.
-!          print*
-!          print '(A)', 'Dear Sir, Madam extraneous rate definition error message'
-!          print*
-!          !             123451234567890xx123xxxxxx1234567890xx123xxxxxx1xxxxxx1
-!          print '(A)', 'ads  lat_site    ads_site lat_site    ads_site'
-!        end if
-!
-!        print '(a5, A10, 2x, a3, 6x, a10, 2x, a3, 6x, L1, 7x, L1, 7x, L1)' ,            &
-!                c_pars%ads_names(species),             &
-!                site_names(st1), ads_site_names(ast1), &
-!                site_names(st2), ads_site_names(ast2)
-!                !e_defined1, e_defined2, r_defined
-!      end if
-!
-!
-!    end do
-!    end do
-!    end do
-!    end do
-!    end do
 
     if(undefined_rate) then
       print '(/6x, A)', 'Please supply the required rates'
