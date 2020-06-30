@@ -276,21 +276,23 @@ contains
     if(present(warning)) warn = warning
 
     if (warn) then
-      msg = '      It is my duty to give you gentle warning concerning'
+      !msg = '      It is my duty to give you gentle warning concerning'
+      msg = ' Warning:'
     else
-      msg = '      It is my duty to inform you that you have an error'
+      !msg = '      It is my duty to inform you that you have an error'
+      msg = ' Error:'
     end if
 
     ! convert line number to string
     write(dummy,*) line_number
 
     print*
-    print '(A)',  '--- Dear Sir/Madam: '
+!    print '(A)',  '--- Dear Sir/Madam: '
     print '(A)',  msg
-    print '(2A)', '         file: ', trim(file_name)
-    print '(2A)', '         line: ' // trim(adjustl(dummy)) // ': ' // trim(line)
-    print '(2A)', '         reason: ',trim(message)
-    print '(/A)', '      As always, I remain your humble servant, kMC Code'
+    print '(2A)', '    file: ', trim(file_name)
+    print '(2A)', '    line: ' // trim(adjustl(dummy)) // ': ' // trim(line)
+    print '(2A)', '    reason: ',trim(message)
+!    print '(/A)', '      As always, I remain your humble servant, kMC Code'
 
     if(st) stop 999
 

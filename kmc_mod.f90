@@ -47,13 +47,17 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
 
   type(mc_lat) :: lat_save
 
+  ! initialize vector of conditions for debug trap
+  debug =  .false.
+
+  ! save the initial lattice structre for restore on each trajectory
   lat_save = lat
 
   ! Create a rate structure
   r_hop =    hopping_rates_init(c_pars, lat, e_pars)
   r_des = desorption_rates_init(c_pars, lat, e_pars)
   call r_hop%print(c_pars)
-!  call r_des%print(c_pars)
+  call r_des%print(c_pars)
 
   ! inverse thermodynamic temperature
   beta = 1.0_dp/(kB*c_pars%temperature)
@@ -72,9 +76,13 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
   ! time binning for distributions
   step_bin = c_pars%t_end/c_pars%n_bins
 
-  write(*,'(20X,A)') "B.K.L. Code's progress report:"
+
+  write(*,'(20X,A)') "B.K.L. Code's progress report::"
   ! Loop over trajectories
   do itraj=1, c_pars%n_trajs
+
+! set debug trap ---------------------------------
+!debug(1) = itraj==2
 
     call progress_bar( 'current trajectory ', 0* 100*itraj/c_pars%n_trajs , '   total', 0)
 
@@ -113,6 +121,7 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
         call r_hop%construct(i, lat, e_pars, beta)
       end do
     end if
+
     ! Desorption
     if (r_des%is_defined) then
       do i=1,n_ads_total
@@ -134,7 +143,8 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
         end do
         end do
       end if
-      ! total accumulated rate for desorption reactions
+      ! total accumulate rate for desorption
+      !       (= rate for desorption reactions + hopping reactions)
       total_rate(desorption_id) = total_rate(hopping_id)
       if (r_des%is_defined) then
         do ads=1,n_ads_total
@@ -150,6 +160,9 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
         do reaction_id=1,n_reaction_types
           if (u < total_rate(reaction_id)) exit
         end do
+
+! set debug trap ---------------------------------
+!debug(2) = reaction_id==1
 
         select case (reaction_id)
 
@@ -193,9 +206,12 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
 
       end if
 
-      delta_t = -log(ran1())/total_rate(n_reaction_types)   ! when does a hop occur?
+      delta_t = -log(ran1())/total_rate(n_reaction_types)   ! when does a reaction occur?
       time_new = time + delta_t
       kmc_nsteps = kmc_nsteps + 1
+
+! set debug trap ---------------------------------
+!debug(3) = time_new>8.6E-6
 
       call progress_bar(                  &
           'current trajectory',           &
@@ -212,6 +228,8 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
       if (time_new > c_pars%t_end) time_new = c_pars%t_end
 
       ibin_new = int(time_new/step_bin) + 1
+
+
 
       if (ibin_new - ibin > 0 ) then
 
@@ -264,6 +282,20 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
         case (hopping_id)
         ! Particle (ads) is going to hop in direction (m_nn) to ads. site (site)
 
+! debug trap -----------------------------
+if( all(debug) ) then
+  print*
+  print*, 'time=', time
+  call lat%print_ocs
+  !call lat%print_ads
+  print '(a,i3,1x,a)', 'adsorbate ', ads, 'will hop'
+  !print *
+  !write(*, '(A, 100i10)'    ) 'lat%n_ads ', lat%n_ads
+  !call lat%print_ads
+  !-----print energy
+  write(*, '(A, 1pe12.3)') 'total_energy =', total_energy(lat,e_pars)
+
+end if
           ! create a list of adsorbates affected by hop
           change_list = 0
           k_change = 1
@@ -321,9 +353,20 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
     !      stop 15
 
           ! Update rate array for the affected adsorbates
+
           do i=1,k_change
             call r_hop%construct(change_list(i), lat, e_pars, beta)
           end do
+
+! debug trap -----------------------------
+if( all(debug) ) then
+    print*
+    call lat%print_ocs
+    !call lat%print_ads
+    !print*,ads
+    !print*, lat%n_ads
+    pause
+end if
 
         case (desorption_id)
         ! Particle (ads) is going to desorb to nowhere
@@ -342,10 +385,15 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
             end if
           end do
 
-!call lat%print_ocs
-!call lat%print_ads
-!print*,ads
-!pause
+! debug trap -----------------------------
+if( all(debug) ) then
+  print*
+  print*, 'time=', time
+  call lat%print_ocs
+  !call lat%print_ads
+  print '(a,i3,1x,a)', 'adsorbate ', ads, 'will desorb'
+end if
+
           ! Do desorption:
           ! Delete an adsorbate from the lattice
           lat%occupations(lat%ads_list(ads)%row, lat%ads_list(ads)%col) = 0
@@ -373,12 +421,15 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
           ! Adjust the local variable for the number of adsorbates
           n_ads_total = n_ads_total - 1
 
-call lat%print_ocs
-call lat%print_ads
-print*,ads
-print*, lat%n_ads
-
-pause
+! debug trap -----------------------------
+if( all(debug) ) then
+  print*
+  call lat%print_ocs
+  !call lat%print_ads
+  !print*,ads
+  !print*, lat%n_ads
+  pause
+end if
 
       end select
 

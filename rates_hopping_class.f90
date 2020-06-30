@@ -260,11 +260,12 @@ contains
     close(inp_unit)
 
     if (undefined_energy) then
-      write(*, '(A)') 'hopping: error, rates defined for sites with undefined energies'
+      write(*, '(A)') ' Hopping: error, rates defined for sites with undefined energies'
       stop 996
+
     else
-      write(*, '(A)') 'hopping: passed check that energies are defined for all rates'
-!      pause
+      write(*, '(A)') ' Hopping: passed check that energies are defined for all rates'
+
     end if
 
 
@@ -297,12 +298,10 @@ contains
           print*
 !          print '(A)',  '--- Dear Sir, Madam:'
 !          print '(A)',  '      It is my duty to inform you that there are missing rate definitions in'
-          print '(A)',  'hopping: missing rate definitions in the file ', file_name
-!          print *
-          print '(A)',  '      Missing definitions:'
-          print*
-          !             123451234567890xx123xxxxxx1234567890xx123xxxxxx1xxxxxx1
-          print '(6x, A)', 'ads  lat_site    ads_site lat_site    ads_site'
+          print '(A)',  ' Hopping: missing rate definitions'
+          print '(2A)', '    file name:', file_name
+          print '(A)',  '    missing definitions:'
+          print '(/6x, A)', 'ads  lat_site    ads_site lat_site    ads_site'
 
         end if
 
@@ -320,14 +319,14 @@ contains
     end do
 
     if(undefined_rate) then
-      print '(/6x, A)', 'Please supply the required rates'
+      print '(/A)', ' Hopping: please supply the required rates'
  !     print '(/6x, A)', 'As always, I remain your humble servant, kMC Code'
-      print *
+ !     print *
       stop 997
 
     else
-      print '(/A)', 'hopping: passed required rates consistency check'
-      print*
+      print '(A)', ' Hopping: passed required rates consistency check'
+!      print*
 !      stop 'debugging stop'
 
     end if
@@ -439,9 +438,9 @@ contains
 
     print*, 'Hopping Rates:'
     do i=1,size(this%process,1)
-      print '(/A)','---------------------------'
-      print '( A,A)','species: ', c_pars%ads_names(i)
-      print '(A)', '---------------------------'
+      print '(A)',' ---------------------------'
+      print '( A,A)',' species: ', c_pars%ads_names(i)
+      print '(A)', ' ---------------------------'
       do i1=1,n_max_site_types
       do i2=1,n_max_ads_sites
       do i3=1,n_max_site_types
@@ -449,7 +448,7 @@ contains
         if (this%process(i,i1,i2,i3,i4)< 0.0_dp) then
           cycle
         else
-          write(*,'(A,A,2X,A,A,6e12.3)') &
+          write(*,'(1x,A,A,2X,A,A,6e12.3)') &
               site_names(i1), ads_site_names(i2), &
               site_names(i3), ads_site_names(i4), &
               this%process(i,i1,i2,i3,i4)

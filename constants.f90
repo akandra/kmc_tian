@@ -99,4 +99,8 @@ module constants
   real(dp), parameter :: Kelvin2eV        = kB
 
 
+  ! Global variables for debugging
+  logical :: debug(10)
+
+
 end module constants

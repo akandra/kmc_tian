@@ -106,7 +106,6 @@ contains
         ! ios = 0  otherwise
 
       if (ios == 0) then
-
         ! Split an input string
         words = ''
         call split_string(buffer, words, nwords)

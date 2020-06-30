@@ -164,8 +164,7 @@ contains
 
                     call error_message(file_name, line_number, buffer, &
                                        "rate defined for site with undefined adsorption energy", &
-                                       stop=.false., warning=.true.)
-
+                                       stop=.false., warning=.false.)
                     undefined_energy = .true.
                 end if
 
@@ -229,14 +228,8 @@ contains
 
     close(inp_unit)
 
-    if (undefined_energy) then
-      print *
-      write(*, '(A)') 'warnings issued because of extraneous lines in rates file'
-
-    else
-!      print *
-      write(*, '(A)') 'desorption: passed check that energies are defined for all rates'
-!      pause
+    if (.not. undefined_energy) then
+      write(*, '(/A)') ' Desorption: passed check that energies are defined for all rates'
     end if
 
 
@@ -263,22 +256,14 @@ contains
       if ( e_defined1 .and. (.not. r_defined)) then
         if (.not. undefined_rate) then
           undefined_rate = .true.
-          print*
-!          print '(A)',  '--- Dear Sir, Madam:'
-!          print '(A)',  '      It is my duty to inform you that there are missing rate definitions in'
-          print '(A)',  'desorption: missing rate definitions in the file ', file_name
-!          print *
+          print '(A)',  ' Desorption: missing rate definitions in the file ', file_name
           print '(A)',  ' Missing definitions:'
-!          print*
-          !             123451234567890xx123xxxxxx1234567890xx123
           print '(6x, A)', 'ads  lat_site    ads_site'
-
         end if
 
         print '(6x, a5, A10, 2x, a3, 6x, a10, 2x, a3, 6x, L1)' ,            &
                 c_pars%ads_names(species),             &
                 site_names(st1), ads_site_names(ast1)
-!        print*, e_defined1, r_defined
       end if
 
     end do
@@ -286,16 +271,16 @@ contains
     end do
 
     if(undefined_rate) then
-      print '(A)', ' Do nothing if you are ok with that.'
-!      print '(/6x, A)', 'As always, I remain your humble servant, kMC Code'
+      print '(/A)', ' Do nothing if you are ok with that.'
       print *
-!      stop '997 - desorption rates class'
-
     else
-      print '(/A)', 'desorption: passed required rates consistency check'
-      print*
-!      stop 'debugging stop'
+      print '(A)', ' Desorption: passed required rates consistency check'
+      print *
+    end if
 
+    if(undefined_energy) then
+      print '(A)', ' Desorption: error - undefined energy -- aborting execution'
+      stop 997
     end if
 
   end function desorption_rates_init
