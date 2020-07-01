@@ -44,15 +44,6 @@ module control_parameters_class
 
   end type
 
-
-  interface control_parameters
-
-    ! dja change to make f2003 complient
-    !module procedure :: control_parameters_init
-    module procedure control_parameters_init
-
-  end interface
-
 contains
 
   function control_parameters_init(file_name_base)

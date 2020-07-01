@@ -58,12 +58,6 @@ module mc_lat_class
 
   end type mc_lat
 
-  interface mc_lat
-
-    module procedure :: mc_lat_init
-
-  end interface
-
 
 contains
 

@@ -11,9 +11,9 @@ module rates_desorption_class
   implicit none
 
   private
-  public    :: desorption_rates_init, desorption_rates_type
+  public    :: desorption_init, desorption_type
 
-  type :: desorption_rates_type
+  type :: desorption_type
 
     logical :: is_defined = .false.
     ! Desorption Rates
@@ -34,19 +34,13 @@ module rates_desorption_class
   end type
 
 
-  interface desorption_rates_type
-
-    module procedure :: desorption_rates_init
-
-  end interface
-
 contains
 !------------------------------------------------------------------------------
-  function desorption_rates_init(c_pars, lat, e_pars)
+  function desorption_init(c_pars, lat, e_pars)
 !------------------------------------------------------------------------------
-    type(desorption_rates_type) desorption_rates_init
+    type(desorption_type) desorption_init
 
-    type(control_parameters), intent(inout) :: c_pars
+    type(control_parameters), intent(in)    :: c_pars
     type(mc_lat)            , intent(in)    :: lat
     type(energy_parameters) , intent(in)    :: e_pars
 
@@ -79,11 +73,12 @@ contains
     integer :: row, col, site, id
 
     ! Allocate rates array
-    allocate( desorption_rates_init%rates(lat%n_rows*lat%n_cols) )
-    allocate( desorption_rates_init%process( c_pars%n_species,&
+    allocate( desorption_init%rates(lat%n_rows*lat%n_cols) )
+    allocate( desorption_init%process( c_pars%n_species,&
                                  n_max_site_types, n_max_ads_sites) )
 
-    desorption_rates_init%process = default_rate
+    desorption_init%process = default_rate
+    desorption_init%rates    = 0.0_dp
 
     !  read rate definitions from the input file
     file_name = c_pars%rate_file_name
@@ -114,7 +109,7 @@ contains
 !------------------------------------------------------------------------------
           case('desorption')                               ! select case (words(1)
 !------------------------------------------------------------------------------
-            desorption_rates_init%is_defined = .true.
+            desorption_init%is_defined = .true.
 
             if (parse_state /= parse_state_default) &
               call error_message(file_name, line_number, buffer, &
@@ -156,7 +151,7 @@ contains
                              "wrong site name in the desorption section")
 
                 ! check for duplicate entry
-                if (desorption_rates_init%process(current_species_id,i1,i2 ) /= default_rate)&
+                if (desorption_init%process(current_species_id,i1,i2 ) /= default_rate)&
                   call error_message(file_name, line_number, buffer, "duplicated entry")
 
                 ! check energy is defined for initial site_type and ads_site
@@ -175,7 +170,7 @@ contains
                                               "Arrhenius must have 2 parameters")
                     read(words(3),*) pars(1)
                     read(words(4),*) pars(2)
-                    desorption_rates_init%process(current_species_id,i1,i2 ) = &
+                    desorption_init%process(current_species_id,i1,i2 ) = &
                                 arrhenius(c_pars%temperature, pars(1:2))
 
                   case (extArrhenius_id)
@@ -184,7 +179,7 @@ contains
                     read(words(3),*) pars(1)
                     read(words(4),*) pars(2)
                     read(words(5),*) pars(3)
-                    desorption_rates_init%process(current_species_id,i1,i2 ) = &
+                    desorption_init%process(current_species_id,i1,i2 ) = &
                                 extArrhenius(c_pars%temperature, pars(1:3))
 
                   case default
@@ -251,7 +246,7 @@ contains
     do ast1      = 1, n_max_ads_sites
 
       e_defined1 = e_pars%ads_energy(species, st1, ast1) /= e_pars%undefined_energy
-      r_defined  = desorption_rates_init%process (species, st1, ast1) /= default_rate
+      r_defined  = desorption_init%process (species, st1, ast1) /= default_rate
 
       if ( e_defined1 .and. (.not. r_defined)) then
         if (.not. undefined_rate) then
@@ -283,12 +278,12 @@ contains
       stop 997
     end if
 
-  end function desorption_rates_init
+  end function desorption_init
 
 !-----------------------------------------------------------------------------
   subroutine construct(this, ads, lat, e_pars, beta)
 !-----------------------------------------------------------------------------
-    class(desorption_rates_type), intent(inout) :: this
+    class(desorption_type), intent(inout) :: this
     integer, intent(in) :: ads
     class(mc_lat), intent(inout) :: lat
     class(energy_parameters), intent(in) :: e_pars
@@ -321,7 +316,7 @@ contains
 !------------------------------------------------------------------------------
   subroutine print(this, c_pars)
 !------------------------------------------------------------------------------
-    class(desorption_rates_type), intent(in) :: this
+    class(desorption_type), intent(in) :: this
 
     class(control_parameters), intent(in) :: c_pars
 

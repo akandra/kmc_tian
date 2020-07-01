@@ -11,7 +11,7 @@ module rates_hopping_class
   implicit none
 
   private
-  public    :: hopping_rates_init, hopping_rates_type
+  public    :: hopping_init, hopping_type
 
   type :: v_list_dp
 
@@ -19,7 +19,7 @@ module rates_hopping_class
 
   end type
 
-  type :: hopping_rates_type
+  type :: hopping_type
 
     logical :: is_defined = .false.
     ! Hopping Rates
@@ -36,26 +36,22 @@ module rates_hopping_class
     !                   .  .  .  .  .
     real(dp), dimension(:, :, :, :, :), allocatable :: process
 
+    ! List of additional nn directions to scan after hop
+    integer, dimension(:,:), allocatable :: nn_new
+
   contains
     procedure :: construct
     procedure :: print
 
   end type
 
-
-  interface hopping_rates_type
-
-    module procedure :: hopping_rates_init
-
-  end interface
-
 contains
 !------------------------------------------------------------------------------
-  function hopping_rates_init(c_pars, lat, e_pars)
+  function hopping_init(c_pars, lat, e_pars)
 !------------------------------------------------------------------------------
-    type(hopping_rates_type) hopping_rates_init
+    type(hopping_type) hopping_init
 
-    type(control_parameters), intent(inout) :: c_pars
+    type(control_parameters), intent(in)    :: c_pars
     type(mc_lat)            , intent(in)    :: lat
     type(energy_parameters) , intent(in)    :: e_pars
 
@@ -86,24 +82,40 @@ contains
     real(dp), parameter   :: default_rate  = -1.0_dp
 
     integer :: row, col, site, id
+    integer :: n_nn, n_nn2, max_avail_ads_sites
 
-    ! Allocate rates array
-    allocate( hopping_rates_init%rates(lat%n_rows*lat%n_cols,lat%n_nn(1)) )
-    do i=1,lat%n_ads_tot()
-      row = lat%ads_list(i)%row
-      col = lat%ads_list(i)%col
-      site = lat%lst(row,col)
-      id  = lat%ads_list(i)%id
-      do m=1,lat%n_nn(1)
-        allocate( hopping_rates_init%rates(i,m)%list(size(lat%avail_ads_sites(id,site)%list)) )
-      end do
+    n_nn  = lat%n_nn(1)
+    n_nn2 = n_nn/2
+    ! List of additional nn directions to scan after hop
+    allocate(hopping_init%nn_new(n_nn,n_nn2))
+    do m=1,n_nn
+    do i=1,n_nn2
+      hopping_init%nn_new(m,i) = modulo( m+i-n_nn2, n_nn ) + 1
+    end do
     end do
 
-    allocate(hopping_rates_init%process( c_pars%n_species,&
+    ! maximal number of available ads. sites
+    max_avail_ads_sites = 1
+    do i=1,c_pars%n_species
+    do m=1,n_max_site_types
+      i1 = size(lat%avail_ads_sites(i,m)%list)
+      if (max_avail_ads_sites < i1) max_avail_ads_sites = i1
+    end do
+    end do
+    ! Allocate and initialize rates array
+    allocate( hopping_init%rates(lat%n_rows*lat%n_cols,n_nn) )
+    do i=1,lat%n_rows*lat%n_cols
+    do m=1,n_nn
+      allocate( hopping_init%rates(i,m)%list(max_avail_ads_sites) )
+      hopping_init%rates(i,m)%list = 0.0_dp
+    end do
+    end do
+
+    allocate(hopping_init%process( c_pars%n_species,&
                                  n_max_site_types, n_max_ads_sites,&
                                  n_max_site_types, n_max_ads_sites) )
 
-    hopping_rates_init%process = default_rate
+    hopping_init%process = default_rate
 
     !  read rate definitions from the input file
     file_name = c_pars%rate_file_name
@@ -134,7 +146,7 @@ contains
 !------------------------------------------------------------------------------
           case('hopping')                               ! select case (words(1)
 !------------------------------------------------------------------------------
-            hopping_rates_init%is_defined = .true.
+            hopping_init%is_defined = .true.
 
             if (parse_state /= parse_state_default) &
               call error_message(file_name, line_number, buffer, &
@@ -178,7 +190,7 @@ contains
                              "wrong site name in the hopping section")
 
                 ! check for duplicate entry
-                if (hopping_rates_init%process(current_species_id,i1,i2,i3,i4 ) /= default_rate)&
+                if (hopping_init%process(current_species_id,i1,i2,i3,i4 ) /= default_rate)&
                   call error_message(file_name, line_number, buffer, "duplicated entry (check symetry duplicates)")
 
                 ! check energy is defined for initial and final site_type and ads_site
@@ -199,11 +211,11 @@ contains
                                               "Arrhenius must have 2 parameters")
                     read(words(5),*) pars(1)
                     read(words(6),*) pars(2)
-                    hopping_rates_init%process(current_species_id,i1,i2,i3,i4 ) = &
+                    hopping_init%process(current_species_id,i1,i2,i3,i4 ) = &
                                 arrhenius(c_pars%temperature, pars(1:2))
                     ! symmetrize
-                    hopping_rates_init%process(current_species_id,i3,i4,i1,i2 ) = &
-                    hopping_rates_init%process(current_species_id,i1,i2,i3,i4 )
+                    hopping_init%process(current_species_id,i3,i4,i1,i2 ) = &
+                    hopping_init%process(current_species_id,i1,i2,i3,i4 )
 
                   case (extArrhenius_id)
                     if (nwords/=7) call error_message(file_name, line_number, buffer,&
@@ -211,11 +223,11 @@ contains
                     read(words(5),*) pars(1)
                     read(words(6),*) pars(2)
                     read(words(7),*) pars(3)
-                    hopping_rates_init%process(current_species_id,i1,i2,i3,i4 ) = &
+                    hopping_init%process(current_species_id,i1,i2,i3,i4 ) = &
                                 extArrhenius(c_pars%temperature, pars(1:3))
                     ! symmetrize
-                    hopping_rates_init%process(current_species_id,i3,i4,i1,i2 ) = &
-                    hopping_rates_init%process(current_species_id,i1,i2,i3,i4 )
+                    hopping_init%process(current_species_id,i3,i4,i1,i2 ) = &
+                    hopping_init%process(current_species_id,i1,i2,i3,i4 )
 
                   case default
                     call error_message(file_name, line_number, buffer, "This should not happen! Check the code!")
@@ -290,7 +302,7 @@ contains
 
       e_defined1 = e_pars%ads_energy(species, st1, ast1) /= e_pars%undefined_energy
       e_defined2 = e_pars%ads_energy(species, st2, ast2) /= e_pars%undefined_energy
-      r_defined  = hopping_rates_init%process (species, st1, ast1, st2, ast2) /= default_rate
+      r_defined  = hopping_init%process (species, st1, ast1, st2, ast2) /= default_rate
 
       if ( (e_defined1 .and. e_defined2) .and. (.not. r_defined)) then
         if (.not. undefined_rate) then
@@ -331,12 +343,12 @@ contains
 
     end if
 
-  end function hopping_rates_init
+  end function hopping_init
 
 !-----------------------------------------------------------------------------
   subroutine construct(this, ads, lat, e_pars, beta)
 !-----------------------------------------------------------------------------
-    class(hopping_rates_type), intent(inout) :: this
+    class(hopping_type), intent(inout) :: this
     integer, intent(in) :: ads
     class(mc_lat), intent(inout) :: lat
     class(energy_parameters), intent(in) :: e_pars
@@ -430,7 +442,7 @@ contains
 !------------------------------------------------------------------------------
   subroutine print(this, c_pars)
 !------------------------------------------------------------------------------
-    class(hopping_rates_type), intent(in) :: this
+    class(hopping_type), intent(in) :: this
 
     class(control_parameters), intent(in) :: c_pars
 

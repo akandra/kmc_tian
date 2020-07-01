@@ -33,12 +33,6 @@ module energy_parameters_class
   end type
 
 
-  interface energy_parameters
-
-    module procedure :: energy_parameters_init
-
-  end interface
-
 contains
 
   function energy_parameters_init(control_pars)
