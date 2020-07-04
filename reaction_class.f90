@@ -9,6 +9,7 @@ module reaction_class
   use utilities
   use rates_hopping_class
   use rates_desorption_class
+  use rates_dissociation_class
 
   implicit none
 
@@ -117,6 +118,8 @@ contains
         acc_rate(desorption_id) = acc_rate(desorption_id) + this%desorption%rates(ads)
       end do
     end if
+
+    acc_rate(dissociation_id) = acc_rate(hopping_id)
     ! Save the total rate value
     this%total_rate = acc_rate(n_reaction_types)
     ! do nothing if there is nothing to do

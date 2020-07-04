@@ -414,73 +414,74 @@ contains
   do col=1,this%n_cols
 
     i_ads = this%occupations(row,col)
+    if ( i_ads > 0 ) then
+      if ( this%ads_list(i_ads)%id == species ) then
 
-    if ( i_ads > 0 .and. this%ads_list(i_ads)%id == species) then
+        do m=1,nnn2
 
-      do m=1,nnn2
+          ! Take previously scan neighbours
+          call this%hop(i_ads,nnn2+m,row_nn(m),col_nn(m), ads_site)
+          i_ads_nn = this%occupations(row_nn(m), col_nn(m))
 
-        ! Take previously scan neighbours
-        call this%hop(i_ads,nnn2+m,row_nn(m),col_nn(m), ads_site)
-        i_ads_nn = this%occupations(row_nn(m), col_nn(m))
-        if ( i_ads_nn > 0 .and. this%ads_list(i_ads_nn)%id == species ) then
-            scanned_nn_occs(m) = 1
-        else
-            scanned_nn_occs(m) = 0
-        end if
+          scanned_nn_occs(m) = 0
+          if ( i_ads_nn > 0 ) then
+            if ( this%ads_list(i_ads_nn)%id == species ) scanned_nn_occs(m) = 1
+          end if
 
-        ! Switch off periodic boundary conditions
-        ! Warning: works only for hexagonal lattice,
-        !          maybe, because of Corona virus
-        if (row==1) scanned_nn_occs(2:3) = 0
-        if (col==1) scanned_nn_occs(1) = 0
-        if (col==this%n_cols) scanned_nn_occs(3) = 0
+          ! Switch off periodic boundary conditions
+          ! Warning: works only for hexagonal lattice,
+          !          maybe, because of Corona virus
+          if (row==1) scanned_nn_occs(2:3) = 0
+          if (col==1) scanned_nn_occs(1) = 0
+          if (col==this%n_cols) scanned_nn_occs(3) = 0
 
-      end do
+        end do
 
-      select case (sum(scanned_nn_occs))
+        select case (sum(scanned_nn_occs))
 
-        case (0)
-          !print*
-          !print*,"Case 0"
-          largest_label = largest_label + 1
-          cluster_label(row,col) = largest_label
+          case (0)
+            !print*
+            !print*,"Case 0"
+            largest_label = largest_label + 1
+            cluster_label(row,col) = largest_label
 
-        case (1)
-          !print*
-          !print*,"Case 1"
-          do m=1,nnn2
-            if (scanned_nn_occs(m) == 1) then
-              cluster_label(row,col) = &
-                      lfind( cluster_label(row_nn(m),col_nn(m)), labels)
+          case (1)
+            !print*
+            !print*,"Case 1"
+            do m=1,nnn2
+              if (scanned_nn_occs(m) == 1) then
+                cluster_label(row,col) = &
+                        lfind( cluster_label(row_nn(m),col_nn(m)), labels)
+                end if
+            end do
+
+          case (2)
+            !print*
+            !print*,"Case 2"
+            do m=1,nnn2-1
+              itemp = cluster_label(row_nn(m),col_nn(m))
+            do n=m+1,nnn2
+              if (scanned_nn_occs(m) == 1 .and. scanned_nn_occs(n) == 1) then
+                call lunion(itemp,cluster_label(row_nn(n),col_nn(n)),labels)
+                cluster_label(row,col) = lfind(itemp, labels)
               end if
-          end do
+            end do
+            end do
 
-        case (2)
-          !print*
-          !print*,"Case 2"
-          do m=1,nnn2-1
-            itemp = cluster_label(row_nn(m),col_nn(m))
-          do n=m+1,nnn2
-            if (scanned_nn_occs(m) == 1 .and. scanned_nn_occs(n) == 1) then
-              call lunion(itemp,cluster_label(row_nn(n),col_nn(n)),labels)
-              cluster_label(row,col) = lfind(itemp, labels)
-            end if
-          end do
-          end do
+          case (3)
+            !print*
+            !print*,"Case 3"
+            itemp = cluster_label(row_nn(1),col_nn(1))
+            call lunion(itemp, cluster_label(row_nn(2),col_nn(2)),labels)
+            call lunion(itemp, cluster_label(row_nn(3),col_nn(3)),labels)
+            cluster_label(row,col) = lfind(itemp, labels)
 
-        case (3)
-          !print*
-          !print*,"Case 3"
-          itemp = cluster_label(row_nn(1),col_nn(1))
-          call lunion(itemp, cluster_label(row_nn(2),col_nn(2)),labels)
-          call lunion(itemp, cluster_label(row_nn(3),col_nn(3)),labels)
-          cluster_label(row,col) = lfind(itemp, labels)
+          case default
+            stop 'Hoshen-Kopelman: too many neighbors'
 
-        case default
-          stop 'Hoshen-Kopelman: too many neighbors'
+        end select
 
-      end select
-
+      end if
     end if
 
   end do

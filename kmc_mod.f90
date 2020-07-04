@@ -111,14 +111,15 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
       time_new = time + delta_t
       kmc_nsteps = kmc_nsteps + 1
 
+      if (time_new > c_pars%t_end) time_new = c_pars%t_end
+
+
       call progress_bar(                  &
           'current trajectory',           &
           int(100*time_new/c_pars%t_end), &
           '   total',                     &
           ! total =  % completed trajs + contribution form current trajctory
           100*(itraj-1)/c_pars%n_trajs + int(100.*time_new/(c_pars%t_end*c_pars%n_trajs)))
-
-      if (time_new > c_pars%t_end) time_new = c_pars%t_end
 
       ibin_new = int(time_new/step_bin) + 1
 
@@ -151,7 +152,7 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
           write(outhst_unit,'(A6,1pe12.3)') "time ",ibin*step_bin
           do species=1,c_pars%n_species
             write(outhst_unit,*) species
-            write(outhst_unit,n_ads_fmt) hist(species,:)
+            write(outhst_unit,n_ads_fmt) (hist(species,i), i=1,lat%n_ads(species))
           end do
           hist = 0
 
@@ -165,7 +166,6 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
 
       ibin = ibin_new
       time = time_new ! time shift
-
 
     end do ! over time
 !-------------------------------------------------------------
