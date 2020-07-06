@@ -26,15 +26,19 @@ module rates_dissociation_class
     !                          n_adsorbate              -> which particle
     !                          .  n_neighbor            -> where to
     !                          .  .
-    type(v_list_dp), dimension(:, :), allocatable :: rates
+    type(v_list_dp), dimension(:,:), allocatable :: rates
 
-    !               (   n_species                       -> which species
-    !                   .  n_site_type                  -> where from
+    !               (   n_species                           -> reactant
+    !                   .  n_site_type                      -> where from
     !                   .  .  n_adsorption_sites
-    !                   .  .  .  n_site_type            -> where to
-    !                   .  .  .  .  n_adsorption_sites )
-    !                   .  .  .  .  .
-    real(dp), dimension(:, :, :, :, :), allocatable :: process
+    !                   .  .  .  n_species                  -> product 1
+    !                   .  .  .  .  n_site_type             -> where to
+    !                   .  .  .  .  .  n_adsorption_sites
+    !                   .  .  .  .  .  .  n_species         -> product 2
+    !                   .  .  .  .  .  .  .  n_site_type    -> where to
+    !                   .  .  .  .  .  .  .  .  n_adsorption_sites  )
+    !                   .  .  .  .  .  .  .  .  .
+    real(dp), dimension(:, :, :, :, :, :, :, :, :), allocatable :: process
 
     ! List of additional nn directions to scan after hop
     integer, dimension(:,:), allocatable :: nn_new
@@ -55,7 +59,7 @@ contains
     type(mc_lat)            , intent(in)    :: lat
     type(energy_parameters) , intent(in)    :: e_pars
 
-    integer :: i, ios, nwords, line_number, i1, i2, i3, i4, m
+    integer :: i, ios, nwords, line_number, i1, i2, i3, i4, i5, i6, m
 
     integer :: species, st1, st2, ast1, ast2
     logical :: e_defined1, e_defined2, r_defined, undefined_rate, undefined_energy
@@ -65,8 +69,8 @@ contains
     character(len=len(trim(c_pars%rate_file_name))) :: file_name
     character(1)                                    :: answer
 
-    character(len=10)     :: current_species_name
-    integer               :: current_species_id
+    character(len=10)     :: current_reactant_name, current_product1_name, current_product2_name
+    integer               :: current_reactant_id, current_product1_id, current_product2_id
     character(len=20)     :: current_law_name
     integer               :: current_law_id
 
@@ -84,192 +88,207 @@ contains
     integer :: row, col, site, id
     integer :: n_nn, n_nn2, max_avail_ads_sites
 
-!    n_nn  = lat%n_nn(1)
-!    n_nn2 = n_nn/2
-!    ! List of additional nn directions to scan after hop
-!    allocate(dissociation_init%nn_new(n_nn,n_nn2))
-!    do m=1,n_nn
-!    do i=1,n_nn2
-!      dissociation_init%nn_new(m,i) = modulo( m+i-n_nn2, n_nn ) + 1
-!    end do
-!    end do
+    n_nn  = lat%n_nn(1)
+    n_nn2 = n_nn/2
+    ! List of additional nn directions to scan after dissociation
+    allocate(dissociation_init%nn_new(n_nn,n_nn2))
+    do m=1,n_nn
+    do i=1,n_nn2
+      dissociation_init%nn_new(m,i) = modulo( m+i-n_nn2, n_nn ) + 1
+    end do
+    end do
+
+    ! maximal number of available ads. sites
+    max_avail_ads_sites = 1
+    do i=1,c_pars%n_species
+    do m=1,n_max_site_types
+      i1 = size(lat%avail_ads_sites(i,m)%list)
+      if (max_avail_ads_sites < i1) max_avail_ads_sites = i1
+    end do
+    end do
+    ! Allocate and initialize rates array
+    allocate( dissociation_init%rates(lat%n_rows*lat%n_cols,n_nn) )
+    do i=1,lat%n_rows*lat%n_cols
+    do m=1,n_nn
+      allocate( dissociation_init%rates(i,m)%list(max_avail_ads_sites) )
+      dissociation_init%rates(i,m)%list = 0.0_dp
+    end do
+    end do
+
+    allocate(dissociation_init%process( c_pars%n_species,n_max_site_types, n_max_ads_sites,&
+                                        c_pars%n_species,n_max_site_types, n_max_ads_sites,&
+                                        c_pars%n_species,n_max_site_types, n_max_ads_sites ))
+
+    dissociation_init%process = default_rate
+
+    !  read rate definitions from the input file
+    file_name = c_pars%rate_file_name
+    call open_for_read(inp_unit, file_name )
+
+    ios = 0
+    parse_state = parse_state_default
+    line_number = 0
+    undefined_energy = .false.
+
+
+
+    do while (ios == 0)
+
+      read(inp_unit, '(A)', iostat=ios) buffer
+      line_number = line_number + 1
+        ! ios < 0: end of record condition encountered or endfile condition detected
+        ! ios > 0: an error is detected
+        ! ios = 0  otherwise
+
+      if (ios /= 0) exit
+
+        ! Split an input string
+        words = ''
+        call split_string(buffer, words, nwords)
+
+        select case (words(1)) ! take a keyword
+!------------------------------------------------------------------------------
+          case('dissociation')                               ! select case (words(1)
+!------------------------------------------------------------------------------
+            dissociation_init%is_defined = .true.
+
+            if (parse_state /= parse_state_default) &
+              call error_message(file_name, line_number, buffer, &
+                         "invalid ending of the reaction section")
+            parse_state = parse_state_dissociation
+            if (nwords/=5) call error_message(file_name, line_number, buffer, &
+                               "dissociation key must have 4 parameters")
+
+            read(words(2),'(A)') current_reactant_name
+            current_reactant_id = get_index(current_reactant_name, c_pars%ads_names )
+            if (current_reactant_id == 0) call error_message(file_name, line_number, buffer, &
+                                                  "inconsistent dissociation reactant definition")
+
+            read(words(3),'(A)') current_product1_name
+            current_product1_id = get_index(current_product1_name, c_pars%ads_names )
+            if (current_product1_id == 0) call error_message(file_name, line_number, buffer, &
+                                                  "inconsistent dissociation product 1 definition")
+
+            read(words(4),'(A)') current_product2_name
+            current_product2_id = get_index(current_product2_name, c_pars%ads_names )
+            if (current_product2_id == 0) call error_message(file_name, line_number, buffer, &
+                                                  "inconsistent dissociation product 2 definition")
+
+            current_law_id = get_index(words(5), law_names )
+            if (current_law_id == 0) call error_message(file_name, line_number, buffer, &
+                                                  "dissociation: unknown temperature law")
+!            print*, 'reactant name and id: ', current_reactant_name, current_reactant_id
+!            print*, 'product1 name and id: ', current_product1_name, current_product1_id
+!            print*, 'product2 name and id: ', current_product2_name, current_product2_id
+!            print*, c_pars%ads_names
+!            stop 111
+
+!------------------------------------------------------------------------------
+          case ('terrace','step','corner')              ! select case(words(1))
+!------------------------------------------------------------------------------
+
+
+            select case (parse_state)
+
+              case(parse_state_ignore)
+                ! ignore
+                ! print *, 'warning ignoring line', line_number, buffer
+
+              case(dissociation_id)
+
+                i1 = get_index(words(1),    site_names)
+                i2 = get_index(words(2),ads_site_names)
+                i3 = get_index(words(3),    site_names)
+                i4 = get_index(words(4),ads_site_names)
+                i5 = get_index(words(5),    site_names)
+                i6 = get_index(words(6),ads_site_names)
+
+                if ( i1==0 .or. i2==0 .or. i3==0 .or. i4==0 .or. i5==0 .or. i6==0) &
+                  call error_message(file_name, line_number, buffer, &
+                             "wrong site name in the dissociation section")
+
+                ! check for duplicate entry
+                if (dissociation_init%process(current_reactant_id,i1,i2, &
+                                              current_product1_id,i3,i4, &
+                                              current_product2_id,i5,i6 ) /= default_rate)&
+                  call error_message(file_name, line_number, buffer, "duplicated entry")
+
+                ! check energy is defined for reactant's and for products' site_type and ads_site
+                if( e_pars%ads_energy(current_reactant_id, i1, i2) == e_pars%undefined_energy .or. &
+                    e_pars%ads_energy(current_product1_id, i3, i4) == e_pars%undefined_energy .or. &
+                    e_pars%ads_energy(current_product2_id, i5, i6) == e_pars%undefined_energy ) then
+
+                    call error_message(file_name, line_number, buffer, &
+                                       " rate defined for site with undefined adsorption energy", &
+                                       stop=.false., warning=.false.)
+
+                    undefined_energy = .true.
+                end if
+
+                select case (current_law_id)
+
+                  case (Arrhenius_id)
+                    if (nwords/=8) call error_message(file_name, line_number, buffer,&
+                                              "Arrhenius must have 2 parameters")
+                    read(words(7),*) pars(1)
+                    read(words(8),*) pars(2)
+                    dissociation_init%process(current_reactant_id,i1,i2, &
+                                              current_product1_id,i3,i4, &
+                                              current_product2_id,i5,i6 ) = arrhenius(c_pars%temperature, pars(1:2))
+
+                  case (extArrhenius_id)
+                    if (nwords/=9) call error_message(file_name, line_number, buffer,&
+                                              "extArrhenius must have 3 parameters")
+                    read(words(7),*) pars(1)
+                    read(words(8),*) pars(2)
+                    read(words(9),*) pars(3)
+                    dissociation_init%process(current_reactant_id,i1,i2, &
+                                              current_product1_id,i3,i4, &
+                                              current_product2_id,i5,i6 ) = extArrhenius(c_pars%temperature, pars(1:3))
+
+                  case default
+                    call error_message(file_name, line_number, buffer, "Dissociation: this should not happen! Check the code!")
+
+                end select
+
+!                 print*, 'reaction: ', reaction_names(parse_state),&
+!                        ' for species:', current_reactant_name, current_product1_name, current_product2_name
+!                 print*, 'law: ', law_names(current_law_id),&
+!                        ' from:', site_names(i1),ads_site_names(i2),&
+!                        ' to:'  , site_names(i3),ads_site_names(i4),&
+!                        ' and '  , site_names(i5),ads_site_names(i6)
+!                print'(A,3f16.3)', 'with pars: ', pars
+!                stop 112
 !
-!    ! maximal number of available ads. sites
-!    max_avail_ads_sites = 1
-!    do i=1,c_pars%n_species
-!    do m=1,n_max_site_types
-!      i1 = size(lat%avail_ads_sites(i,m)%list)
-!      if (max_avail_ads_sites < i1) max_avail_ads_sites = i1
-!    end do
-!    end do
-!    ! Allocate and initialize rates array
-!    allocate( dissociation_init%rates(lat%n_rows*lat%n_cols,n_nn) )
-!    do i=1,lat%n_rows*lat%n_cols
-!    do m=1,n_nn
-!      allocate( dissociation_init%rates(i,m)%list(max_avail_ads_sites) )
-!      dissociation_init%rates(i,m)%list = 0.0_dp
-!    end do
-!    end do
-!
-!    allocate(dissociation_init%process( c_pars%n_species,&
-!                                 n_max_site_types, n_max_ads_sites,&
-!                                 n_max_site_types, n_max_ads_sites) )
-!
-!    dissociation_init%process = default_rate
-!
-!    !  read rate definitions from the input file
-!    file_name = c_pars%rate_file_name
-!    call open_for_read(inp_unit, file_name )
-!
-!    ios = 0
-!    parse_state = parse_state_default
-!    line_number = 0
-!    undefined_energy = .false.
-!
-!
-!
-!    do while (ios == 0)
-!
-!      read(inp_unit, '(A)', iostat=ios) buffer
-!      line_number = line_number + 1
-!        ! ios < 0: end of record condition encountered or endfile condition detected
-!        ! ios > 0: an error is detected
-!        ! ios = 0  otherwise
-!
-!      if (ios /= 0) exit
-!
-!        ! Split an input string
-!        words = ''
-!        call split_string(buffer, words, nwords)
-!
-!        select case (words(1)) ! take a keyword
-!!------------------------------------------------------------------------------
-!          case('dissociation')                               ! select case (words(1)
-!!------------------------------------------------------------------------------
-!            dissociation_init%is_defined = .true.
-!
-!            if (parse_state /= parse_state_default) &
-!              call error_message(file_name, line_number, buffer, &
-!                         "invalid ending of the reaction section")
-!            parse_state = parse_state_dissociation
-!            if (nwords/=3) call error_message(file_name, line_number, buffer, &
-!                               "dissociation key must have 2 parameters")
-!
-!            read(words(2),'(A)') current_species_name
-!            current_species_id = get_index(current_species_name, c_pars%ads_names )
-!            if (current_species_id == 0) call error_message(file_name, line_number, buffer, &
-!                                                  "inconsistent dissociation definition")
-!
-!            current_law_id = get_index(words(3), law_names )
-!            if (current_law_id == 0) call error_message(file_name, line_number, buffer, &
-!                                                  "unknown temperature law")
-!!            print*, 'name     =', current_species_name
-!!            print*, 'id       =', current_species_id
-!!            print*, c_pars%ads_names
-!
-!!------------------------------------------------------------------------------
-!          case ('terrace','step','corner')              ! select case(words(1))
-!!------------------------------------------------------------------------------
-!
-!
-!            select case (parse_state)
-!
-!              case(parse_state_ignore)
-!                ! ignore
-!                ! print *, 'warning ignoring line', line_number, buffer
-!
-!              case(dissociation_id)
-!
-!                i1 = get_index(words(1),    site_names)
-!                i2 = get_index(words(2),ads_site_names)
-!                i3 = get_index(words(3),    site_names)
-!                i4 = get_index(words(4),ads_site_names)
-!
-!                if ( i1==0 .or. i2==0 .or. i3==0 .or. i4==0) &
-!                  call error_message(file_name, line_number, buffer, &
-!                             "wrong site name in the dissociation section")
-!
-!                ! check for duplicate entry
-!                if (dissociation_init%process(current_species_id,i1,i2,i3,i4 ) /= default_rate)&
-!                  call error_message(file_name, line_number, buffer, "duplicated entry (check symetry duplicates)")
-!
-!                ! check energy is defined for initial and final site_type and ads_site
-!                if( e_pars%ads_energy(current_species_id, i1, i2) == e_pars%undefined_energy .or. &
-!                    e_pars%ads_energy(current_species_id, i3, i4) == e_pars%undefined_energy ) then
-!
-!                    call error_message(file_name, line_number, buffer, &
-!                                       "rate defined for site with undefined adsorption energy", &
-!                                       stop=.false., warning=.false.)
-!
-!                    undefined_energy = .true.
-!                end if
-!
-!                select case (current_law_id)
-!
-!                  case (Arrhenius_id)
-!                    if (nwords/=6) call error_message(file_name, line_number, buffer,&
-!                                              "Arrhenius must have 2 parameters")
-!                    read(words(5),*) pars(1)
-!                    read(words(6),*) pars(2)
-!                    dissociation_init%process(current_species_id,i1,i2,i3,i4 ) = &
-!                                arrhenius(c_pars%temperature, pars(1:2))
-!                    ! symmetrize
-!                    dissociation_init%process(current_species_id,i3,i4,i1,i2 ) = &
-!                    dissociation_init%process(current_species_id,i1,i2,i3,i4 )
-!
-!                  case (extArrhenius_id)
-!                    if (nwords/=7) call error_message(file_name, line_number, buffer,&
-!                                              "extArrhenius must have 3 parameters")
-!                    read(words(5),*) pars(1)
-!                    read(words(6),*) pars(2)
-!                    read(words(7),*) pars(3)
-!                    dissociation_init%process(current_species_id,i1,i2,i3,i4 ) = &
-!                                extArrhenius(c_pars%temperature, pars(1:3))
-!                    ! symmetrize
-!                    dissociation_init%process(current_species_id,i3,i4,i1,i2 ) = &
-!                    dissociation_init%process(current_species_id,i1,i2,i3,i4 )
-!
-!                  case default
-!                    call error_message(file_name, line_number, buffer, "This should not happen! Check the code!")
-!
-!                end select
-!
-!!                 print*, 'reaction: ', reaction_names(parse_state),&
-!!                        ' for species:', current_species_name
-!!                 print*, 'law: ', law_names(current_law_id),&
-!!                        ' from:', site_names(i1),ads_site_names(i2),&
-!!                        ' to:'  , site_names(i3),ads_site_names(i4)
-!!                print'(A,3f16.3)', 'with pars: ', pars
-!
-!              case default
-!                call error_message(file_name, line_number, buffer, "invalid site type statement")
-!
-!            end select
-!
-!!------------------------------------------------------------------------------
-!          case('')                                      ! select case(words(1))
-!!------------------------------------------------------------------------------
-!            if (buffer == '') then
-!              parse_state = parse_state_default
-!!              print*, 'blank line '
-!!            else
-!!              print*, 'comment: ', trim(buffer)
-!            end if
-!
-!!------------------------------------------------------------------------------
-!          case default                                  ! select case(words(1))
-!!------------------------------------------------------------------------------
-!            if ( parse_state == parse_state_default .and. get_index(words(1),reaction_names) /= 0 ) &
-!              parse_state = parse_state_ignore
-!
-!            if (parse_state /= parse_state_ignore) &
-!              call error_message(file_name, line_number, buffer, "unknown key")
-!
-!        end select                                      ! select case(words(1))
-!
-!    end do ! while ios=0
-!
-!    close(inp_unit)
+              case default
+                call error_message(file_name, line_number, buffer, "Dissociation: invalid site type statement")
+
+            end select
+
+!------------------------------------------------------------------------------
+          case('')                                      ! select case(words(1))
+!------------------------------------------------------------------------------
+            if (buffer == '') then
+              parse_state = parse_state_default
+!              print*, 'blank line '
+!            else
+!              print*, 'comment: ', trim(buffer)
+            end if
+
+!------------------------------------------------------------------------------
+          case default                                  ! select case(words(1))
+!------------------------------------------------------------------------------
+            if ( parse_state == parse_state_default .and. get_index(words(1),reaction_names) /= 0 ) &
+              parse_state = parse_state_ignore
+
+            if (parse_state /= parse_state_ignore) &
+              call error_message(file_name, line_number, buffer, "Dissociation: unknown key")
+
+        end select                                      ! select case(words(1))
+
+    end do ! while ios=0
+
+    close(inp_unit)
 !
 !    if (undefined_energy) then
 !      write(*, '(A)') ' dissociation: error, rates defined for sites with undefined energies'

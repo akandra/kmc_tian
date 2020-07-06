@@ -19,8 +19,9 @@ module reaction_class
 
   type :: reaction_type
 
-    type(   hopping_type) :: hopping
-    type(desorption_type) :: desorption
+    type(     hopping_type) :: hopping
+    type(  desorption_type) :: desorption
+    type(dissociation_type) :: dissociation
 
     real(dp) :: beta                    ! inverse thermodynamic temperature
     integer  :: n_ads_total             ! total number of adsorbates
@@ -45,8 +46,9 @@ contains
 
 
     ! Create a rate structure
-    reaction_init%hopping    =    hopping_init(c_pars, lat, e_pars)
-    reaction_init%desorption = desorption_init(c_pars, lat, e_pars)
+    reaction_init%hopping      =      hopping_init(c_pars, lat, e_pars)
+    reaction_init%desorption   =   desorption_init(c_pars, lat, e_pars)
+    reaction_init%dissociation = dissociation_init(c_pars, lat, e_pars)
 !    call reaction_init%hopping%print(c_pars)
 !    call reaction_init%desorption%print(c_pars)
 
@@ -247,9 +249,11 @@ contains
           call this%desorption%construct(change_list(i), lat, e_pars, this%beta)
         end do
 
-        ! Adjust the rates arrays
-        this%desorption%rates(ads) = this%desorption%rates(this%n_ads_total)
-        this%hopping%rates(ads,:)  = this%hopping%rates(this%n_ads_total,:)
+        ! Adjust the rates arrays except when ads is the last particle
+        if (ads < this%n_ads_total) then
+          this%desorption%rates(ads) = this%desorption%rates(this%n_ads_total)
+          this%hopping%rates(ads,:)  = this%hopping%rates(this%n_ads_total,:)
+        end if
 
         ! Update the the number of adsorbates in this
         this%n_ads_total = this%n_ads_total - 1

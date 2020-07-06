@@ -263,7 +263,7 @@ contains
               parse_state = parse_state_ignore
 
             if (parse_state /= parse_state_ignore) &
-              call error_message(file_name, line_number, buffer, "unknown key")
+              call error_message(file_name, line_number, buffer, "hopping: unknown key")
 
         end select                                      ! select case(words(1))
 

@@ -60,8 +60,8 @@ module constants
   ! Number of reaction types
   integer, parameter :: n_reaction_types = 3
   ! List of reaction types
-  character(len=10), dimension(n_reaction_types), parameter :: &
-            reaction_names = [character(10)::'hopping','desorption','dissociation']
+  character(len=20), dimension(n_reaction_types), parameter :: &
+            reaction_names = [character(20)::'hopping','desorption','dissociation']
   ! Reaction ids
   integer, parameter :: hopping_id      = 1
   integer, parameter :: desorption_id   = 2
