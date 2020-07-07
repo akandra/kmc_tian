@@ -14,9 +14,20 @@ module rates_dissociation_class
   public    :: dissociation_init, dissociation_type
 
   type :: v_list_dp
-
     real(dp), dimension(:), allocatable :: list ! n_avail_ads_sites
+  end type
 
+  type :: dissociation_def
+    integer  :: r
+    integer  :: r_lst
+    integer  :: r_ast
+    integer  :: p1
+    integer  :: p1_lst
+    integer  :: p1_ast
+    integer  :: p2
+    integer  :: p2_lst
+    integer  :: p2_ast
+    real(dp) :: rate
   end type
 
   type :: dissociation_type
@@ -28,6 +39,11 @@ module rates_dissociation_class
     !                          .  .
     type(v_list_dp), dimension(:,:), allocatable :: rates
 
+    ! List of products for dissociation
+    ! NB.: we consider dissociation for a given reactant only into TWO products
+    !                                 . number of dissociation reactions as defined in the reaction file
+    type(dissociation_def), dimension(:), allocatable :: process
+
     !               (   n_species                           -> reactant
     !                   .  n_site_type                      -> where from
     !                   .  .  n_adsorption_sites
@@ -38,7 +54,7 @@ module rates_dissociation_class
     !                   .  .  .  .  .  .  .  n_site_type    -> where to
     !                   .  .  .  .  .  .  .  .  n_adsorption_sites  )
     !                   .  .  .  .  .  .  .  .  .
-    real(dp), dimension(:, :, :, :, :, :, :, :, :), allocatable :: process
+!    real(dp), dimension(:, :, :, :, :, :, :, :, :), allocatable :: process
 
     ! List of additional nn directions to scan after hop
     integer, dimension(:,:), allocatable :: nn_new
@@ -87,6 +103,8 @@ contains
 
     integer :: row, col, site, id
     integer :: n_nn, n_nn2, max_avail_ads_sites
+    integer :: n_dissociation_reactions = 0
+    integer :: dissociation_counter = 0
 
     n_nn  = lat%n_nn(1)
     n_nn2 = n_nn/2
@@ -115,22 +133,21 @@ contains
     end do
     end do
 
-    allocate(dissociation_init%process( c_pars%n_species,n_max_site_types, n_max_ads_sites,&
-                                        c_pars%n_species,n_max_site_types, n_max_ads_sites,&
-                                        c_pars%n_species,n_max_site_types, n_max_ads_sites ))
-
-    dissociation_init%process = default_rate
+!    allocate(dissociation_init%process( c_pars%n_species,n_max_site_types, n_max_ads_sites,&
+!                                        c_pars%n_species,n_max_site_types, n_max_ads_sites,&
+!                                        c_pars%n_species,n_max_site_types, n_max_ads_sites ))
+!
+!    dissociation_init%process = default_rate
 
     !  read rate definitions from the input file
     file_name = c_pars%rate_file_name
     call open_for_read(inp_unit, file_name )
 
+    ! First read to define the number of dissociation reactions
+    ! and check for parsing errors
     ios = 0
     parse_state = parse_state_default
     line_number = 0
-    undefined_energy = .false.
-
-
 
     do while (ios == 0)
 
@@ -196,6 +213,102 @@ contains
 
               case(dissociation_id)
 
+                n_dissociation_reactions = n_dissociation_reactions + 1
+
+              case default
+                call error_message(file_name, line_number, buffer, "Dissociation: invalid site type statement")
+
+            end select
+
+!------------------------------------------------------------------------------
+          case('')                                      ! select case(words(1))
+!------------------------------------------------------------------------------
+            if (buffer == '') then
+              parse_state = parse_state_default
+!              print*, 'blank line '
+!            else
+!              print*, 'comment: ', trim(buffer)
+            end if
+
+!------------------------------------------------------------------------------
+          case default                                  ! select case(words(1))
+!------------------------------------------------------------------------------
+            if ( parse_state == parse_state_default .and. get_index(words(1),reaction_names) /= 0 ) &
+              parse_state = parse_state_ignore
+
+            if (parse_state /= parse_state_ignore) &
+              call error_message(file_name, line_number, buffer, "Dissociation: unknown key")
+
+        end select                                      ! select case(words(1))
+
+    end do ! while ios=0
+
+    close(inp_unit)
+
+    allocate(dissociation_init%process(n_dissociation_reactions))
+
+    ! Second read
+    call open_for_read(inp_unit, file_name )
+
+    ios = 0
+    parse_state = parse_state_default
+    line_number = 0
+    undefined_energy = .false.
+
+    do while (ios == 0)
+
+      read(inp_unit, '(A)', iostat=ios) buffer
+      line_number = line_number + 1
+        ! ios < 0: end of record condition encountered or endfile condition detected
+        ! ios > 0: an error is detected
+        ! ios = 0  otherwise
+
+      if (ios /= 0) exit
+
+        ! Split an input string
+        words = ''
+        call split_string(buffer, words, nwords)
+
+        select case (words(1)) ! take a keyword
+!------------------------------------------------------------------------------
+          case('dissociation')                               ! select case (words(1)
+!------------------------------------------------------------------------------
+            dissociation_init%is_defined = .true.
+
+            parse_state = parse_state_dissociation
+
+            read(words(2),'(A)') current_reactant_name
+            current_reactant_id = get_index(current_reactant_name, c_pars%ads_names )
+
+            read(words(3),'(A)') current_product1_name
+            current_product1_id = get_index(current_product1_name, c_pars%ads_names )
+
+            read(words(4),'(A)') current_product2_name
+            current_product2_id = get_index(current_product2_name, c_pars%ads_names )
+
+            current_law_id = get_index(words(5), law_names )
+
+!            print*, 'reactant name and id: ', current_reactant_name, current_reactant_id
+!            print*, 'product1 name and id: ', current_product1_name, current_product1_id
+!            print*, 'product2 name and id: ', current_product2_name, current_product2_id
+!            print*, c_pars%ads_names
+!            stop 111
+
+!------------------------------------------------------------------------------
+          case ('terrace','step','corner')              ! select case(words(1))
+!------------------------------------------------------------------------------
+
+
+            select case (parse_state)
+
+              case(parse_state_ignore)
+                ! ignore
+                ! print *, 'warning ignoring line', line_number, buffer
+
+              case(dissociation_id)
+
+                dissociation_counter = dissociation_counter + 1
+
                 i1 = get_index(words(1),    site_names)
                 i2 = get_index(words(2),ads_site_names)
                 i3 = get_index(words(3),    site_names)
@@ -225,6 +338,16 @@ contains
                     undefined_energy = .true.
                 end if
 
+                dissociation_init%process(dissociation_counter)%r      = current_reactant_id
+                dissociation_init%process(dissociation_counter)%r_lst  = i1
+                dissociation_init%process(dissociation_counter)%r_ast  = i2
+                dissociation_init%process(dissociation_counter)%p1     = current_product1_id
+                dissociation_init%process(dissociation_counter)%p1_lst = i3
+                dissociation_init%process(dissociation_counter)%p1_ast = i4
+                dissociation_init%process(dissociation_counter)%p2     = current_product2_id
+                dissociation_init%process(dissociation_counter)%p2_lst = i5
+                dissociation_init%process(dissociation_counter)%p2_ast = i6
+
                 select case (current_law_id)
 
                   case (Arrhenius_id)
@@ -232,9 +355,7 @@ contains
                                               "Arrhenius must have 2 parameters")
                     read(words(7),*) pars(1)
                     read(words(8),*) pars(2)
-                    dissociation_init%process(current_reactant_id,i1,i2, &
-                                              current_product1_id,i3,i4, &
-                                              current_product2_id,i5,i6 ) = arrhenius(c_pars%temperature, pars(1:2))
+                    dissociation_init%process(dissociation_counter)%rate = arrhenius(c_pars%temperature, pars(1:2))
 
                   case (extArrhenius_id)
                     if (nwords/=9) call error_message(file_name, line_number, buffer,&
@@ -242,9 +363,7 @@ contains
                     read(words(7),*) pars(1)
                     read(words(8),*) pars(2)
                     read(words(9),*) pars(3)
-                    dissociation_init%process(current_reactant_id,i1,i2, &
-                                              current_product1_id,i3,i4, &
-                                              current_product2_id,i5,i6 ) = extArrhenius(c_pars%temperature, pars(1:3))
+                    dissociation_init%process(dissociation_counter)%rate = extArrhenius(c_pars%temperature, pars(1:3))
 
                   case default
                     call error_message(file_name, line_number, buffer, "Dissociation: this should not happen! Check the code!")
@@ -289,78 +408,16 @@ contains
     end do ! while ios=0
 
     close(inp_unit)
-!
-!    if (undefined_energy) then
-!      write(*, '(A)') ' dissociation: error, rates defined for sites with undefined energies'
-!      stop 996
-!
-!    else
-!      write(*, '(A)') ' dissociation: passed check that energies are defined for all rates'
-!
-!    end if
-!
-!
-!    ! ---------------------------------------------------------------------------------------------
-!    ! Check the input consistency
-!    ! ---------------------------------------------------------------------------------------------
-!    !
-!    ! Check if rates are defined for all values of site_types, ads_sites
-!    !   for which adsorption energies are defined
-!    ! Adsorpton energies (n_species x n_site_type x n_adsorption_sites)
-!    ! real(dp), dimension(:,:,:), allocatable :: ads_energy
-!    !
-!    ! Note ads_energies could be allocated of n_site_types rather than n_max_site_types
-!    !
-!
-!    undefined_rate = .false.
-!    do species   = 1, c_pars%n_species
-!    do st1       = 1, n_max_site_types
-!    do ast1      = 1, n_max_ads_sites
-!    do st2       = st1, n_max_site_types
-!    do ast2      = 1, n_max_ads_sites
-!
-!      e_defined1 = e_pars%ads_energy(species, st1, ast1) /= e_pars%undefined_energy
-!      e_defined2 = e_pars%ads_energy(species, st2, ast2) /= e_pars%undefined_energy
-!      r_defined  = dissociation_init%process (species, st1, ast1, st2, ast2) /= default_rate
-!
-!      if ( (e_defined1 .and. e_defined2) .and. (.not. r_defined)) then
-!        if (.not. undefined_rate) then
-!          undefined_rate = .true.
-!          print*
-!!          print '(A)',  '--- Dear Sir, Madam:'
-!!          print '(A)',  '      It is my duty to inform you that there are missing rate definitions in'
-!          print '(A)',  ' dissociation: missing rate definitions'
-!          print '(2A)', '    file name:', file_name
-!          print '(A)',  '    missing definitions:'
-!          print '(/6x, A)', 'ads  lat_site    ads_site lat_site    ads_site'
-!
-!        end if
-!
-!        print '(6x, a5, A10, 2x, a3, 6x, a10, 2x, a3, 6x, L1, 7x, L1, 7x, L1)' ,            &
-!                c_pars%ads_names(species),             &
-!                site_names(st1), ads_site_names(ast1), &
-!                site_names(st2), ads_site_names(ast2)
-!                !e_defined1, e_defined2, r_defined
-!      end if
-!
-!    end do
-!    end do
-!    end do
-!    end do
-!    end do
-!
-!    if(undefined_rate) then
-!      print '(/A)', ' dissociation: please supply the required rates'
-! !     print '(/6x, A)', 'As always, I remain your humble servant, kMC Code'
-! !     print *
-!      stop 997
-!
-!    else
-!      print '(A)', ' dissociation: passed required rates consistency check'
-!!      print*
-!!      stop 'debugging stop'
-!
-!    end if
+
+
+    if (undefined_energy) then
+      write(*, '(A)') ' Dissociation: error, rates defined for sites with undefined energies'
+      stop 995
+
+    else
+      write(*, '(A)') ' Dissociation: passed check that energies are defined for all rates'
+
+    end if
 
   end function dissociation_init
 
@@ -374,85 +431,53 @@ contains
     real(dp), intent(in) :: beta
 
     integer :: id, m, iads
-    integer :: row_old, col_old, lst_old, ast_old
-    integer :: row_new, col_new, lst_new, ast_new
-    real(dp) :: energy_old, energy_new
+    integer :: row, col, lst, ast
+    integer :: row_2, col_2, lst_2, ast_2
 
-!    ! energy for particle ads in its old position
-!    energy_old = energy(ads, lat, e_pars)
-!
-!    ! Save the old configuration
-!    row_old = lat%ads_list(ads)%row
-!    col_old = lat%ads_list(ads)%col
-!    lst_old = lat%lst(row_old,col_old)
-!    ast_old = lat%ads_list(ads)%ast
-!    id      = lat%ads_list(ads)%id
-!
-!    ! Delete particle ads from the old position
-!    ! we do it here since we never work with occupations inside the following loop
-!    lat%occupations(row_old,col_old) = 0
-!
-!    ! Loop over possible new positions of particle ads
-!    do m=1,lat%n_nn(1)
-!
-!      ! Get position and site type of neighbour m
-!      call lat%neighbor(ads, m, row_new, col_new)
-!      lst_new  = lat%lst(row_new, col_new)
-!
-!      ! Check if the cell is free
-!      if (lat%occupations(row_new, col_new) > 0) then
-!
-!        this%rates(ads,m)%list = 0.0d0
-!
-!      else
-!
-!        ! Put particle ads to site m
-!        lat%ads_list(ads)%row = row_new
-!        lat%ads_list(ads)%col = col_new
-!        lat%occupations(row_new,col_new) = ads
-!
-!        ! Loop over adsorption sites
-!        do iads = 1, size(lat%avail_ads_sites(id,lst_new)%list)
-!
-!          ! Move particle ads to adsorption site list(iads)
-!          ast_new = lat%avail_ads_sites(id,lst_new)%list(iads)
-!          lat%ads_list(ads)%ast = ast_new
-!
-!          ! Calculate energy of ads in new position
-!          energy_new = energy(ads, lat, e_pars)
-!
-!          ! Apply detailed balance when
-!          ! energy in the old position < energy in the new position
-!          if (energy_old < energy_new) then
-!              this%rates(ads,m)%list(iads) = this%process(id, lst_old, ast_old, lst_new, ast_new)&
-!                  *exp( -beta*(energy_new - energy_old) )
-!!                print*
-!!                print*, 'id ',id, ' old site ',lst_old,' old ads. site ', ast_old
-!!                print*, ' new site ',lst_new,' new ads. site ', ast_new
-!!                print*, 'rate ',this%process(id, lst_old, ast_old, lst_new, ast_new)
-!          else
-!              this%rates(ads,m)%list(iads) = this%process(id, lst_old, ast_old, lst_new, ast_new)
-!!                print*, id,lst_old, ast_old, lst_new, ast_new,this%process(id, lst_old, ast_old, lst_new, ast_new)
-!          end if
-!
-!!            print '(A,i4,A,i4,A,i4)', 'ads ',ads,' neighbor ',m,' ads. site ',lat%ads_list(ads)%ast
-!!            print '(A,e18.4,A,e18.4)',' E_old = ', energy_old, ' E_new = ',energy_new
-!!            print *,' r_hop = ',this%process(id, lst_old, ast_old, lst_new, ast_new),&
-!!                                      ' rate = ', this%rates(ads,m)%list(iads)
-!!            write(*,*) 'pause'
-!!            read(*,*)
-!
-!        end do ! iads
-!
-!        ! Return particle ads to the old position
-!        lat%ads_list(ads)%row = row_old
-!        lat%ads_list(ads)%col = col_old
-!        lat%ads_list(ads)%ast = ast_old
-!        lat%occupations(row_new,col_new) = 0
-!
-!      end if ! occupations
-!
-!    end do ! m
+    row = lat%ads_list(ads)%row
+    col = lat%ads_list(ads)%col
+    lst = lat%lst(row,col)
+    ast = lat%ads_list(ads)%ast
+    id  = lat%ads_list(ads)%id
+
+    ! Loop over possible positions for product 2
+    do m=1,lat%n_nn(1)
+
+      ! Get position and site type of neighbour m
+      call lat%neighbor(ads, m, row_2, col_2)
+      lst_2  = lat%lst(row_2, col_2)
+
+      ! Check if the cell is free
+      if (lat%occupations(row_2, col_2) > 0) then
+
+        this%rates(ads,m)%list = 0.0d0
+
+      else
+
+        ! Loop over adsorption sites
+        do iads = 1, size(lat%avail_ads_sites(id,lst_2)%list)
+
+          this%rates(ads,m)%list(iads) = this%process(id, lst, ast, id,)
+!                print*, id,lst_old, ast_old, lst_new, ast_new,this%process(id, lst_old, ast_old, lst_new, ast_new)
+
+!            print '(A,i4,A,i4,A,i4)', 'ads ',ads,' neighbor ',m,' ads. site ',lat%ads_list(ads)%ast
+!            print '(A,e18.4,A,e18.4)',' E_old = ', energy_old, ' E_new = ',energy_new
+!            print *,' r_hop = ',this%process(id, lst_old, ast_old, lst_new, ast_new),&
+!                                      ' rate = ', this%rates(ads,m)%list(iads)
+!            write(*,*) 'pause'
+!            read(*,*)
+
+        end do ! iads
+
+        ! Return particle ads to the old position
+        lat%ads_list(ads)%row = row_old
+        lat%ads_list(ads)%col = col_old
+        lat%ads_list(ads)%ast = ast_old
+        lat%occupations(row_new,col_new) = 0
+
+      end if ! occupations
+
+    end do ! m
 !
 !    lat%occupations(row_old,col_old) = ads
 
