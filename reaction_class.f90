@@ -51,6 +51,8 @@ contains
     reaction_init%dissociation = dissociation_init(c_pars, lat, e_pars)
 !    call reaction_init%hopping%print(c_pars)
 !    call reaction_init%desorption%print(c_pars)
+    call reaction_init%dissociation%print(c_pars)
+    stop 222
 
     reaction_init%beta = 1.0_dp/(kB*c_pars%temperature)
     reaction_init%n_ads_total = lat%n_ads_tot()

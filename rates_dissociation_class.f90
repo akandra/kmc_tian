@@ -59,6 +59,9 @@ module rates_dissociation_class
     ! List of additional nn directions to scan after hop
     integer, dimension(:,:), allocatable :: nn_new
 
+    ! Number od dissociation channels
+    integer :: n_processes
+
   contains
     procedure :: construct
     procedure :: print
@@ -105,6 +108,8 @@ contains
     integer :: n_nn, n_nn2, max_avail_ads_sites
     integer :: n_dissociation_reactions = 0
     integer :: dissociation_counter = 0
+
+    logical :: duplicate_error = .false.
 
     n_nn  = lat%n_nn(1)
     n_nn2 = n_nn/2
@@ -245,6 +250,8 @@ contains
 
     close(inp_unit)
 
+    dissociation_init%n_processes = n_dissociation_reactions
+
     allocate(dissociation_init%process(n_dissociation_reactions))
 
     ! Second read
@@ -321,10 +328,25 @@ contains
                              "wrong site name in the dissociation section")
 
                 ! check for duplicate entry
-                if (dissociation_init%process(current_reactant_id,i1,i2, &
-                                              current_product1_id,i3,i4, &
-                                              current_product2_id,i5,i6 ) /= default_rate)&
-                  call error_message(file_name, line_number, buffer, "duplicated entry")
+!                if (dissociation_init%process(current_reactant_id,i1,i2, &
+!                                              current_product1_id,i3,i4, &
+!                                              current_product2_id,i5,i6 ) /= default_rate)&
+!                  call error_message(file_name, line_number, buffer, "duplicated entry")
+                do i=1,dissociation_counter - 1
+                  if ( dissociation_init%process(i)%r      == current_reactant_id .and. &
+                       dissociation_init%process(i)%r_lst  == i1                  .and. &
+                       dissociation_init%process(i)%r_ast  == i2                  .and. &
+                       dissociation_init%process(i)%p1     == current_product1_id .and. &
+                       dissociation_init%process(i)%p1_lst == i3                  .and. &
+                       dissociation_init%process(i)%p1_ast == i4                  .and. &
+                       dissociation_init%process(i)%p2     == current_product2_id .and. &
+                       dissociation_init%process(i)%p2_lst == i5                  .and. &
+                       dissociation_init%process(i)%p2_ast == i6                      ) then
+                    call error_message(file_name, line_number, buffer, "duplicated entry", stop = .false.)
+                    duplicate_error = .true.
+                  end if
+                end do
+                if (duplicate_error) stop 993
 
                 ! check energy is defined for reactant's and for products' site_type and ads_site
                 if( e_pars%ads_energy(current_reactant_id, i1, i2) == e_pars%undefined_energy .or. &
@@ -454,10 +476,18 @@ contains
 
       else
 
-        ! Loop over adsorption sites
-        do iads = 1, size(lat%avail_ads_sites(id,lst_2)%list)
+        do iads=1, this%n_processes
 
-          this%rates(ads,m)%list(iads) = this%process(id, lst, ast, id,)
+          if ( this%process(iads)%r     == id .and. &
+               this%process(iads)%r_lst == lst .and. &
+               this%process(iads)%r_ast == ast        )
+WE ARE HERE !
+        end do
+
+        ! Loop over adsorption sites
+!        do iads = 1, size(lat%avail_ads_sites(id,lst_2)%list)
+
+!          this%rates(ads,m)%list(iads) = this%process(id, lst, ast, id,)
 !                print*, id,lst_old, ast_old, lst_new, ast_new,this%process(id, lst_old, ast_old, lst_new, ast_new)
 
 !            print '(A,i4,A,i4,A,i4)', 'ads ',ads,' neighbor ',m,' ads. site ',lat%ads_list(ads)%ast
@@ -467,13 +497,13 @@ contains
 !            write(*,*) 'pause'
 !            read(*,*)
 
-        end do ! iads
+!        end do ! iads
 
         ! Return particle ads to the old position
-        lat%ads_list(ads)%row = row_old
-        lat%ads_list(ads)%col = col_old
-        lat%ads_list(ads)%ast = ast_old
-        lat%occupations(row_new,col_new) = 0
+!        lat%ads_list(ads)%row = row_old
+!        lat%ads_list(ads)%col = col_old
+!        lat%ads_list(ads)%ast = ast_old
+!        lat%occupations(row_new,col_new) = 0
 
       end if ! occupations
 
@@ -490,31 +520,24 @@ contains
 
     class(control_parameters), intent(in) :: c_pars
 
-    integer :: i, i1, i2, i3, i4
+    integer :: i
+    character(:), allocatable :: reactant_name, product1_name, product2_name
 
-!    print*, 'dissociation Rates:'
-!    do i=1,size(this%process,1)
-!      print '(A)',' ---------------------------'
-!      print '( A,A)',' species: ', c_pars%ads_names(i)
-!      print '(A)', ' ---------------------------'
-!      do i1=1,n_max_site_types
-!      do i2=1,n_max_ads_sites
-!      do i3=1,n_max_site_types
-!      do i4=1,n_max_ads_sites
-!        if (this%process(i,i1,i2,i3,i4)< 0.0_dp) then
-!          cycle
-!        else
-!          write(*,'(1x,A,A,2X,A,A,6e12.3)') &
-!              site_names(i1), ads_site_names(i2), &
-!              site_names(i3), ads_site_names(i4), &
-!              this%process(i,i1,i2,i3,i4)
-!        end if
-!      end do
-!      end do
-!      end do
-!      end do
-!    end do
-!    print*
+    print*
+    print*, 'Dissociation Rates:'
+    print '(A)', ' ---------------------------'
+    do i=1,size(this%process,1)
+      reactant_name = c_pars%ads_names(this%process(i)%r )
+      product1_name = c_pars%ads_names(this%process(i)%p1)
+      product2_name = c_pars%ads_names(this%process(i)%p2)
+      write(*,'(1x,A,A,A,2X,A,A,2X,A,A,e12.3)')  &
+              trim(reactant_name)// ' -> '// trim(product1_name)// ' + '// trim(product2_name)//': ',&
+              site_names(this%process(i)%r_lst),  ads_site_names(this%process(i)%r_ast), &
+              site_names(this%process(i)%p1_lst), ads_site_names(this%process(i)%p1_ast), &
+              site_names(this%process(i)%p2_lst), ads_site_names(this%process(i)%p2_ast), &
+              this%process(i)%rate
+    end do
+    print*
 
   end subroutine print
 

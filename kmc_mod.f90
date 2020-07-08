@@ -91,6 +91,7 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
     !-------- Construct rates arrays
     call r%construct(lat, e_pars)
 
+
     ! start time propagation
     time = big_bang
     do while (time<c_pars%t_end)
