@@ -6,6 +6,7 @@ module constants
   public
 
   integer, parameter :: dp = REAL64
+  integer, parameter :: i8 = int8
 
   ! Physical and mathematical constants
   real(dp), parameter :: big_bang       = 0.0_dp ! in fortnights

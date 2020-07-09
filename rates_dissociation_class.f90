@@ -13,8 +13,19 @@ module rates_dissociation_class
   private
   public    :: dissociation_init, dissociation_type
 
+
+  type channel
+    integer(i8) :: ast_p1
+    integer(i8) :: ast_p2
+    real(dp)    :: rate
+  end type
+
+  type :: v_list_channel
+   type(channel), dimension(:), allocatable :: list ! n_avail_ads_sites
+  end type
+
   type :: v_list_dp
-    real(dp), dimension(:), allocatable :: list ! n_avail_ads_sites
+   real(dp), dimension(:,:), allocatable :: list ! n_avail_ads_sites
   end type
 
   type :: dissociation_def
@@ -34,10 +45,10 @@ module rates_dissociation_class
 
     logical :: is_defined = .false.
     ! dissociation Rates
-    !                          n_adsorbate              -> which particle
-    !                          .  n_neighbor            -> where to
-    !                          .  .
-    type(v_list_dp), dimension(:,:), allocatable :: rates
+    !                               adsorbate              -> which particle
+    !                               .  neighbor            -> where to
+    !                               .  .
+    type(v_list_dp), dimension(:, :), allocatable :: rates
 
     ! List of products for dissociation
     ! NB.: we consider dissociation for a given reactant only into TWO products
@@ -133,7 +144,7 @@ contains
     allocate( dissociation_init%rates(lat%n_rows*lat%n_cols,n_nn) )
     do i=1,lat%n_rows*lat%n_cols
     do m=1,n_nn
-      allocate( dissociation_init%rates(i,m)%list(max_avail_ads_sites) )
+      allocate( dissociation_init%rates(i,m)%list(max_avail_ads_sites,max_avail_ads_sites) )
       dissociation_init%rates(i,m)%list = 0.0_dp
     end do
     end do
@@ -452,66 +463,61 @@ contains
     class(energy_parameters), intent(in) :: e_pars
     real(dp), intent(in) :: beta
 
-    integer :: id, m, iads
+    integer :: id_r, id_p1, id_p2, m, iprocs, i_ast_p1, i_ast_p2
     integer :: row, col, lst, ast
     integer :: row_2, col_2, lst_2, ast_2
 
-    row = lat%ads_list(ads)%row
-    col = lat%ads_list(ads)%col
-    lst = lat%lst(row,col)
-    ast = lat%ads_list(ads)%ast
-    id  = lat%ads_list(ads)%id
+    ! Get the reactant information
+    row  = lat%ads_list(ads)%row
+    col  = lat%ads_list(ads)%col
+    lst  = lat%lst(row,col)
+    ast  = lat%ads_list(ads)%ast
+    id_r = lat%ads_list(ads)%id
 
     ! Loop over possible positions for product 2
     do m=1,lat%n_nn(1)
 
       ! Get position and site type of neighbour m
       call lat%neighbor(ads, m, row_2, col_2)
-      lst_2  = lat%lst(row_2, col_2)
 
       ! Check if the cell is free
       if (lat%occupations(row_2, col_2) > 0) then
 
-        this%rates(ads,m)%list = 0.0d0
+        this%rates(ads,m)%list = 0.0_dp
 
       else
+        ! Get the lattice site type for product 2
+        lst_2 = lat%lst(row_2, col_2)
+        do iprocs=1, this%n_processes
 
-        do iads=1, this%n_processes
+          if ( this%process(iprocs)%r     == id_r .and. &
+               this%process(iprocs)%r_lst == lst  .and. &
+               this%process(iprocs)%r_ast == ast  .and. &
+               this%process(iprocs)%p2_lst== lst_2       ) then
 
-          if ( this%process(iads)%r     == id .and. &
-               this%process(iads)%r_lst == lst .and. &
-               this%process(iads)%r_ast == ast        )
-WE ARE HERE !
+            id_p1 = this%process(iprocs)%p1
+            id_p2 = this%process(iprocs)%p2
+
+            extloop: do i_ast_p1=1, size(lat%avail_ads_sites(id_p1, lst  )%list)
+            do          i_ast_p2=1, size(lat%avail_ads_sites(id_p2, lst_2)%list)
+              if ( this%process(iprocs)%p1_ast == lat%avail_ads_sites(id_p1, lst  )%list(i_ast_p1) .and. &
+                   this%process(iprocs)%p2_ast == lat%avail_ads_sites(id_p2, lst_2)%list(i_ast_p2) ) then
+                this%rates(ads,m)%list(i_ast_p1,i_ast_p2) = this%process(iprocs)%rate
+                exit extloop
+              end if
+            end do
+            end do extloop
+
+          end if
+
         end do
 
-        ! Loop over adsorption sites
-!        do iads = 1, size(lat%avail_ads_sites(id,lst_2)%list)
-
-!          this%rates(ads,m)%list(iads) = this%process(id, lst, ast, id,)
-!                print*, id,lst_old, ast_old, lst_new, ast_new,this%process(id, lst_old, ast_old, lst_new, ast_new)
-
-!            print '(A,i4,A,i4,A,i4)', 'ads ',ads,' neighbor ',m,' ads. site ',lat%ads_list(ads)%ast
-!            print '(A,e18.4,A,e18.4)',' E_old = ', energy_old, ' E_new = ',energy_new
-!            print *,' r_hop = ',this%process(id, lst_old, ast_old, lst_new, ast_new),&
-!                                      ' rate = ', this%rates(ads,m)%list(iads)
-!            write(*,*) 'pause'
-!            read(*,*)
-
-!        end do ! iads
-
-        ! Return particle ads to the old position
-!        lat%ads_list(ads)%row = row_old
-!        lat%ads_list(ads)%col = col_old
-!        lat%ads_list(ads)%ast = ast_old
-!        lat%occupations(row_new,col_new) = 0
 
       end if ! occupations
 
     end do ! m
-!
-!    lat%occupations(row_old,col_old) = ads
 
-  end subroutine construct
+ end subroutine construct
 
 !------------------------------------------------------------------------------
   subroutine print(this, c_pars)

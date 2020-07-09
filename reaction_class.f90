@@ -52,7 +52,6 @@ contains
 !    call reaction_init%hopping%print(c_pars)
 !    call reaction_init%desorption%print(c_pars)
     call reaction_init%dissociation%print(c_pars)
-    stop 222
 
     reaction_init%beta = 1.0_dp/(kB*c_pars%temperature)
     reaction_init%n_ads_total = lat%n_ads_tot()
@@ -79,6 +78,13 @@ contains
     if (this%desorption%is_defined) then
       do i=1,this%n_ads_total
         call this%desorption%construct(i, lat, e_pars, this%beta)
+      end do
+    end if
+
+    ! Dissociation
+    if (this%dissociation%is_defined) then
+      do i=1,this%n_ads_total
+        call this%dissociation%construct(i, lat, e_pars, this%beta)
       end do
     end if
 
