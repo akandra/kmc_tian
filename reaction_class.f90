@@ -65,7 +65,7 @@ contains
     class(mc_lat),            intent(inout) :: lat
     class(energy_parameters), intent(in)    :: e_pars
 
-    integer :: i
+    integer :: i,m
 
     ! Hopping
     if (this%hopping%is_defined) then
@@ -82,12 +82,22 @@ contains
     end if
 
     ! Dissociation
+    print*
+    call lat%print_ocs
+    print*,'Dissociation rates:'
+    print*
     if (this%dissociation%is_defined) then
       do i=1,this%n_ads_total
         call this%dissociation%construct(i, lat, e_pars, this%beta)
+
+        write(*,'(A,i4,A,i4,X,A,A)') 'ads: ',i, ' reactant: ', lat%ads_list(i)%id, site_names(lat%lst(lat%ads_list(i)%row,lat%ads_list(i)%col)), ads_site_names(lat%ads_list(i)%ast)
+        do m=1,lat%n_nn(1)
+          write(*,'(A,i4,A,10f4.1)') 'Direction: ',m, " Rates: ", this%dissociation%rates(i,m)%list
+        end do
+
       end do
     end if
-
+stop 555
   end subroutine construct
 
 !-----------------------------------------------------------------------------
