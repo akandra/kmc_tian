@@ -27,16 +27,18 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
 
   character(len=max_string_length) :: buffer, n_ads_fmt
   integer :: itraj, ibin, ibin_new
-  integer :: i,species
+  integer :: i, species
   integer :: kmc_nsteps
   integer, dimension(lat%n_rows,lat%n_cols) :: cluster_label
-  ! Warning: size of cluster_sizes and hist array are too large
+  ! Warning: size of cluster_sizes and hist array are large
   !          consider a way to decrease them
   integer, dimension(lat%n_rows*lat%n_cols) :: cluster_sizes
   integer :: largest_label
   integer, dimension(c_pars%n_species,lat%n_rows*lat%n_cols) :: hist
   real(dp) :: time
   real(dp) :: delta_t, time_new, step_bin
+
+  integer :: j, k, n_chan  ! only for debug printout
 
   type(mc_lat) :: lat_save
 
@@ -49,15 +51,34 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
   ! Create a rate structure
   r = reaction_init(c_pars, lat, e_pars)
 
+
+
+!!------------------------------------------------------------------------------
+!!  debug printing
+!!------------------------------------------------------------------------------
+!print *, 'debug printouts'
+!print '(A, i0)', ' n_processes = ', r%dissociation%n_processes
+!print '(A, i0)', ' lat%n_ads   = ', lat%n_ads
+!
+!print '(A)', ' n_chan'
+!do i=1, lat%n_ads(1)
+!  n_chan = size(r%dissociation%rate_info(i)%list)
+!  write(*, '(i4, i6)',advance='no') i, n_chan
+!  print*, r%dissociation%rate_info(i)%list(1)%rate
+!
+!end do
+!
+!stop 111
+
+
+
   ! time binning for distributions
   step_bin = c_pars%t_end/c_pars%n_bins
 
   write(*,'(20X,A)') "B.K.L. Code's progress report:"
+
   ! Loop over trajectories
   do itraj=1, c_pars%n_trajs
-
-! set debug trap ---------------------------------
-!debug(1) = itraj==2
 
     call progress_bar( 'current trajectory ', 0* 100*itraj/c_pars%n_trajs , '   total', 0)
 
@@ -90,7 +111,6 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
 
     !-------- Construct rates arrays
     call r%construct(lat, e_pars)
-
 
     ! start time propagation
     time = big_bang

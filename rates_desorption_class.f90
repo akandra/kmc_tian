@@ -251,7 +251,7 @@ contains
       if ( e_defined1 .and. (.not. r_defined)) then
         if (.not. undefined_rate) then
           undefined_rate = .true.
-          print '(A)',  ' Desorption: missing rate definitions in the file ', file_name
+          print '(2A)',  ' Desorption: warning missing rate definitions in the file ', file_name
           print '(A)',  ' Missing definitions:'
           print '(6x, A)', 'ads  lat_site    ads_site'
         end if
@@ -266,10 +266,10 @@ contains
     end do
 
     if(undefined_rate) then
-      print '(/A)', ' Do nothing if you are ok with that.'
+      print '(/A)', ' Add rate definitions if they should be preent'
       print *
     else
-      print '(A)', ' Desorption: passed required rates consistency check'
+      print '(A)', ' Desorption: passed rates consistency check'
       print *
     end if
 

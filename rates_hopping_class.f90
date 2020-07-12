@@ -14,9 +14,7 @@ module rates_hopping_class
   public    :: hopping_init, hopping_type
 
   type :: v_list_dp
-
     real(dp), dimension(:), allocatable :: list ! n_avail_ads_sites
-
   end type
 
   type :: hopping_type
@@ -198,7 +196,7 @@ contains
                     e_pars%ads_energy(current_species_id, i3, i4) == e_pars%undefined_energy ) then
 
                     call error_message(file_name, line_number, buffer, &
-                                       "rate defined for site with undefined adsorption energy", &
+                                       " in hopping rate defined for site with undefined adsorption energy", &
                                        stop=.false., warning=.false.)
 
                     undefined_energy = .true.

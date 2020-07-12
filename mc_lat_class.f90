@@ -183,14 +183,17 @@ contains
     end do
     end do
 
-!    do i=1,control_pars%n_species
-!    do j=1,n_site_types
-!      print'(4A)','species = ',control_pars%ads_names(i),'site type =',site_names(j)
-!      print*,'list = ',(ads_site_names(lat%avail_ads_sites(i,j)%list(k)), &
-!                          k=1,size(lat%avail_ads_sites(i,j)%list))
-!    end do
-!    end do
-!    stop 333
+!!----------------------------------------------------------------------------------
+!! debug printout for construction of avail_ads_sites
+!print *, 'debug printout for construction of avail_ads_sites mc_lat_class line 191'
+!do i=1,control_pars%n_species
+!do j=1,n_site_types
+!  write(*, '(A, A5, A, A10)',advance='no')' species = ',control_pars%ads_names(i),'site type =',site_names(j)
+!  print '(A,A5,1x,A,1x,A,1x,A,1x,A,1x)','  list = ',(ads_site_names(lat%avail_ads_sites(i,j)%list(k)), &
+!                    k=1,size(lat%avail_ads_sites(i,j)%list))
+!  end do
+!end do
+!----------------------------------------------------------------------------------
 
     if (control_pars%cfg_file_name=='none') then
       ! Populate the lattice

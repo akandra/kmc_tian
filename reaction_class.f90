@@ -1,5 +1,13 @@
 module reaction_class
-
+  !---------------------------------------------------------------------------
+  !  Module for binary dissocation reaction  r --> p1 + p2
+  !---------------------------------------------------------------------------
+  !  * controlled by the dissociation keyword section of the .reaction file
+  !  * p1 is assumed to be at the same lattice site as r with its adsorption
+  !    site type (ast) choosen from those specified in the .reaction file
+  !  * p2 lattice site is taken as a nearest neighbor of r with its ast
+  !    taken from those specified in the .reaction file
+  !---------------------------------------------------------------------------
   use constants
   use control_parameters_class
   use mc_lat_class
@@ -40,14 +48,14 @@ contains
 !------------------------------------------------------------------------------
     type(reaction_type) reaction_init
 
-    type(control_parameters), intent(in)    :: c_pars ! Warning: check where c_pars gets redefined
+    type(control_parameters), intent(in)    :: c_pars
     type(mc_lat)            , intent(in)    :: lat
     type(energy_parameters) , intent(in)    :: e_pars
 
 
     ! Create a rate structure
-    reaction_init%hopping      =      hopping_init(c_pars, lat, e_pars)
-    reaction_init%desorption   =   desorption_init(c_pars, lat, e_pars)
+    reaction_init%hopping      = hopping_init(c_pars, lat, e_pars)
+    reaction_init%desorption   = desorption_init(c_pars, lat, e_pars)
     reaction_init%dissociation = dissociation_init(c_pars, lat, e_pars)
 !    call reaction_init%hopping%print(c_pars)
 !    call reaction_init%desorption%print(c_pars)
@@ -65,39 +73,80 @@ contains
     class(mc_lat),            intent(inout) :: lat
     class(energy_parameters), intent(in)    :: e_pars
 
-    integer :: i,m
+    integer       :: i
+    integer       :: ads, chan, proc
+    integer       :: r_id, r_lst, r_ast
+    integer       :: p1_id, p1_lst, p1_ast, p2_id, p2_lst, p2_ast
+    real(dp)      :: rate
+    integer       :: m
+    character(8)  :: lst_name, lst_p2_name, ast_r_name, ast_p1_name, ast_p2_name
 
     ! Hopping
     if (this%hopping%is_defined) then
-      do i=1,this%n_ads_total
-        call this%hopping%construct(i, lat, e_pars, this%beta)
+      do ads = 1, this%n_ads_total
+        call this%hopping%construct(ads, lat, e_pars, this%beta)
       end do
     end if
 
     ! Desorption
     if (this%desorption%is_defined) then
-      do i=1,this%n_ads_total
-        call this%desorption%construct(i, lat, e_pars, this%beta)
+      do ads = 1, this%n_ads_total
+        call this%desorption%construct(ads, lat, e_pars, this%beta)
       end do
     end if
 
     ! Dissociation
-    print*
-    call lat%print_ocs
-    print*,'Dissociation rates:'
-    print*
     if (this%dissociation%is_defined) then
-      do i=1,this%n_ads_total
-        call this%dissociation%construct(i, lat, e_pars, this%beta)
 
-        write(*,'(A,i4,A,i4,X,A,A)') 'ads: ',i, ' reactant: ', lat%ads_list(i)%id, site_names(lat%lst(lat%ads_list(i)%row,lat%ads_list(i)%col)), ads_site_names(lat%ads_list(i)%ast)
-        do m=1,lat%n_nn(1)
-          write(*,'(A,i4,A,10f4.1)') 'Direction: ',m, " Rates: ", this%dissociation%rates(i,m)%list
-        end do
-
+      do ads = 1, this%n_ads_total
+        call this%dissociation%construct(ads, lat, e_pars, this%beta)
       end do
+
     end if
-stop 555
+
+! Debugging printout desorption
+print*
+call lat%print_ocs
+print *
+print '(a)' ,' Dissociation channels from reaction class'
+print '(a)' ,' --------------------------------------------------------------------'
+print '(a)', '  ads# proc#  m  rate       lst      ast_r   ast_p1   lst_p2   ast_p2'
+print '(a)' ,' --------------------------------------------------------------------'
+
+do ads = 1, this%n_ads_total
+  do chan= 1, this%dissociation%rate_info(ads)%n_channels
+
+    i = this%dissociation%rate_info(ads)%list(chan)%proc
+
+    r_id  = this%dissociation%channels(i)%r
+    r_ast = this%dissociation%channels(i)%r_ast
+    r_lst = this%dissociation%channels(i)%r_lst
+
+    p1_id  = this%dissociation%channels(i)%p1
+    p1_ast = this%dissociation%channels(i)%p1_ast
+    p1_lst = this%dissociation%channels(i)%p1_lst
+
+    p2_id  = this%dissociation%channels(i)%p2
+    p2_ast = this%dissociation%channels(i)%p2_ast
+    p2_lst = this%dissociation%channels(i)%p2_lst
+
+    rate   = this%dissociation%channels(i)%rate
+
+    m      = this%dissociation%rate_info(ads)%list(chan)%m
+
+    lst_name    = site_names(r_lst)
+    lst_p2_name = site_names(p2_lst)
+    ast_r_name  = ads_site_names(r_ast)
+    ast_p1_name = ads_site_names(p1_ast)
+    ast_p2_name = ads_site_names(p2_ast)
+
+    print '(t4,i0, t9,i0, t15,i0, t16,1pe10.2, t29,A7, 2x,A3, t46,A3, t55,A7, 2x,A3)', &
+            ads, i, m, rate, lst_name, ast_r_name, ast_p1_name, lst_p2_name, ast_p2_name
+
+  end do
+  print*
+end do
+
   end subroutine construct
 
 !-----------------------------------------------------------------------------

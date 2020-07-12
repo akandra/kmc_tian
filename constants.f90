@@ -9,7 +9,7 @@ module constants
   integer, parameter :: i8 = int8
 
   ! Physical and mathematical constants
-  real(dp), parameter :: big_bang       = 0.0_dp ! in fortnights
+  real(dp), parameter :: big_bang       = 0.0_dp
   real(dp), parameter :: sqrt2          = sqrt(2.0_dp)
   real(dp), parameter :: isqrt2         = 1.0_dp/sqrt2
   real(dp), parameter :: sqrt3          = sqrt(3.0_dp)
