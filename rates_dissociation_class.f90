@@ -21,12 +21,13 @@ module rates_dissociation_class
   implicit none
 
   private
-  public    :: dissociation_init, dissociation_type
+  public    :: dissociation_init, dissociation_type, rate_info
 
 
   type rate_info
     integer(1) :: proc
     integer(1) :: m
+    real(dp)   :: rate
   end type
 
 
@@ -168,7 +169,7 @@ contains
       allocate( dissociation_init%rate_info(i)%list( max_avail_ads_sites * &
                                                      max_avail_ads_sites * &
                                                      lat%n_nn(1)) )
-      dissociation_init%rate_info(i)%list = rate_info( 0, 0 )
+      dissociation_init%rate_info(i)%list = rate_info( 0, 0, 0.0_dp )
     end do
 
     !  read rate definitions from the input file
@@ -496,18 +497,18 @@ contains
     character(8) :: lst_name, lst_p2_name, ast_r_name, ast_p1_name, ast_p2_name
 
 !debug(1) = (ads == 10)
-debug(1) = .true.
+!debug(1) = .false.
 
 ! debug printout header
-if (debug(1)) then
-  print *
-  print '(a)'    ,' Debug printout from rates_dissociation _class subroutine construct'
-  print '(a,i0)' ,' Print of rates as they are calculated.  ads =', ads
-  print '(a)'    ,' --------------------------------------------------------------------'
-  print '(a)'    ,'  ads# proc#  m  rate       lst      ast_r   ast_p1   lst_p2   ast_p2'
-  print '(a)'    ,' --------------------------------------------------------------------'
-
-end if
+!if (debug(1)) then
+!  print *
+!  print '(a)'    ,' Debug printout from rates_dissociation _class subroutine construct'
+!  print '(a,i0)' ,' Print of rates as they are calculated.  ads =', ads
+!  print '(a)'    ,' --------------------------------------------------------------------'
+!  print '(a)'    ,'  ads# proc#  m  rate       lst      ast_r   ast_p1   lst_p2   ast_p2'
+!  print '(a)'    ,' --------------------------------------------------------------------'
+!
+!end if
 
     ! Get the reactant information
     row  = lat%ads_list(ads)%row
@@ -551,21 +552,23 @@ end if
                 n_channels=n_channels + 1
                 this%rate_info(ads)%list(n_channels)%proc  = iprocs
                 this%rate_info(ads)%list(n_channels)%m     = m
+                ! WARNING: Decide later if we need the rate field
+                this%rate_info(ads)%list(n_channels)%rate  = this%channels(iprocs)%rate
 
-if(debug(1))then
-  lst_name    = site_names(lst)
-  lst_p2_name = site_names(lst_2)
-  ast_r_name  = ads_site_names(lat%avail_ads_sites(id_r , lst  )%list(ast))
-  ast_p1_name = ads_site_names(lat%avail_ads_sites(id_p1, lst  )%list(i_ast_p1))
-  ast_p2_name = ads_site_names(lat%avail_ads_sites(id_p2, lst_2)%list(i_ast_p2))
-
-  !  ads# chan#  m  rate       lst      ast_r   ast_p1   lst_p2   ast_p2
-  !   1    1     1__2.00e+00   terrace  top     fcc      terrace  fcc
-  !0        1         2         3         4        5        6         7
-  !1234567890123456789012345678901234567890123456890124567890123456789012345
-  print '(t4,i0, t9,i0, t15,i0, t16,1pe10.2, t29,A7, 2x,A3, t46,A3, t55,A7, 2x,A3)', &
-        ads, iprocs, m, this%channels(iprocs)%rate, lst_name, ast_r_name, ast_p1_name, lst_p2_name, ast_p2_name
-end if
+!if(debug(1))then
+!  lst_name    = site_names(lst)
+!  lst_p2_name = site_names(lst_2)
+!  ast_r_name  = ads_site_names(lat%avail_ads_sites(id_r , lst  )%list(ast))
+!  ast_p1_name = ads_site_names(lat%avail_ads_sites(id_p1, lst  )%list(i_ast_p1))
+!  ast_p2_name = ads_site_names(lat%avail_ads_sites(id_p2, lst_2)%list(i_ast_p2))
+!
+!  !  ads# chan#  m  rate       lst      ast_r   ast_p1   lst_p2   ast_p2
+!  !   1    1     1__2.00e+00   terrace  top     fcc      terrace  fcc
+!  !0        1         2         3         4        5        6         7
+!  !1234567890123456789012345678901234567890123456890124567890123456789012345
+!  print '(t4,i0, t9,i0, t15,i0, t16,1pe10.2, t29,A7, 2x,A3, t46,A3, t55,A7, 2x,A3)', &
+!        ads, iprocs, m, this%channels(iprocs)%rate, lst_name, ast_r_name, ast_p1_name, lst_p2_name, ast_p2_name
+!end if
 
               end if
             end do
