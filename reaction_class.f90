@@ -34,6 +34,11 @@ module reaction_class
     real(dp) :: beta                    ! inverse thermodynamic temperature
     integer  :: n_ads_total             ! total number of adsorbates
     real(dp) :: total_rate              ! sum over all relevant rates
+    ! reaction counters
+    !                  reaction
+    !                  . species
+    !                  . .
+    integer, dimension(:,:), allocatable :: counter
 
   contains
     procedure :: construct
@@ -63,6 +68,9 @@ contains
 
     reaction_init%beta = 1.0_dp/(kB*c_pars%temperature)
     reaction_init%n_ads_total = lat%n_ads_tot()
+
+    allocate(reaction_init%counter(n_reaction_types,c_pars%n_species))
+    reaction_init%counter = 0
 
   end function reaction_init
 
@@ -160,7 +168,7 @@ end do
     integer :: i, m, ads, iads, reaction_id, i_change, channel
     integer :: n_nn, n_nn2, m_nn, col_p2, row_p2, proc
     integer :: id_r, id_p1, id_p2, ast_r, ast_p1, ast_p2
-    integer :: row, col, row_new, col_new, lst_new, ast_new, id
+    integer :: row, col, row_new, col_new, lst_new, ast_new
     real(dp), dimension(n_reaction_types) :: acc_rate
     integer, dimension(2*lat%n_nn(1)) :: change_list
 
@@ -216,15 +224,22 @@ end do
     select case (reaction_id)
 
       case(hopping_id)
+!print*
+!print*,'Starting hopping ...'
         ! determine hopping channel (adsorbate, direction, ads. site of available ones)
         !                           (      ads,      m_nn,                        iads)
         temp_dp = 0.0_dp
         extloop: do ads=1,this%n_ads_total
           do m_nn=1,n_nn
-          do iads=1,size(this%hopping%rates(ads,m_nn)%list) ! Warning: check timing of size calculation
-            temp_dp = temp_dp + this%hopping%rates(ads,m_nn)%list(iads)
-            if (u < temp_dp) exit extloop
-          end do
+            ! a new position of particle (ads) after a hop to a neighbor (m_nn)
+            call lat%neighbor(ads,m_nn,row_new,col_new)
+            id_r = lat%ads_list(ads)%id
+            lst_new = lat%lst(row_new,col_new)
+            do iads=1,size(lat%avail_ads_sites(id_r,lst_new)%list)
+              ast_new = lat%avail_ads_sites(id_r,lst_new)%list(iads)
+              temp_dp = temp_dp + this%hopping%rates(ads,m_nn)%list(iads)
+              if (u < temp_dp) exit extloop
+            end do
           end do
         end do extloop
 
@@ -248,12 +263,6 @@ end do
           end if
         end do
 
-        ! a new position of particle (ads) after a hop to a neighbor (m_nn)
-        call lat%neighbor(ads,m_nn,row_new,col_new)
-        id = lat%ads_list(ads)%id
-        lst_new = lat%lst(row_new,col_new)
-        ast_new = lat%avail_ads_sites(id,lst_new)%list(iads)
-
         ! Make a hop:
         ! Delete an adsorbate from its old position
         lat%occupations(lat%ads_list(ads)%row, lat%ads_list(ads)%col) = 0
@@ -274,8 +283,15 @@ end do
           end if
         end do
 
-        ! Update rate array for the affected adsorbates
+        ! Reset the rate info for ads
+        do m=1,n_nn
+          this%hopping%rates(ads,m)%list = 0.0_dp
+        end do
+        this%desorption%rates(ads) = 0.0_dp
+        this%dissociation%rate_info(ads)%list = rate_info(0,0,0.0_dp)
+        this%dissociation%rate_info(ads)%n_channels = 0
 
+        ! Update rate array for the affected adsorbates
         do i=1,i_change
           call      this%hopping%construct(change_list(i), lat, e_pars, this%beta)
           call   this%desorption%construct(change_list(i), lat, e_pars, this%beta)
@@ -283,6 +299,8 @@ end do
         end do
 
       case(desorption_id)
+!print*
+!print*,'Starting desorption ...'
         ! determine desorption channel (adsorbate)
         !                              (      ads)
         temp_dp = acc_rate(hopping_id)
@@ -308,11 +326,12 @@ end do
           end if
         end do
 
-        ! Do desorption:
+        ! ---------- Do desorption:
+        id_r = lat%ads_list(ads)%id
         ! Delete an adsorbate from the lattice
         lat%occupations(lat%ads_list(ads)%row, lat%ads_list(ads)%col) = 0
         ! Update the number of adsorbates in the lat structure
-        lat%n_ads(lat%ads_list(ads)%id) = lat%n_ads(lat%ads_list(ads)%id) - 1
+        lat%n_ads(id_r) = lat%n_ads(id_r) - 1
         ! Rearrange adsorbates except when the last adsorbate desorbs
         if (ads < this%n_ads_total) then
           ! Put the last adsorbate in place of ads
@@ -334,7 +353,7 @@ end do
           call this%dissociation%construct(change_list(i), lat, e_pars, this%beta)
         end do
 
-        ! Clean up rate arrays for the last adsorbate
+        ! Reset the rate info for the last adsorbate
         do m=1,n_nn
           this%hopping%rates(this%n_ads_total,m)%list = 0.0_dp
         end do
@@ -346,12 +365,8 @@ end do
         this%n_ads_total = this%n_ads_total - 1
 
       case(dissociation_id)
-
-print*
-print*, 'Before dissociation'
-call lat%print_ocs
-call lat%print_ads
-
+!print*
+!print*,'Starting dissociation ...'
         ! determine dissociation channel (ads, channel)
         temp_dp = acc_rate(desorption_id)
         extloop2: do ads=1,this%n_ads_total
@@ -362,7 +377,6 @@ call lat%print_ads
         end do extloop2
 
         ! create a list of adsorbates affected by dissociation
-
         change_list = 0
         i_change = 1
         ! Put the reactant's (which to become p1) ads  into the list
@@ -421,13 +435,13 @@ call lat%print_ads
         i_change = i_change + 1
         change_list(i_change) = lat%occupations(row_p2,col_p2)
 
-print*, 'After dissociation'
-call lat%print_ocs
-print*, 'Change list:'
-print*, 'Number of adsorbates which feel dissociations:', i_change
-print*, change_list
-call lat%print_ads
-pause
+!print*, 'After dissociation'
+!call lat%print_ocs
+!print*, 'Change list:'
+!print*, 'Number of adsorbates which feel dissociations:', i_change
+!print*, change_list
+!call lat%print_ads
+!pause
 
         ! Reset the rate info for ads (product 1)
         do m=1,n_nn
@@ -450,6 +464,9 @@ pause
         stop 'do_reaction (of reaction_class): must never occur!'
 
     end select
+
+    ! Update reaction counter
+    this%counter(reaction_id,id_r) = this%counter(reaction_id,id_r) + 1
 
   end subroutine do_reaction
 
