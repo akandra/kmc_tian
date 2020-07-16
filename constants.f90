@@ -59,14 +59,15 @@ module constants
   !-------- Reactions info ---------!
 
   ! Number of reaction types
-  integer, parameter :: n_reaction_types = 3
+  integer, parameter :: n_reaction_types = 4
   ! List of reaction types
   character(len=20), dimension(n_reaction_types), parameter :: &
-            reaction_names = [character(20)::'hopping','desorption','dissociation']
+            reaction_names = [character(20)::'hopping','desorption','dissociation','association']
   ! Reaction ids
   integer, parameter :: hopping_id      = 1
   integer, parameter :: desorption_id   = 2
   integer, parameter :: dissociation_id = 3
+  integer, parameter :: association_id  = 4
 
 
   !-------- Temperature dependences info ---------!

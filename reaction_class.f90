@@ -1,12 +1,7 @@
 module reaction_class
   !---------------------------------------------------------------------------
-  !  Module for binary dissocation reaction  r --> p1 + p2
+  !  Module for dealing with reactiona
   !---------------------------------------------------------------------------
-  !  * controlled by the dissociation keyword section of the .reaction file
-  !  * p1 is assumed to be at the same lattice site as r with its adsorption
-  !    site type (ast) choosen from those specified in the .reaction file
-  !  * p2 lattice site is taken as a nearest neighbor of r with its ast
-  !    taken from those specified in the .reaction file
   !---------------------------------------------------------------------------
   use constants
   use control_parameters_class
@@ -18,6 +13,7 @@ module reaction_class
   use rates_hopping_class
   use rates_desorption_class
   use rates_dissociation_class
+  use rates_association_class
 
   implicit none
 
@@ -30,6 +26,7 @@ module reaction_class
     type(     hopping_type) :: hopping
     type(  desorption_type) :: desorption
     type(dissociation_type) :: dissociation
+    type( association_type) :: association
 
     real(dp) :: beta                    ! inverse thermodynamic temperature
     integer  :: n_ads_total             ! total number of adsorbates
@@ -59,9 +56,10 @@ contains
 
 
     ! Create a rate structure
-    reaction_init%hopping      = hopping_init(c_pars, lat, e_pars)
-    reaction_init%desorption   = desorption_init(c_pars, lat, e_pars)
+    reaction_init%hopping      =      hopping_init(c_pars, lat, e_pars)
+    reaction_init%desorption   =   desorption_init(c_pars, lat, e_pars)
     reaction_init%dissociation = dissociation_init(c_pars, lat, e_pars)
+    reaction_init%association  =  association_init(c_pars, lat, e_pars)
 !    call reaction_init%hopping%print(c_pars)
 !    call reaction_init%desorption%print(c_pars)
 !    call reaction_init%dissociation%print(c_pars)
