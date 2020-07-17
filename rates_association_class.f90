@@ -105,7 +105,8 @@ contains
     type(mc_lat)            , intent(in)    :: lat
     type(energy_parameters) , intent(in)    :: e_pars
 
-    integer :: i, ios, nwords, line_number, i1, i2, i3, i4, i5, i6, m
+    integer :: i, ios, nwords, line_number, m
+    integer, dimension(4) :: i_lst, i_ast
 
     integer :: species, st1, st2, ast1, ast2
     logical :: e_defined1, e_defined2, r_defined, undefined_rate, undefined_energy
@@ -115,8 +116,8 @@ contains
     character(len=len(trim(c_pars%rate_file_name))) :: file_name
     character(1)                                    :: answer
 
-    character(len=10)     :: current_reactant_name, current_product1_name, current_product2_name
-    integer               :: current_reactant_id, current_product1_id, current_product2_id
+    character(len=10)     :: current_r1_name, current_r2_name, current_p1_name, current_p2_name
+    integer               :: current_r1_id, current_r2_id, current_p1_id, current_p2_id
     character(len=20)     :: current_law_name
     integer               :: current_law_id
 
@@ -133,7 +134,7 @@ contains
 
     integer :: row, col, site, id
     integer :: n_nn, n_nn2, max_avail_ads_sites
-    integer :: n_association_channels = 0
+    integer :: n_association_species, n_association_channels = 0
     integer :: association_counter = 0
 
     logical :: duplicate_error = .false.
@@ -157,7 +158,6 @@ contains
     end do
     end do
 
-WE ARE HERE
     !---------------------------------------------------------------------------
     !  Allocate and Intialize rate_info structure
     !---------------------------------------------------------------------------
@@ -165,9 +165,8 @@ WE ARE HERE
 
     do i=1,lat%n_rows*lat%n_cols
       allocate( association_init%rate_info(i)%list( max_avail_ads_sites * &
-                                                     max_avail_ads_sites * &
-                                                     lat%n_nn(1)) )
-      association_init%rate_info(i)%list = rate_info( 0, 0, 0.0_dp )
+                                                     max_avail_ads_sites  ) )
+      association_init%rate_info(i)%list = rate_info( 0, 0.0_dp )
     end do
 
     !  read rate definitions from the input file
@@ -208,37 +207,37 @@ WE ARE HERE
               call error_message(file_name, line_number, buffer, &
                          "invalid ending of the reaction section")
             parse_state = parse_state_association
-            if (nwords/=5) call error_message(file_name, line_number, buffer, &
-                               "association key must have 4 parameters")
+            if ( nwords/=5 .and. nwords/=6 ) call error_message(file_name, line_number, buffer, &
+                               "association key must have 4 or 5 parameters")
 
-            read(words(2),'(A)') current_reactant_name
-            current_reactant_id = get_index(current_reactant_name, c_pars%ads_names )
-            if (current_reactant_id == 0) call error_message(file_name, line_number, buffer, &
-                                                  "inconsistent association reactant definition")
+            read(words(2),'(A)') current_r1_name
+            current_r1_id = get_index(current_r1_name, c_pars%ads_names )
+            if (current_r1_id == 0) call error_message(file_name, line_number, buffer, &
+                                         "inconsistent association reactant 1 definition")
 
-            read(words(3),'(A)') current_product1_name
-            current_product1_id = get_index(current_product1_name, c_pars%ads_names )
-            if (current_product1_id == 0) call error_message(file_name, line_number, buffer, &
-                                                  "inconsistent association product 1 definition")
+            read(words(3),'(A)') current_r2_name
+            current_r2_id = get_index(current_r2_name, c_pars%ads_names )
+            if (current_r2_id == 0) call error_message(file_name, line_number, buffer, &
+                                         "inconsistent association reactant 2 definition")
 
-            read(words(4),'(A)') current_product2_name
-            current_product2_id = get_index(current_product2_name, c_pars%ads_names )
-            if (current_product2_id == 0) call error_message(file_name, line_number, buffer, &
-                                                  "inconsistent association product 2 definition")
+            read(words(4),'(A)') current_p1_name
+            current_p1_id = get_index(current_p1_name, c_pars%ads_names )
+            if (current_p1_id == 0) call error_message(file_name, line_number, buffer, &
+                                         "inconsistent association product 1 definition")
 
-            current_law_id = get_index(words(5), law_names )
+            if (nwords == 6) then
+              read(words(5),'(A)') current_p2_name
+              current_p2_id = get_index(current_p2_name, c_pars%ads_names )
+              if (current_p2_id == 0) call error_message(file_name, line_number, buffer, &
+                                           "inconsistent association product 2 definition")
+            end if
+
+            current_law_id = get_index(words(nwords), law_names )
             if (current_law_id == 0) call error_message(file_name, line_number, buffer, &
                                                   "association: unknown temperature law")
-!            print*, 'reactant name and id: ', current_reactant_name, current_reactant_id
-!            print*, 'product1 name and id: ', current_product1_name, current_product1_id
-!            print*, 'product2 name and id: ', current_product2_name, current_product2_id
-!            print*, c_pars%ads_names
-!            stop 111
-
 !-------------------------------------------------------------------------------
           case ('terrace','step','corner')            ! of select case(words(1))
 !-------------------------------------------------------------------------------
-
 
             select case (parse_state)
 
@@ -282,6 +281,10 @@ WE ARE HERE
 
     allocate(association_init%channels(n_association_channels))
     association_init%n_processes = n_association_channels
+    association_init%channels = association_def(0,0,0,0,0,0,0,0,0,0,0,0,0.0_dp)
+
+    print*, 'n_association_channels = ', n_association_channels
+    stop 111
 
 
 !-------------------------------------------------------------------------------
@@ -313,31 +316,37 @@ WE ARE HERE
 !-------------------------------------------------------------------------------
           case('association')                        ! of select case (words(1)
 !-------------------------------------------------------------------------------
+            n_association_species = nwords - 2
             association_init%is_defined = .true.
             parse_state = parse_state_association
 
-            read(words(2),'(A)') current_reactant_name
-            current_reactant_id = get_index(current_reactant_name, c_pars%ads_names )
+            read(words(2),'(A)') current_r1_name
+            current_r1_id = get_index(current_r1_name, c_pars%ads_names )
 
-            read(words(3),'(A)') current_product1_name
-            current_product1_id = get_index(current_product1_name, c_pars%ads_names )
+            read(words(3),'(A)') current_r2_name
+            current_r2_id = get_index(current_r2_name, c_pars%ads_names )
 
-            read(words(4),'(A)') current_product2_name
-            current_product2_id = get_index(current_product2_name, c_pars%ads_names )
+            read(words(4),'(A)') current_p1_name
+            current_p1_id = get_index(current_p1_name, c_pars%ads_names )
 
-            current_law_id = get_index(words(5), law_names )
+            if (n_association_species == 4) then
+              read(words(5),'(A)') current_p2_name
+              current_p2_id = get_index(current_p2_name, c_pars%ads_names )
+            end if
+
+            current_law_id = get_index(words(nwords), law_names )
 
 !            ! debugging printout
-!            print*, 'reactant name and id: ', current_reactant_name, current_reactant_id
-!            print*, 'product1 name and id: ', current_product1_name, current_product1_id
-!            print*, 'product2 name and id: ', current_product2_name, current_product2_id
+!            print*, 'reactant1 name and id: ', current_r1_name, current_r1_id
+!            print*, 'reactant2 name and id: ', current_r2_name, current_r2_id
+!            print*, 'product1  name and id: ', current_p1_name, current_p1_id
+!            if (nwords == 6) print*, 'product2  name and id: ', current_p2_name, current_p2_id
 !            print*, c_pars%ads_names
 !            stop 111
 
 !-------------------------------------------------------------------------------
           case ('terrace','step','corner')            ! of select case(words(1))
 !-------------------------------------------------------------------------------
-
 
             select case (parse_state)
 
@@ -349,38 +358,63 @@ WE ARE HERE
 
                 association_counter = association_counter + 1
 
-                i1 = get_index(words(1),    site_names)
-                i2 = get_index(words(2),ads_site_names)
-                i3 = get_index(words(3),    site_names)
-                i4 = get_index(words(4),ads_site_names)
-                i5 = get_index(words(5),    site_names)
-                i6 = get_index(words(6),ads_site_names)
+                do i=1,n_association_species
+                  i_lst(i) = get_index(words(2*i-1),    site_names)
+                  i_ast(i) = get_index(words(2*i  ),ads_site_names)
+                end do
 
-                if ( i1==0 .or. i2==0 .or. i3==0 .or. i4==0 .or. i5==0 .or. i6==0) &
+                if ( any(i_lst(1:n_association_species)) == 0 ) &
                   call error_message(file_name, line_number, buffer, &
                              "wrong site name in the association section")
+                if ( any(i_ast(1:n_association_species)) == 0 ) &
+                  call error_message(file_name, line_number, buffer, &
+                             "wrong adsorption site name in the association section")
 
+                if (n_association_species = 4 ) then
 
-                do i=1,association_counter - 1
-                  if ( association_init%channels(i)%r      == current_reactant_id .and. &
-                       association_init%channels(i)%r_lst  == i1                  .and. &
-                       association_init%channels(i)%r_ast  == i2                  .and. &
-                       association_init%channels(i)%p1     == current_product1_id .and. &
-                       association_init%channels(i)%p1_lst == i3                  .and. &
-                       association_init%channels(i)%p1_ast == i4                  .and. &
-                       association_init%channels(i)%p2     == current_product2_id .and. &
-                       association_init%channels(i)%p2_lst == i5                  .and. &
-                       association_init%channels(i)%p2_ast == i6                      ) then
-                    call error_message(file_name, line_number, buffer, "duplicated entry", stop = .false.)
-                    duplicate_error = .true.
-                  end if
-                end do
-                if (duplicate_error) stop 993
+                  do i=1,association_counter - 1
+                    if ( association_init%channels(i)%r1  == current_r1_id .and. &
+                      association_init%channels(i)%r1_lst == i_lst(1)      .and. &
+                      association_init%channels(i)%r1_ast == i_ast(1)      .and. &
+                      association_init%channels(i)%r2     == current_r2_id .and. &
+                      association_init%channels(i)%r2_lst == i_lst(2)      .and. &
+                      association_init%channels(i)%r2_ast == i_ast(2)      .and. &
+                      association_init%channels(i)%p1     == current_p1_id .and. &
+                      association_init%channels(i)%p1_lst == i_lst(3)      .and. &
+                      association_init%channels(i)%p1_ast == i_ast(3)      .and. &
+                      association_init%channels(i)%p2     == current_p2_id .and. &
+                      association_init%channels(i)%p2_lst == i_lst(4)      .and. &
+                      association_init%channels(i)%p2_ast == i_ast(4)             ) then
+                        call error_message(file_name, line_number, buffer, "duplicated entry", stop = .false.)
+                        duplicate_error = .true.
+                    end if
+                  end do
+
+                else
+
+                  do i=1,association_counter - 1
+                    if ( association_init%channels(i)%r1  == current_r1_id .and. &
+                      association_init%channels(i)%r1_lst == i_lst(1)      .and. &
+                      association_init%channels(i)%r1_ast == i_ast(1)      .and. &
+                      association_init%channels(i)%r2     == current_r2_id .and. &
+                      association_init%channels(i)%r2_lst == i_lst(2)      .and. &
+                      association_init%channels(i)%r2_ast == i_ast(2)      .and. &
+                      association_init%channels(i)%p1     == current_p1_id .and. &
+                      association_init%channels(i)%p1_lst == i_lst(3)      .and. &
+                      association_init%channels(i)%p1_ast == i_ast(3)       ) then
+                        call error_message(file_name, line_number, buffer, "duplicated entry", stop = .false.)
+                        duplicate_error = .true.
+                    end if
+                  end do
+
+                end if
+
+                if (duplicate_error) stop 992
 
                 ! check energy is defined for reactant's and for products' site_type and ads_site
-                if( e_pars%ads_energy(current_reactant_id, i1, i2) == e_pars%undefined_energy .or. &
-                    e_pars%ads_energy(current_product1_id, i3, i4) == e_pars%undefined_energy .or. &
-                    e_pars%ads_energy(current_product2_id, i5, i6) == e_pars%undefined_energy ) then
+                if( e_pars%ads_energy(current_r1_id, i_lst(1), i_ast(1)) == e_pars%undefined_energy .or. &
+                    e_pars%ads_energy(current_r2_id, i_lst(2), i_ast(2)) == e_pars%undefined_energy .or. &
+                    e_pars%ads_energy(current_p1_id, i_lst(3), i_ast(3)) == e_pars%undefined_energy ) then
 
                     call error_message(file_name, line_number, buffer, &
                                        " rate defined for site with undefined adsorption energy", &
@@ -389,16 +423,31 @@ WE ARE HERE
                     undefined_energy = .true.
                 end if
 
-                association_init%channels(association_counter)%r      = current_reactant_id
-                association_init%channels(association_counter)%r_lst  = i1
-                association_init%channels(association_counter)%r_ast  = i2
-                association_init%channels(association_counter)%p1     = current_product1_id
-                association_init%channels(association_counter)%p1_lst = i3
-                association_init%channels(association_counter)%p1_ast = i4
-                association_init%channels(association_counter)%p2     = current_product2_id
-                association_init%channels(association_counter)%p2_lst = i5
-                association_init%channels(association_counter)%p2_ast = i6
+                if( n_association_species == 4 .and. &
+                    e_pars%ads_energy(current_p2_id, i_lst(4), i_ast(4)) == e_pars%undefined_energy ) then
 
+                    call error_message(file_name, line_number, buffer, &
+                                       " rate defined for site with undefined adsorption energy", &
+                                       stop=.false., warning=.false.)
+
+                    undefined_energy = .true.
+                end if
+
+                association_init%channels(association_counter)%r1      = current_r1_id
+                association_init%channels(association_counter)%r1_lst  = i_lst(1)
+                association_init%channels(association_counter)%r1_ast  = i_ast(1)
+                association_init%channels(association_counter)%r2      = current_r2_id
+                association_init%channels(association_counter)%r2_lst  = i_lst(2)
+                association_init%channels(association_counter)%r2_ast  = i_ast(2)
+                association_init%channels(association_counter)%p1     = current_p1_id
+                association_init%channels(association_counter)%p1_lst = i_lst(3)
+                association_init%channels(association_counter)%p1_ast = i_ast(3)
+                if (n_association_species == 4)
+                  association_init%channels(association_counter)%p2     = current_p2_id
+                  association_init%channels(association_counter)%p2_lst = i_lst(4)
+                  association_init%channels(association_counter)%p2_ast = i_ast(4)
+                end if
+WE ARE HERE
                 select case (current_law_id)
 
                   case (Arrhenius_id)
@@ -462,16 +511,16 @@ WE ARE HERE
     close(inp_unit)
 
 
-    if (undefined_energy) then
-      write(*, '(A)') ' association: error, rates defined for sites with undefined energies'
-      stop 995
+!    if (undefined_energy) then
+!      write(*, '(A)') ' association: error, rates defined for sites with undefined energies'
+!      stop 995
+!
+!    else
+!      write(*, '(A)') ' association: passed check that energies are defined for all rates'
+!
+!    end if
 
-    else
-      write(*, '(A)') ' association: passed check that energies are defined for all rates'
-
-    end if
-
-  end function dissociation_init
+  end function association_init
 
 
 
@@ -509,79 +558,79 @@ WE ARE HERE
 !end if
 
     ! Get the reactant information
-    row  = lat%ads_list(ads)%row
-    col  = lat%ads_list(ads)%col
-    lst  = lat%lst(row,col)
-    ast  = lat%ads_list(ads)%ast
-    id_r = lat%ads_list(ads)%id
-
-    ! Loop over possible positions for product 2
-    n_channels=0
-    do m=1,lat%n_nn(1)
-
-      ! Get position and site type of neighbour m
-      call lat%neighbor(ads, m, row_2, col_2)
-
-      ! Check if the cell is free
-      if (lat%occupations(row_2, col_2) == 0) then
-
-        ! Get the lattice site type for product 2
-        lst_2 = lat%lst(row_2, col_2)
-
-        do iprocs=1, this%n_processes
-
-          if ( this%channels(iprocs)%r     == id_r .and. &
-               this%channels(iprocs)%r_lst == lst  .and. &
-               this%channels(iprocs)%r_ast == ast  .and. &
-               this%channels(iprocs)%p2_lst== lst_2       ) &
-          then
-            id_p1   = this%channels(iprocs)%p1
-            id_p2   = this%channels(iprocs)%p2
-
-            ! Determine all the values of the adsorption sites for products p1 and p2
-            ! that match an entry in the process structure.
-            ! If the rate for this entry is >0, add channel to the list
-            do i_ast_p1=1, size(lat%avail_ads_sites(id_p1, lst  )%list)
-            do i_ast_p2=1, size(lat%avail_ads_sites(id_p2, lst_2)%list)
-              if ( this%channels(iprocs)%p1_ast == lat%avail_ads_sites(id_p1, lst  )%list(i_ast_p1) .and. &
-                   this%channels(iprocs)%p2_ast == lat%avail_ads_sites(id_p2, lst_2)%list(i_ast_p2) .and. &
-                   this%channels(iprocs)%rate > 0 )                                                        &
-              then
-                n_channels=n_channels + 1
-                this%rate_info(ads)%list(n_channels)%proc  = iprocs
-                this%rate_info(ads)%list(n_channels)%m     = m
-                ! WARNING: Decide later if we need the rate field
-                this%rate_info(ads)%list(n_channels)%rate  = this%channels(iprocs)%rate
-
-!if(debug(1))then
-!  lst_name    = site_names(lst)
-!  lst_p2_name = site_names(lst_2)
-!  ast_r_name  = ads_site_names(lat%avail_ads_sites(id_r , lst  )%list(ast))
-!  ast_p1_name = ads_site_names(lat%avail_ads_sites(id_p1, lst  )%list(i_ast_p1))
-!  ast_p2_name = ads_site_names(lat%avail_ads_sites(id_p2, lst_2)%list(i_ast_p2))
+!    row  = lat%ads_list(ads)%row
+!    col  = lat%ads_list(ads)%col
+!    lst  = lat%lst(row,col)
+!    ast  = lat%ads_list(ads)%ast
+!    id_r = lat%ads_list(ads)%id
 !
-!  !  ads# chan#  m  rate       lst      ast_r   ast_p1   lst_p2   ast_p2
-!  !   1    1     1__2.00e+00   terrace  top     fcc      terrace  fcc
-!  !0        1         2         3         4        5        6         7
-!  !1234567890123456789012345678901234567890123456890124567890123456789012345
-!  print '(t4,i0, t9,i0, t15,i0, t16,1pe10.2, t29,A7, 2x,A3, t46,A3, t55,A7, 2x,A3)', &
-!        ads, iprocs, m, this%channels(iprocs)%rate, lst_name, ast_r_name, ast_p1_name, lst_p2_name, ast_p2_name
-!end if
-
-              end if
-            end do
-            end do
-
-            ! save the number of channels in the rate_info structure
-            this%rate_info(ads)%n_channels = n_channels
-
-          end if
-
-        end do
-
-      end if ! occupations
-
-    end do ! m
+!    ! Loop over possible positions for product 2
+!    n_channels=0
+!    do m=1,lat%n_nn(1)
+!
+!      ! Get position and site type of neighbour m
+!      call lat%neighbor(ads, m, row_2, col_2)
+!
+!      ! Check if the cell is free
+!      if (lat%occupations(row_2, col_2) == 0) then
+!
+!        ! Get the lattice site type for product 2
+!        lst_2 = lat%lst(row_2, col_2)
+!
+!        do iprocs=1, this%n_processes
+!
+!          if ( this%channels(iprocs)%r     == id_r .and. &
+!               this%channels(iprocs)%r_lst == lst  .and. &
+!               this%channels(iprocs)%r_ast == ast  .and. &
+!               this%channels(iprocs)%p2_lst== lst_2       ) &
+!          then
+!            id_p1   = this%channels(iprocs)%p1
+!            id_p2   = this%channels(iprocs)%p2
+!
+!            ! Determine all the values of the adsorption sites for products p1 and p2
+!            ! that match an entry in the process structure.
+!            ! If the rate for this entry is >0, add channel to the list
+!            do i_ast_p1=1, size(lat%avail_ads_sites(id_p1, lst  )%list)
+!            do i_ast_p2=1, size(lat%avail_ads_sites(id_p2, lst_2)%list)
+!              if ( this%channels(iprocs)%p1_ast == lat%avail_ads_sites(id_p1, lst  )%list(i_ast_p1) .and. &
+!                   this%channels(iprocs)%p2_ast == lat%avail_ads_sites(id_p2, lst_2)%list(i_ast_p2) .and. &
+!                   this%channels(iprocs)%rate > 0 )                                                        &
+!              then
+!                n_channels=n_channels + 1
+!                this%rate_info(ads)%list(n_channels)%proc  = iprocs
+!                this%rate_info(ads)%list(n_channels)%m     = m
+!                ! WARNING: Decide later if we need the rate field
+!                this%rate_info(ads)%list(n_channels)%rate  = this%channels(iprocs)%rate
+!
+!!if(debug(1))then
+!!  lst_name    = site_names(lst)
+!!  lst_p2_name = site_names(lst_2)
+!!  ast_r_name  = ads_site_names(lat%avail_ads_sites(id_r , lst  )%list(ast))
+!!  ast_p1_name = ads_site_names(lat%avail_ads_sites(id_p1, lst  )%list(i_ast_p1))
+!!  ast_p2_name = ads_site_names(lat%avail_ads_sites(id_p2, lst_2)%list(i_ast_p2))
+!!
+!!  !  ads# chan#  m  rate       lst      ast_r   ast_p1   lst_p2   ast_p2
+!!  !   1    1     1__2.00e+00   terrace  top     fcc      terrace  fcc
+!!  !0        1         2         3         4        5        6         7
+!!  !1234567890123456789012345678901234567890123456890124567890123456789012345
+!!  print '(t4,i0, t9,i0, t15,i0, t16,1pe10.2, t29,A7, 2x,A3, t46,A3, t55,A7, 2x,A3)', &
+!!        ads, iprocs, m, this%channels(iprocs)%rate, lst_name, ast_r_name, ast_p1_name, lst_p2_name, ast_p2_name
+!!end if
+!
+!              end if
+!            end do
+!            end do
+!
+!            ! save the number of channels in the rate_info structure
+!            this%rate_info(ads)%n_channels = n_channels
+!
+!          end if
+!
+!        end do
+!
+!      end if ! occupations
+!
+!    end do ! m
 
  end subroutine construct
 
@@ -595,21 +644,21 @@ WE ARE HERE
     integer :: i
     character(:), allocatable :: reactant_name, product1_name, product2_name
 
-    print*
-    print*, 'association Rates:'
-    print '(A)', ' ---------------------------'
-    do i=1,size(this%channels,1)
-      reactant_name = c_pars%ads_names(this%channels(i)%r )
-      product1_name = c_pars%ads_names(this%channels(i)%p1)
-      product2_name = c_pars%ads_names(this%channels(i)%p2)
-      write(*,'(1x,A,A,A,2X,A,A,2X,A,A,e12.3)')  &
-              trim(reactant_name)// ' -> '// trim(product1_name)// ' + '// trim(product2_name)//': ',&
-              site_names(this%channels(i)%r_lst),  ads_site_names(this%channels(i)%r_ast), &
-              site_names(this%channels(i)%p1_lst), ads_site_names(this%channels(i)%p1_ast), &
-              site_names(this%channels(i)%p2_lst), ads_site_names(this%channels(i)%p2_ast), &
-              this%channels(i)%rate
-    end do
-    print*
+!    print*
+!    print*, 'association Rates:'
+!    print '(A)', ' ---------------------------'
+!    do i=1,size(this%channels,1)
+!      reactant_name = c_pars%ads_names(this%channels(i)%r )
+!      product1_name = c_pars%ads_names(this%channels(i)%p1)
+!      product2_name = c_pars%ads_names(this%channels(i)%p2)
+!      write(*,'(1x,A,A,A,2X,A,A,2X,A,A,e12.3)')  &
+!              trim(reactant_name)// ' -> '// trim(product1_name)// ' + '// trim(product2_name)//': ',&
+!              site_names(this%channels(i)%r_lst),  ads_site_names(this%channels(i)%r_ast), &
+!              site_names(this%channels(i)%p1_lst), ads_site_names(this%channels(i)%p1_ast), &
+!              site_names(this%channels(i)%p2_lst), ads_site_names(this%channels(i)%p2_ast), &
+!              this%channels(i)%rate
+!    end do
+!    print*
 
   end subroutine print
 
