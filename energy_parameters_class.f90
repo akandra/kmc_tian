@@ -60,7 +60,7 @@ contains
     real(dp), parameter:: default_dp  = huge(0.0_dp)
 
     i = control_pars%n_species
-    allocate(energy_parameters_init%ads_energy(i,n_max_site_types,n_max_ads_sites))
+    allocate(energy_parameters_init%ads_energy(i,n_max_lat_site_types,n_max_ads_sites))
     allocate(energy_parameters_init%int_energy_law_id(i,i))
     allocate(energy_parameters_init%int_energy_pars(i,i,n_shells))
     allocate(energy_parameters_init%int_energy_skip(i,i,n_shells))
@@ -116,7 +116,7 @@ contains
             if (parse_state /= parse_state_adsorption) &
               call error_message(file_name, line_number, buffer, "invalid site type statement")
 
-            i1 = get_index(words(1),    site_names)
+            i1 = get_index(words(1),lat_site_names)
             i2 = get_index(words(2),ads_site_names)
 
             if ( i1==0 .or. i2==0 ) &
@@ -127,11 +127,11 @@ contains
 
             read(words(3),*) energy_parameters_init%ads_energy(current_species_id,i1,i2 )
 !              print*, 'species  ' ,current_species_id, &
-!                      'site     ' ,get_index(words(1),    site_names),&
+!                      'site     ' ,get_index(words(1),lat_site_names),&
 !                      'ads_site ' ,get_index(words(2),ads_site_names)
 !              print*, 'energy:  ' ,energy_parameters_init%ads_energy&
 !                                    (current_species_id,&
-!                                     get_index(words(1),    site_names),&
+!                                     get_index(words(1),lat_site_names),&
 !                                     get_index(words(2),ads_site_names) )
 
           case('interaction')

@@ -1,12 +1,11 @@
 module rates_association_class
 
   !---------------------------------------------------------------------------
-  !  Module for binary association reaction  r1 + r2 --> p1 + p2
+  !  Module for binary association reaction  r1 + r2 --> p1
   !---------------------------------------------------------------------------
   !  * controlled by the association keyword section of the .reaction file
-  !  * p1(p2) is assumed to be at the same lattice site as r1(r2) with its adsorption
+  !  * p1 is assumed to be at the same lattice site as r1 with its adsorption
   !    site type (ast) choosen from those specified in the .reaction file
-  !  * if p2 does not exist we hope we can manage it
   !---------------------------------------------------------------------------
 
   use constants
@@ -46,9 +45,6 @@ module rates_association_class
     integer  :: p1        ! product 1 id
     integer  :: p1_lst    ! product 1 lattice site type
     integer  :: p1_ast    ! product 1 adsorbate site type
-    integer  :: p2        ! product 2 id
-    integer  :: p2_lst    ! product 2 lattice site type
-    integer  :: p2_ast    ! product 2 adsorbate site type
     real(dp) :: rate      ! association rate
   end type
 
@@ -105,10 +101,8 @@ contains
     type(mc_lat)            , intent(in)    :: lat
     type(energy_parameters) , intent(in)    :: e_pars
 
-    integer :: i, ios, nwords, line_number, m
-    integer, dimension(4) :: i_lst, i_ast
+    integer :: i, j, ios, nwords, line_number, m
 
-    integer :: species, st1, st2, ast1, ast2
     logical :: e_defined1, e_defined2, r_defined, undefined_rate, undefined_energy
 
     character(len=max_string_length)                :: buffer
@@ -116,15 +110,16 @@ contains
     character(len=len(trim(c_pars%rate_file_name))) :: file_name
     character(1)                                    :: answer
 
-    character(len=10)     :: current_r1_name, current_r2_name, current_p1_name, current_p2_name
-    integer               :: current_r1_id, current_r2_id, current_p1_id, current_p2_id
-    character(len=20)     :: current_law_name
-    integer               :: current_law_id
+    character(len=10)     :: r1_name, r2_name, p1_name
+    integer               :: r1_id,   r2_id,   p1_id
+    character(len=20)     :: law_name
+    integer               :: law_id
 
     integer               :: parse_state
     integer, parameter    :: parse_state_ignore  = -1
     integer, parameter    :: parse_state_default =  0
     integer, parameter    :: parse_state_association =  association_id
+    integer, parameter    :: n_association_species = 3
 
 
     real(dp), dimension(3):: pars = 0.0_dp
@@ -132,29 +127,20 @@ contains
     integer,  parameter   :: default_int = 0
     real(dp), parameter   :: default_rate  = -1.0_dp
 
-    integer :: row, col, site, id
-    integer :: n_nn, n_nn2, max_avail_ads_sites
-    integer :: n_association_species, n_association_channels = 0
+    integer, dimension(n_association_species) :: lst, ast
+
+    integer :: max_avail_ads_sites
+    integer :: n_association_channels = 0
     integer :: association_counter = 0
 
     logical :: duplicate_error = .false.
 
-    n_nn  = lat%n_nn(1)
-!    n_nn2 = n_nn/2
-    ! List of additional nn directions to scan after association
-!    allocate(association_init%nn_new(n_nn,n_nn2))
-!    do m=1,n_nn
-!    do i=1,n_nn2
-!      association_init%nn_new(m,i) = modulo( m+i-n_nn2, n_nn ) + 1
-!    end do
-!    end do
-
     ! maximal number of available ads. sites
     max_avail_ads_sites = 1
     do i=1,c_pars%n_species
-    do m=1,n_max_site_types
-      i1 = size(lat%avail_ads_sites(i,m)%list)
-      if (max_avail_ads_sites < i1) max_avail_ads_sites = i1
+    do m=1,n_max_lat_site_types
+      j = size(lat%avail_ads_sites(i,m)%list)
+      if (max_avail_ads_sites < j) max_avail_ads_sites = j
     end do
     end do
 
@@ -166,7 +152,7 @@ contains
     do i=1,lat%n_rows*lat%n_cols
       allocate( association_init%rate_info(i)%list( max_avail_ads_sites * &
                                                      max_avail_ads_sites  ) )
-      association_init%rate_info(i)%list = rate_info( 0, 0.0_dp )
+      association_init%rate_info(i)%list = rate_info( default_int, default_rate )
     end do
 
     !  read rate definitions from the input file
@@ -207,33 +193,26 @@ contains
               call error_message(file_name, line_number, buffer, &
                          "invalid ending of the reaction section")
             parse_state = parse_state_association
-            if ( nwords/=5 .and. nwords/=6 ) call error_message(file_name, line_number, buffer, &
-                               "association key must have 4 or 5 parameters")
+            if ( nwords/=5) call error_message(file_name, line_number, buffer, &
+                               "association key must have 4 parameters")
 
-            read(words(2),'(A)') current_r1_name
-            current_r1_id = get_index(current_r1_name, c_pars%ads_names )
-            if (current_r1_id == 0) call error_message(file_name, line_number, buffer, &
+            read(words(2),'(A)') r1_name
+            r1_id = get_index(r1_name, c_pars%ads_names )
+            if (r1_id == 0) call error_message(file_name, line_number, buffer, &
                                          "inconsistent association reactant 1 definition")
 
-            read(words(3),'(A)') current_r2_name
-            current_r2_id = get_index(current_r2_name, c_pars%ads_names )
-            if (current_r2_id == 0) call error_message(file_name, line_number, buffer, &
+            read(words(3),'(A)') r2_name
+            r2_id = get_index(r2_name, c_pars%ads_names )
+            if (r2_id == 0) call error_message(file_name, line_number, buffer, &
                                          "inconsistent association reactant 2 definition")
 
-            read(words(4),'(A)') current_p1_name
-            current_p1_id = get_index(current_p1_name, c_pars%ads_names )
-            if (current_p1_id == 0) call error_message(file_name, line_number, buffer, &
+            read(words(4),'(A)') p1_name
+            p1_id = get_index(p1_name, c_pars%ads_names )
+            if (p1_id == 0) call error_message(file_name, line_number, buffer, &
                                          "inconsistent association product 1 definition")
 
-            if (nwords == 6) then
-              read(words(5),'(A)') current_p2_name
-              current_p2_id = get_index(current_p2_name, c_pars%ads_names )
-              if (current_p2_id == 0) call error_message(file_name, line_number, buffer, &
-                                           "inconsistent association product 2 definition")
-            end if
-
-            current_law_id = get_index(words(nwords), law_names )
-            if (current_law_id == 0) call error_message(file_name, line_number, buffer, &
+            law_id = get_index(words(nwords), law_names )
+            if (law_id == 0) call error_message(file_name, line_number, buffer, &
                                                   "association: unknown temperature law")
 !-------------------------------------------------------------------------------
           case ('terrace','step','corner')            ! of select case(words(1))
@@ -281,11 +260,7 @@ contains
 
     allocate(association_init%channels(n_association_channels))
     association_init%n_processes = n_association_channels
-    association_init%channels = association_def(0,0,0,0,0,0,0,0,0,0,0,0,0.0_dp)
-
-    print*, 'n_association_channels = ', n_association_channels
-    stop 111
-
+    association_init%channels = association_def(0,0,0,0,0,0,0,0,0,0.0_dp)
 
 !-------------------------------------------------------------------------------
 !   Second pass of processing the .reaction file:
@@ -316,31 +291,24 @@ contains
 !-------------------------------------------------------------------------------
           case('association')                        ! of select case (words(1)
 !-------------------------------------------------------------------------------
-            n_association_species = nwords - 2
             association_init%is_defined = .true.
             parse_state = parse_state_association
 
-            read(words(2),'(A)') current_r1_name
-            current_r1_id = get_index(current_r1_name, c_pars%ads_names )
+            read(words(2),'(A)') r1_name
+            r1_id = get_index(r1_name, c_pars%ads_names )
 
-            read(words(3),'(A)') current_r2_name
-            current_r2_id = get_index(current_r2_name, c_pars%ads_names )
+            read(words(3),'(A)') r2_name
+            r2_id = get_index(r2_name, c_pars%ads_names )
 
-            read(words(4),'(A)') current_p1_name
-            current_p1_id = get_index(current_p1_name, c_pars%ads_names )
+            read(words(4),'(A)') p1_name
+            p1_id = get_index(p1_name, c_pars%ads_names )
 
-            if (n_association_species == 4) then
-              read(words(5),'(A)') current_p2_name
-              current_p2_id = get_index(current_p2_name, c_pars%ads_names )
-            end if
-
-            current_law_id = get_index(words(nwords), law_names )
+            law_id = get_index(words(nwords), law_names )
 
 !            ! debugging printout
-!            print*, 'reactant1 name and id: ', current_r1_name, current_r1_id
-!            print*, 'reactant2 name and id: ', current_r2_name, current_r2_id
-!            print*, 'product1  name and id: ', current_p1_name, current_p1_id
-!            if (nwords == 6) print*, 'product2  name and id: ', current_p2_name, current_p2_id
+!            print*, 'reactant1 name and id: ', r1_name, r1_id
+!            print*, 'reactant2 name and id: ', r2_name, r2_id
+!            print*, 'product1  name and id: ', p1_name, p1_id
 !            print*, c_pars%ads_names
 !            stop 111
 
@@ -359,96 +327,71 @@ contains
                 association_counter = association_counter + 1
 
                 do i=1,n_association_species
-                  i_lst(i) = get_index(words(2*i-1),    site_names)
-                  i_ast(i) = get_index(words(2*i  ),ads_site_names)
+                  lst(i) = get_index(words(2*i-1),lat_site_names)
+                  ast(i) = get_index(words(2*i  ),ads_site_names)
                 end do
 
-                if ( any(i_lst(1:n_association_species)) == 0 ) &
+                if ( any(lst(1:n_association_species)==0) ) &
                   call error_message(file_name, line_number, buffer, &
-                             "wrong site name in the association section")
-                if ( any(i_ast(1:n_association_species)) == 0 ) &
+                             "wrong lattice site name in the association section")
+                if ( any(ast(1:n_association_species)==0) ) &
                   call error_message(file_name, line_number, buffer, &
                              "wrong adsorption site name in the association section")
 
-                if (n_association_species = 4 ) then
-
-                  do i=1,association_counter - 1
-                    if ( association_init%channels(i)%r1  == current_r1_id .and. &
-                      association_init%channels(i)%r1_lst == i_lst(1)      .and. &
-                      association_init%channels(i)%r1_ast == i_ast(1)      .and. &
-                      association_init%channels(i)%r2     == current_r2_id .and. &
-                      association_init%channels(i)%r2_lst == i_lst(2)      .and. &
-                      association_init%channels(i)%r2_ast == i_ast(2)      .and. &
-                      association_init%channels(i)%p1     == current_p1_id .and. &
-                      association_init%channels(i)%p1_lst == i_lst(3)      .and. &
-                      association_init%channels(i)%p1_ast == i_ast(3)      .and. &
-                      association_init%channels(i)%p2     == current_p2_id .and. &
-                      association_init%channels(i)%p2_lst == i_lst(4)      .and. &
-                      association_init%channels(i)%p2_ast == i_ast(4)             ) then
-                        call error_message(file_name, line_number, buffer, "duplicated entry", stop = .false.)
-                        duplicate_error = .true.
-                    end if
-                  end do
-
-                else
-
-                  do i=1,association_counter - 1
-                    if ( association_init%channels(i)%r1  == current_r1_id .and. &
-                      association_init%channels(i)%r1_lst == i_lst(1)      .and. &
-                      association_init%channels(i)%r1_ast == i_ast(1)      .and. &
-                      association_init%channels(i)%r2     == current_r2_id .and. &
-                      association_init%channels(i)%r2_lst == i_lst(2)      .and. &
-                      association_init%channels(i)%r2_ast == i_ast(2)      .and. &
-                      association_init%channels(i)%p1     == current_p1_id .and. &
-                      association_init%channels(i)%p1_lst == i_lst(3)      .and. &
-                      association_init%channels(i)%p1_ast == i_ast(3)       ) then
-                        call error_message(file_name, line_number, buffer, "duplicated entry", stop = .false.)
-                        duplicate_error = .true.
-                    end if
-                  end do
-
-                end if
-
+                do i=1,association_counter-1
+                  if ( association_init%channels(i)%r1     == r1_id  .and. &
+                       association_init%channels(i)%r1_lst == lst(1) .and. &
+                       association_init%channels(i)%r1_ast == ast(1) .and. &
+                       association_init%channels(i)%r2     == r2_id  .and. &
+                       association_init%channels(i)%r2_lst == lst(2) .and. &
+                       association_init%channels(i)%r2_ast == ast(2) .and. &
+                       association_init%channels(i)%p1     == p1_id  .and. &
+                       association_init%channels(i)%p1_lst == lst(3) .and. &
+                       association_init%channels(i)%p1_ast == ast(3)       ) then
+                    call error_message(file_name, line_number, buffer, &
+                                       "duplicated entry", stop = .false.)
+                      duplicate_error = .true.
+                  end if
+                end do
+                do i=1,association_counter-1
+                  if ( association_init%channels(i)%r1     == r1_id  .and. &
+                       association_init%channels(i)%r1_lst == lst(2) .and. &
+                       association_init%channels(i)%r1_ast == ast(2) .and. &
+                       association_init%channels(i)%r2     == r2_id  .and. &
+                       association_init%channels(i)%r2_lst == lst(1) .and. &
+                       association_init%channels(i)%r2_ast == ast(1) .and. &
+                       association_init%channels(i)%p1     == p1_id  .and. &
+                       association_init%channels(i)%p1_lst == lst(3) .and. &
+                       association_init%channels(i)%p1_ast == ast(3)       ) then
+                    call error_message(file_name, line_number, buffer, &
+                                       "symmetry duplicate", stop = .false.)
+                      duplicate_error = .true.
+                  end if
+                end do
                 if (duplicate_error) stop 992
 
-                ! check energy is defined for reactant's and for products' site_type and ads_site
-                if( e_pars%ads_energy(current_r1_id, i_lst(1), i_ast(1)) == e_pars%undefined_energy .or. &
-                    e_pars%ads_energy(current_r2_id, i_lst(2), i_ast(2)) == e_pars%undefined_energy .or. &
-                    e_pars%ads_energy(current_p1_id, i_lst(3), i_ast(3)) == e_pars%undefined_energy ) then
+                ! check energy is defined for reactant's and for products' lat_site_type and ads_site
+                if( e_pars%ads_energy(r1_id, lst(1), ast(1)) == e_pars%undefined_energy .or. &
+                    e_pars%ads_energy(r2_id, lst(2), ast(2)) == e_pars%undefined_energy .or. &
+                    e_pars%ads_energy(p1_id, lst(3), ast(3)) == e_pars%undefined_energy ) then
 
-                    call error_message(file_name, line_number, buffer, &
+                  call error_message(file_name, line_number, buffer, &
                                        " rate defined for site with undefined adsorption energy", &
                                        stop=.false., warning=.false.)
-
                     undefined_energy = .true.
                 end if
 
-                if( n_association_species == 4 .and. &
-                    e_pars%ads_energy(current_p2_id, i_lst(4), i_ast(4)) == e_pars%undefined_energy ) then
+                association_init%channels(association_counter)%r1      = r1_id
+                association_init%channels(association_counter)%r1_lst  = lst(1)
+                association_init%channels(association_counter)%r1_ast  = ast(1)
+                association_init%channels(association_counter)%r2      = r2_id
+                association_init%channels(association_counter)%r2_lst  = lst(2)
+                association_init%channels(association_counter)%r2_ast  = ast(2)
+                association_init%channels(association_counter)%p1      = p1_id
+                association_init%channels(association_counter)%p1_lst  = lst(3)
+                association_init%channels(association_counter)%p1_ast  = ast(3)
 
-                    call error_message(file_name, line_number, buffer, &
-                                       " rate defined for site with undefined adsorption energy", &
-                                       stop=.false., warning=.false.)
-
-                    undefined_energy = .true.
-                end if
-
-                association_init%channels(association_counter)%r1      = current_r1_id
-                association_init%channels(association_counter)%r1_lst  = i_lst(1)
-                association_init%channels(association_counter)%r1_ast  = i_ast(1)
-                association_init%channels(association_counter)%r2      = current_r2_id
-                association_init%channels(association_counter)%r2_lst  = i_lst(2)
-                association_init%channels(association_counter)%r2_ast  = i_ast(2)
-                association_init%channels(association_counter)%p1     = current_p1_id
-                association_init%channels(association_counter)%p1_lst = i_lst(3)
-                association_init%channels(association_counter)%p1_ast = i_ast(3)
-                if (n_association_species == 4)
-                  association_init%channels(association_counter)%p2     = current_p2_id
-                  association_init%channels(association_counter)%p2_lst = i_lst(4)
-                  association_init%channels(association_counter)%p2_ast = i_ast(4)
-                end if
-WE ARE HERE
-                select case (current_law_id)
+                select case (law_id)
 
                   case (Arrhenius_id)
                     if (nwords/=8) call error_message(file_name, line_number, buffer,&
@@ -470,15 +413,15 @@ WE ARE HERE
 
                 end select
 
-!                 ! Debugging printout
+                 ! Debugging printout
 !                 print*, 'reaction: ', reaction_names(parse_state),&
-!                        ' for species:', current_reactant_name, current_product1_name, current_product2_name
-!                 print*, 'law: ', law_names(current_law_id),&
-!                        ' from:', site_names(i1),ads_site_names(i2),&
-!                        ' to:'  , site_names(i3),ads_site_names(i4),&
-!                        ' and '  , site_names(i5),ads_site_names(i6)
+!                        ' for species:', r1_name, r2_name, p1_name
+!                 print*, 'law: ', law_names(law_id),&
+!                        ' from:', lat_site_names(lst(1)),ads_site_names(ast(1)),&
+!                        ' and:'  , lat_site_names(lst(2)),ads_site_names(ast(2)),&
+!                        ' to: '  ,lat_site_names(lst(3)),ads_site_names(ast(3))
 !                print'(A,3f16.3)', 'with pars: ', pars
-!                stop 112
+!                pause
 
               case default
                 call error_message(file_name, line_number, buffer, "association: invalid site type statement")
@@ -510,20 +453,16 @@ WE ARE HERE
 
     close(inp_unit)
 
+    if (undefined_energy) then
+      write(*, '(A)') ' Association: error, rates defined for sites with undefined energies'
+      stop 995
 
-!    if (undefined_energy) then
-!      write(*, '(A)') ' association: error, rates defined for sites with undefined energies'
-!      stop 995
-!
-!    else
-!      write(*, '(A)') ' association: passed check that energies are defined for all rates'
-!
-!    end if
+    else
+      write(*, '(A/)') ' Association: passed check that energies are defined for all rates'
+
+    end if
 
   end function association_init
-
-
-
 
 !-------------------------------------------------------------------------------
 !  subroutine construct
@@ -603,8 +542,8 @@ WE ARE HERE
 !                this%rate_info(ads)%list(n_channels)%rate  = this%channels(iprocs)%rate
 !
 !!if(debug(1))then
-!!  lst_name    = site_names(lst)
-!!  lst_p2_name = site_names(lst_2)
+!!  lst_name    = lat_site_names(lst)
+!!  lst_p2_name = lat_site_names(lst_2)
 !!  ast_r_name  = ads_site_names(lat%avail_ads_sites(id_r , lst  )%list(ast))
 !!  ast_p1_name = ads_site_names(lat%avail_ads_sites(id_p1, lst  )%list(i_ast_p1))
 !!  ast_p2_name = ads_site_names(lat%avail_ads_sites(id_p2, lst_2)%list(i_ast_p2))
@@ -642,23 +581,23 @@ WE ARE HERE
     class(control_parameters), intent(in) :: c_pars
 
     integer :: i
-    character(:), allocatable :: reactant_name, product1_name, product2_name
+    character(:), allocatable :: r1_name, r2_name, p1_name
 
-!    print*
-!    print*, 'association Rates:'
-!    print '(A)', ' ---------------------------'
-!    do i=1,size(this%channels,1)
-!      reactant_name = c_pars%ads_names(this%channels(i)%r )
-!      product1_name = c_pars%ads_names(this%channels(i)%p1)
-!      product2_name = c_pars%ads_names(this%channels(i)%p2)
-!      write(*,'(1x,A,A,A,2X,A,A,2X,A,A,e12.3)')  &
-!              trim(reactant_name)// ' -> '// trim(product1_name)// ' + '// trim(product2_name)//': ',&
-!              site_names(this%channels(i)%r_lst),  ads_site_names(this%channels(i)%r_ast), &
-!              site_names(this%channels(i)%p1_lst), ads_site_names(this%channels(i)%p1_ast), &
-!              site_names(this%channels(i)%p2_lst), ads_site_names(this%channels(i)%p2_ast), &
-!              this%channels(i)%rate
-!    end do
-!    print*
+    print*
+    print*, 'Association Rates:'
+    print '(A)', ' ---------------------------'
+    do i=1,size(this%channels,1)
+      r1_name = c_pars%ads_names(this%channels(i)%r1 )
+      r2_name = c_pars%ads_names(this%channels(i)%r2)
+      p1_name = c_pars%ads_names(this%channels(i)%p1)
+      write(*,'(1x,A,A,A,2X,A,A,2X,A,A,e12.3)')  &
+              trim(r1_name)// ' + '// trim(r2_name)// ' -> '// trim(p1_name)//': ',&
+              lat_site_names(this%channels(i)%r1_lst), ads_site_names(this%channels(i)%r1_ast), &
+              lat_site_names(this%channels(i)%r2_lst), ads_site_names(this%channels(i)%r2_ast), &
+              lat_site_names(this%channels(i)%p1_lst), ads_site_names(this%channels(i)%p1_ast), &
+              this%channels(i)%rate
+    end do
+    print*
 
   end subroutine print
 

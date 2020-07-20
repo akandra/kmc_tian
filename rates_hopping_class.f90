@@ -95,7 +95,7 @@ contains
     ! maximal number of available ads. sites
     max_avail_ads_sites = 1
     do i=1,c_pars%n_species
-    do m=1,n_max_site_types
+    do m=1,n_max_lat_site_types
       i1 = size(lat%avail_ads_sites(i,m)%list)
       if (max_avail_ads_sites < i1) max_avail_ads_sites = i1
     end do
@@ -110,8 +110,8 @@ contains
     end do
 
     allocate(hopping_init%process( c_pars%n_species,&
-                                 n_max_site_types, n_max_ads_sites,&
-                                 n_max_site_types, n_max_ads_sites) )
+                                 n_max_lat_site_types, n_max_ads_sites,&
+                                 n_max_lat_site_types, n_max_ads_sites) )
 
     hopping_init%process = default_rate
 
@@ -178,9 +178,9 @@ contains
 
               case(hopping_id)
 
-                i1 = get_index(words(1),    site_names)
+                i1 = get_index(words(1),lat_site_names)
                 i2 = get_index(words(2),ads_site_names)
-                i3 = get_index(words(3),    site_names)
+                i3 = get_index(words(3),lat_site_names)
                 i4 = get_index(words(4),ads_site_names)
 
                 if ( i1==0 .or. i2==0 .or. i3==0 .or. i4==0) &
@@ -235,8 +235,8 @@ contains
 !                 print*, 'reaction: ', reaction_names(parse_state),&
 !                        ' for species:', current_species_name
 !                 print*, 'law: ', law_names(current_law_id),&
-!                        ' from:', site_names(i1),ads_site_names(i2),&
-!                        ' to:'  , site_names(i3),ads_site_names(i4)
+!                        ' from:', lat_site_names(i1),ads_site_names(i2),&
+!                        ' to:'  , lat_site_names(i3),ads_site_names(i4)
 !                print'(A,3f16.3)', 'with pars: ', pars
 
               case default
@@ -288,14 +288,14 @@ contains
     ! Adsorpton energies (n_species x n_site_type x n_adsorption_sites)
     ! real(dp), dimension(:,:,:), allocatable :: ads_energy
     !
-    ! Note ads_energies could be allocated of n_site_types rather than n_max_site_types
+    ! Note ads_energies could be allocated of n_site_types rather than n_max_lat_site_types
     !
 
     undefined_rate = .false.
     do species   = 1, c_pars%n_species
-    do st1       = 1, n_max_site_types
+    do st1       = 1, n_max_lat_site_types
     do ast1      = 1, n_max_ads_sites
-    do st2       = st1, n_max_site_types
+    do st2       = st1, n_max_lat_site_types
     do ast2      = 1, n_max_ads_sites
 
       e_defined1 = e_pars%ads_energy(species, st1, ast1) /= e_pars%undefined_energy
@@ -317,8 +317,8 @@ contains
 
         print '(6x, a5, A10, 2x, a3, 6x, a10, 2x, a3, 6x, L1, 7x, L1, 7x, L1)' ,            &
                 c_pars%ads_names(species),             &
-                site_names(st1), ads_site_names(ast1), &
-                site_names(st2), ads_site_names(ast2)
+                lat_site_names(st1), ads_site_names(ast1), &
+                lat_site_names(st2), ads_site_names(ast2)
                 !e_defined1, e_defined2, r_defined
       end if
 
@@ -451,16 +451,16 @@ contains
       print '(A)',' ---------------------------'
       print '( A,A)',' species: ', c_pars%ads_names(i)
       print '(A)', ' ---------------------------'
-      do i1=1,n_max_site_types
+      do i1=1,n_max_lat_site_types
       do i2=1,n_max_ads_sites
-      do i3=1,n_max_site_types
+      do i3=1,n_max_lat_site_types
       do i4=1,n_max_ads_sites
         if (this%process(i,i1,i2,i3,i4)< 0.0_dp) then
           cycle
         else
           write(*,'(1x,A,A,2X,A,A,6e12.3)') &
-              site_names(i1), ads_site_names(i2), &
-              site_names(i3), ads_site_names(i4), &
+              lat_site_names(i1), ads_site_names(i2), &
+              lat_site_names(i3), ads_site_names(i4), &
               this%process(i,i1,i2,i3,i4)
         end if
       end do

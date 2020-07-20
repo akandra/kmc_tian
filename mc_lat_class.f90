@@ -41,7 +41,7 @@ module mc_lat_class
     ! initial number of adsorbates and adsorbates list
     integer, dimension(:), allocatable :: n_ads
     type(adsorbate), dimension(:), allocatable  :: ads_list
-    ! Available adsorbtion sites list (n_species x n_max_site_types x (n_avail_ads_sites))
+    ! Available adsorbtion sites list (n_species x n_max_lat_site_types x (n_avail_ads_sites))
     type(v_list), dimension(:,:), allocatable :: avail_ads_sites
 
     contains
@@ -157,7 +157,7 @@ contains
           lat%lst(:,j)   = step_site
           lat%lst(:,j+1) = corner_site
       end do
-      n_site_types = n_max_site_types
+      n_site_types = n_max_lat_site_types
     else
       n_site_types = 1
     end if
@@ -188,7 +188,7 @@ contains
 !print *, 'debug printout for construction of avail_ads_sites mc_lat_class line 191'
 !do i=1,control_pars%n_species
 !do j=1,n_site_types
-!  write(*, '(A, A5, A, A10)',advance='no')' species = ',control_pars%ads_names(i),'site type =',site_names(j)
+!  write(*, '(A, A5, A, A10)',advance='no')' species = ',control_pars%ads_names(i),'site type =',lat_site_names(j)
 !  print '(A,A5,1x,A,1x,A,1x,A,1x,A,1x)','  list = ',(ads_site_names(lat%avail_ads_sites(i,j)%list(k)), &
 !                    k=1,size(lat%avail_ads_sites(i,j)%list))
 !  end do

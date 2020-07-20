@@ -152,7 +152,7 @@ contains
     ! maximal number of available ads. sites
     max_avail_ads_sites = 1
     do i=1,c_pars%n_species
-    do m=1,n_max_site_types
+    do m=1,n_max_lat_site_types
       i1 = size(lat%avail_ads_sites(i,m)%list)
       if (max_avail_ads_sites < i1) max_avail_ads_sites = i1
     end do
@@ -350,11 +350,11 @@ contains
 
                 dissociation_counter = dissociation_counter + 1
 
-                i1 = get_index(words(1),    site_names)
+                i1 = get_index(words(1),lat_site_names)
                 i2 = get_index(words(2),ads_site_names)
-                i3 = get_index(words(3),    site_names)
+                i3 = get_index(words(3),lat_site_names)
                 i4 = get_index(words(4),ads_site_names)
-                i5 = get_index(words(5),    site_names)
+                i5 = get_index(words(5),lat_site_names)
                 i6 = get_index(words(6),ads_site_names)
 
                 if ( i1==0 .or. i2==0 .or. i3==0 .or. i4==0 .or. i5==0 .or. i6==0) &
@@ -426,9 +426,9 @@ contains
 !                 print*, 'reaction: ', reaction_names(parse_state),&
 !                        ' for species:', current_reactant_name, current_product1_name, current_product2_name
 !                 print*, 'law: ', law_names(current_law_id),&
-!                        ' from:', site_names(i1),ads_site_names(i2),&
-!                        ' to:'  , site_names(i3),ads_site_names(i4),&
-!                        ' and '  , site_names(i5),ads_site_names(i6)
+!                        ' from:', lat_site_names(i1),ads_site_names(i2),&
+!                        ' to:'  , lat_site_names(i3),ads_site_names(i4),&
+!                        ' and '  , lat_site_names(i5),ads_site_names(i6)
 !                print'(A,3f16.3)', 'with pars: ', pars
 !                stop 112
 
@@ -468,7 +468,7 @@ contains
       stop 995
 
     else
-      write(*, '(A)') ' Dissociation: passed check that energies are defined for all rates'
+      write(*, '(A/)') ' Dissociation: passed check that energies are defined for all rates'
 
     end if
 
@@ -555,8 +555,8 @@ contains
                 this%rate_info(ads)%list(n_channels)%rate  = this%channels(iprocs)%rate
 
 !if(debug(1))then
-!  lst_name    = site_names(lst)
-!  lst_p2_name = site_names(lst_2)
+!  lst_name    = lat_site_names(lst)
+!  lst_p2_name = lat_site_names(lst_2)
 !  ast_r_name  = ads_site_names(lat%avail_ads_sites(id_r , lst  )%list(ast))
 !  ast_p1_name = ads_site_names(lat%avail_ads_sites(id_p1, lst  )%list(i_ast_p1))
 !  ast_p2_name = ads_site_names(lat%avail_ads_sites(id_p2, lst_2)%list(i_ast_p2))
@@ -605,9 +605,9 @@ contains
       product2_name = c_pars%ads_names(this%channels(i)%p2)
       write(*,'(1x,A,A,A,2X,A,A,2X,A,A,e12.3)')  &
               trim(reactant_name)// ' -> '// trim(product1_name)// ' + '// trim(product2_name)//': ',&
-              site_names(this%channels(i)%r_lst),  ads_site_names(this%channels(i)%r_ast), &
-              site_names(this%channels(i)%p1_lst), ads_site_names(this%channels(i)%p1_ast), &
-              site_names(this%channels(i)%p2_lst), ads_site_names(this%channels(i)%p2_ast), &
+              lat_site_names(this%channels(i)%r_lst),  ads_site_names(this%channels(i)%r_ast), &
+              lat_site_names(this%channels(i)%p1_lst), ads_site_names(this%channels(i)%p1_ast), &
+              lat_site_names(this%channels(i)%p2_lst), ads_site_names(this%channels(i)%p2_ast), &
               this%channels(i)%rate
     end do
     print*

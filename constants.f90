@@ -20,10 +20,10 @@ module constants
   !-------- Site type info ---------!
 
   ! Number of site types
-  integer, parameter :: n_max_site_types = 3
+  integer, parameter :: n_max_lat_site_types = 3
   ! List of site types
-  character(len=10), dimension(n_max_site_types), parameter :: &
-            site_names = [character(10)::'terrace','step','corner']
+  character(len=10), dimension(n_max_lat_site_types), parameter :: &
+            lat_site_names = [character(10)::'terrace','step','corner']
   ! Site type ids
   integer, parameter :: terrace_site = 1
   integer, parameter :: step_site    = 2

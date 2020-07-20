@@ -60,10 +60,8 @@ contains
     reaction_init%desorption   =   desorption_init(c_pars, lat, e_pars)
     reaction_init%dissociation = dissociation_init(c_pars, lat, e_pars)
     reaction_init%association  =  association_init(c_pars, lat, e_pars)
-!    call reaction_init%hopping%print(c_pars)
-!    call reaction_init%desorption%print(c_pars)
-!    call reaction_init%dissociation%print(c_pars)
-
+    call reaction_init%association%print(c_pars)
+    stop 113
     reaction_init%beta = 1.0_dp/(kB*c_pars%temperature)
     reaction_init%n_ads_total = lat%n_ads_tot()
 
@@ -140,8 +138,8 @@ do ads = 1, this%n_ads_total
 
     m      = this%dissociation%rate_info(ads)%list(chan)%m
 
-    lst_name    = site_names(r_lst)
-    lst_p2_name = site_names(p2_lst)
+    lst_name    = lat_site_names(r_lst)
+    lst_p2_name = lat_site_names(p2_lst)
     ast_r_name  = ads_site_names(r_ast)
     ast_p1_name = ads_site_names(p1_ast)
     ast_p2_name = ads_site_names(p2_ast)
