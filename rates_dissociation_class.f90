@@ -603,7 +603,7 @@ contains
       reactant_name = c_pars%ads_names(this%channels(i)%r )
       product1_name = c_pars%ads_names(this%channels(i)%p1)
       product2_name = c_pars%ads_names(this%channels(i)%p2)
-      write(*,'(1x,A,A,A,2X,A,A,2X,A,A,e12.3)')  &
+      write(*,'(1x,A,A,A,2X,A,A,2X,A,A,1pe11.2)')  &
               trim(reactant_name)// ' -> '// trim(product1_name)// ' + '// trim(product2_name)//': ',&
               lat_site_names(this%channels(i)%r_lst),  ads_site_names(this%channels(i)%r_ast), &
               lat_site_names(this%channels(i)%p1_lst), ads_site_names(this%channels(i)%p1_ast), &

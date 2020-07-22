@@ -6,6 +6,13 @@ module rates_association_class
   !  * controlled by the association keyword section of the .reaction file
   !  * p1 is assumed to be at the same lattice site as r1 with its adsorption
   !    site type (ast) choosen from those specified in the .reaction file
+  !  * if there exists information that p1 is exclusively formed at one of the
+  !    reactant sites, this reactant should be listed as r1; if there are two different
+  !    rates, they should be listed separately in the input file
+  !  * the symmetric case (like O+O -> O2) is tricky.  THINK MORE ABOUT THIS
+  !  *
+  !  * THINK AND THEN ACT, NOT OTHER WAY AROUND
+  !  *
   !---------------------------------------------------------------------------
 
   use constants
@@ -24,7 +31,7 @@ module rates_association_class
 
   type rate_info
     integer(1) :: proc
-!    integer(1) :: m
+    integer    :: ads_r2
     real(dp)   :: rate
   end type
 
@@ -134,6 +141,7 @@ contains
     integer :: association_counter = 0
 
     logical :: duplicate_error = .false.
+    logical ::      r1p1_error = .false.
 
     ! maximal number of available ads. sites
     max_avail_ads_sites = 1
@@ -150,9 +158,9 @@ contains
     allocate( association_init%rate_info(lat%n_rows*lat%n_cols) )
 
     do i=1,lat%n_rows*lat%n_cols
-      allocate( association_init%rate_info(i)%list( max_avail_ads_sites * &
+      allocate( association_init%rate_info(i)%list( lat%n_nn(1) * &
                                                      max_avail_ads_sites  ) )
-      association_init%rate_info(i)%list = rate_info( default_int, default_rate )
+      association_init%rate_info(i)%list = rate_info( default_int,  default_int, default_rate )
     end do
 
     !  read rate definitions from the input file
@@ -353,22 +361,12 @@ contains
                       duplicate_error = .true.
                   end if
                 end do
-                do i=1,association_counter-1
-                  if ( association_init%channels(i)%r1     == r1_id  .and. &
-                       association_init%channels(i)%r1_lst == lst(2) .and. &
-                       association_init%channels(i)%r1_ast == ast(2) .and. &
-                       association_init%channels(i)%r2     == r2_id  .and. &
-                       association_init%channels(i)%r2_lst == lst(1) .and. &
-                       association_init%channels(i)%r2_ast == ast(1) .and. &
-                       association_init%channels(i)%p1     == p1_id  .and. &
-                       association_init%channels(i)%p1_lst == lst(3) .and. &
-                       association_init%channels(i)%p1_ast == ast(3)       ) then
-                    call error_message(file_name, line_number, buffer, &
-                                       "symmetry duplicate", stop = .false.)
-                      duplicate_error = .true.
-                  end if
-                end do
-                if (duplicate_error) stop 992
+
+                if ( lst(1) /= lst(3) ) then
+                  call error_message(file_name, line_number, buffer, &
+                      "r1 and p1 lattice site type have to be the same", stop = .false.)
+                  r1p1_error = .true.
+                end if
 
                 ! check energy is defined for reactant's and for products' lat_site_type and ads_site
                 if( e_pars%ads_energy(r1_id, lst(1), ast(1)) == e_pars%undefined_energy .or. &
@@ -453,6 +451,9 @@ contains
 
     close(inp_unit)
 
+    if (duplicate_error) stop 992
+    if (     r1p1_error) stop 991
+
     if (undefined_energy) then
       write(*, '(A)') ' Association: error, rates defined for sites with undefined energies'
       stop 995
@@ -475,101 +476,101 @@ contains
     class(energy_parameters), intent(in) :: e_pars
     real(dp), intent(in) :: beta
 
-    integer :: id_r, id_p1, id_p2, m, iprocs, i_ast_p1, i_ast_p2
-    integer :: row, col, lst, ast
-    integer :: row_2, col_2, lst_2, ast_2
-    integer :: n_channels
-    integer :: i
-    character(8) :: lst_name, lst_p2_name, ast_r_name, ast_p1_name, ast_p2_name
+    integer :: m, iprocs, i_ast_p1, i_ast_p2
+    integer :: id_r1, row_r1, col_r1, lst_r1, ast_r1
+    integer :: id_r2, row_r2, col_r2, lst_r2, ast_r2, ads_r2
+    integer :: id_p1, row_p1, col_p1, lst_p1, ast_p1
+    integer :: channel
+    character(8) :: lst_r1_name, lst_r2_name, lst_p1_name, ast_r1_name, ast_r2_name, ast_p1_name
 
-!debug(1) = (ads == 10)
-!debug(1) = .false.
+debug(1) = (ads == 1)
 
 ! debug printout header
-!if (debug(1)) then
-!  print *
-!  print '(a)'    ,' Debug printout from rates_association _class subroutine construct'
-!  print '(a,i0)' ,' Print of rates as they are calculated.  ads =', ads
-!  print '(a)'    ,' --------------------------------------------------------------------'
-!  print '(a)'    ,'  ads# proc#  m  rate       lst      ast_r   ast_p1   lst_p2   ast_p2'
-!  print '(a)'    ,' --------------------------------------------------------------------'
-!
-!end if
+if (debug(1)) then
+  print *
+  print '(a)'    ,' Debug printout from rates_association_class subroutine construct'
+  print '(a,i0)' ,' Print of rates as they are calculated.  ads =', ads
+  print '(a)'    ,' --------------------------------------------------------------------------------------'
+  print '(a)'    ,'  ads# proc#  ads_r2#  rate       lst_r1     ast_r1   lst_r2   ast_r2   lst_p1   ast_p1'
+  print '(a)'    ,' --------------------------------------------------------------------------------------'
 
-    ! Get the reactant information
-!    row  = lat%ads_list(ads)%row
-!    col  = lat%ads_list(ads)%col
-!    lst  = lat%lst(row,col)
-!    ast  = lat%ads_list(ads)%ast
-!    id_r = lat%ads_list(ads)%id
-!
-!    ! Loop over possible positions for product 2
-!    n_channels=0
-!    do m=1,lat%n_nn(1)
-!
-!      ! Get position and site type of neighbour m
-!      call lat%neighbor(ads, m, row_2, col_2)
-!
-!      ! Check if the cell is free
-!      if (lat%occupations(row_2, col_2) == 0) then
-!
-!        ! Get the lattice site type for product 2
-!        lst_2 = lat%lst(row_2, col_2)
-!
-!        do iprocs=1, this%n_processes
-!
-!          if ( this%channels(iprocs)%r     == id_r .and. &
-!               this%channels(iprocs)%r_lst == lst  .and. &
-!               this%channels(iprocs)%r_ast == ast  .and. &
-!               this%channels(iprocs)%p2_lst== lst_2       ) &
-!          then
-!            id_p1   = this%channels(iprocs)%p1
-!            id_p2   = this%channels(iprocs)%p2
-!
-!            ! Determine all the values of the adsorption sites for products p1 and p2
-!            ! that match an entry in the process structure.
-!            ! If the rate for this entry is >0, add channel to the list
-!            do i_ast_p1=1, size(lat%avail_ads_sites(id_p1, lst  )%list)
-!            do i_ast_p2=1, size(lat%avail_ads_sites(id_p2, lst_2)%list)
-!              if ( this%channels(iprocs)%p1_ast == lat%avail_ads_sites(id_p1, lst  )%list(i_ast_p1) .and. &
-!                   this%channels(iprocs)%p2_ast == lat%avail_ads_sites(id_p2, lst_2)%list(i_ast_p2) .and. &
-!                   this%channels(iprocs)%rate > 0 )                                                        &
-!              then
-!                n_channels=n_channels + 1
-!                this%rate_info(ads)%list(n_channels)%proc  = iprocs
-!                this%rate_info(ads)%list(n_channels)%m     = m
-!                ! WARNING: Decide later if we need the rate field
-!                this%rate_info(ads)%list(n_channels)%rate  = this%channels(iprocs)%rate
-!
-!!if(debug(1))then
-!!  lst_name    = lat_site_names(lst)
-!!  lst_p2_name = lat_site_names(lst_2)
-!!  ast_r_name  = ads_site_names(lat%avail_ads_sites(id_r , lst  )%list(ast))
-!!  ast_p1_name = ads_site_names(lat%avail_ads_sites(id_p1, lst  )%list(i_ast_p1))
-!!  ast_p2_name = ads_site_names(lat%avail_ads_sites(id_p2, lst_2)%list(i_ast_p2))
-!!
-!!  !  ads# chan#  m  rate       lst      ast_r   ast_p1   lst_p2   ast_p2
-!!  !   1    1     1__2.00e+00   terrace  top     fcc      terrace  fcc
-!!  !0        1         2         3         4        5        6         7
-!!  !1234567890123456789012345678901234567890123456890124567890123456789012345
-!!  print '(t4,i0, t9,i0, t15,i0, t16,1pe10.2, t29,A7, 2x,A3, t46,A3, t55,A7, 2x,A3)', &
-!!        ads, iprocs, m, this%channels(iprocs)%rate, lst_name, ast_r_name, ast_p1_name, lst_p2_name, ast_p2_name
-!!end if
-!
-!              end if
-!            end do
-!            end do
-!
-!            ! save the number of channels in the rate_info structure
-!            this%rate_info(ads)%n_channels = n_channels
-!
-!          end if
-!
-!        end do
-!
-!      end if ! occupations
-!
-!    end do ! m
+end if
+
+    ! Consider ads as reactant 1
+    row_r1 = lat%ads_list(ads)%row
+    col_r1 = lat%ads_list(ads)%col
+    lst_r1 = lat%lst(row_r1,col_r1)
+    ast_r1 = lat%ads_list(ads)%ast
+    id_r1  = lat%ads_list(ads)%id
+
+    ! Loop over possible positions for reactant 2
+    channel = 0
+    do m=1,lat%n_nn(1)
+
+      ! Get position and site type of neighbour m
+      call lat%neighbor(ads, m, row_r2, col_r2)
+
+      ! Check if the cell is occupied
+      ads_r2 = lat%occupations(row_r2, col_r2)
+      if (ads_r2/=0) then
+
+        ! Consider neighbour m as a possible reactant 2
+        lst_r2 = lat%lst(row_r2,col_r2)
+        ast_r2 = lat%ads_list(ads_r2)%ast
+        id_r2  = lat%ads_list(ads_r2)%id
+
+        do iprocs=1, this%n_processes
+
+          if ( this%channels(iprocs)%r1     == id_r1  .and. &
+               this%channels(iprocs)%r2     == id_r2  .and. &
+               this%channels(iprocs)%r1_lst == lst_r1 .and. &
+               this%channels(iprocs)%r2_lst == lst_r2 .and. &
+               this%channels(iprocs)%r1_ast == ast_r1 .and. &
+               this%channels(iprocs)%r2_ast == ast_r2     ) &
+          then
+
+            channel = channel + 1
+
+            ! Get the information on product 1
+            id_p1  = this%channels(iprocs)%p1
+            lst_p1 = this%channels(iprocs)%p1_lst
+            ast_p1 = this%channels(iprocs)%p1_ast
+
+            this%rate_info(ads)%list(channel)%proc  = iprocs
+            this%rate_info(ads)%list(channel)%ads_r2 = ads_r2
+            ! WARNING: Decide later if we need the rate field
+            this%rate_info(ads)%list(channel)%rate  = this%channels(iprocs)%rate
+
+if(debug(1))then
+  lst_r1_name = lat_site_names(lst_r1)
+  lst_r2_name = lat_site_names(lst_r2)
+  ast_r1_name = ads_site_names(lat%avail_ads_sites(id_r1, lst_r1 )%list(ast_r1))
+  ast_r2_name = ads_site_names(lat%avail_ads_sites(id_r2, lst_r2 )%list(ast_r2))
+  ast_p1_name = ads_site_names(lat%avail_ads_sites(id_p1, lst_p1 )%list(ast_p1))
+
+  !  ads# chan#  ads_r2#  rate       lst      ast_r   ast_p1   lst_p2   ast_p2
+  !   1    1     1__2.00e+00   terrace  top     fcc      terrace  fcc
+  !0        1         2         3         4        5        6         7
+  !1234567890123456789012345678901234567890123456890124567890123456789012345
+  print '(t4,i0, t9,i0, t15,i0, t16,1pe10.2, t29,A7, 2x,A3, t29,A7, t46,A3, t55,A7, 2x,A3)', &
+        ads, iprocs, ads_r2, this%channels(iprocs)%rate, lst_r1_name, ast_r1_name, lst_r2_name, ast_r2_name, lst_p1_name, ast_p1_name
+end if
+
+            ! save the number of channels in the rate_info structure
+            this%rate_info(ads)%n_channels = channel
+
+          end if
+
+        end do ! iprocs
+
+      end if ! occupations
+
+print*,m, ads_r2, channel
+pause
+
+WE ARE HERE
+
+    end do ! m
 
  end subroutine construct
 
@@ -590,7 +591,7 @@ contains
       r1_name = c_pars%ads_names(this%channels(i)%r1 )
       r2_name = c_pars%ads_names(this%channels(i)%r2)
       p1_name = c_pars%ads_names(this%channels(i)%p1)
-      write(*,'(1x,A,A,A,2X,A,A,2X,A,A,e12.3)')  &
+      write(*,'(1x,A,A,A,2X,A,A,2X,A,A,1pe11.2)')  &
               trim(r1_name)// ' + '// trim(r2_name)// ' -> '// trim(p1_name)//': ',&
               lat_site_names(this%channels(i)%r1_lst), ads_site_names(this%channels(i)%r1_ast), &
               lat_site_names(this%channels(i)%r2_lst), ads_site_names(this%channels(i)%r2_ast), &

@@ -332,7 +332,7 @@ contains
         if (this%process(i,i1,i2)< 0.0_dp) then
           cycle
         else
-          write(*,'(A,A,e12.3)') &
+          write(*,'(A,A,1pe11.2)') &
               lat_site_names(i1), ads_site_names(i2), this%process(i,i1,i2)
         end if
       end do

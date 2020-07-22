@@ -458,7 +458,7 @@ contains
         if (this%process(i,i1,i2,i3,i4)< 0.0_dp) then
           cycle
         else
-          write(*,'(1x,A,A,2X,A,A,6e12.3)') &
+          write(*,'(1x,A,A,2X,A,A,6(1pe11.2))') &
               lat_site_names(i1), ads_site_names(i2), &
               lat_site_names(i3), ads_site_names(i4), &
               this%process(i,i1,i2,i3,i4)

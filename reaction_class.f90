@@ -61,7 +61,7 @@ contains
     reaction_init%dissociation = dissociation_init(c_pars, lat, e_pars)
     reaction_init%association  =  association_init(c_pars, lat, e_pars)
     call reaction_init%association%print(c_pars)
-    stop 113
+
     reaction_init%beta = 1.0_dp/(kB*c_pars%temperature)
     reaction_init%n_ads_total = lat%n_ads_tot()
 
@@ -104,6 +104,15 @@ contains
 
       do ads = 1, this%n_ads_total
         call this%dissociation%construct(ads, lat, e_pars, this%beta)
+      end do
+
+    end if
+
+    ! Association
+    if (this%association%is_defined) then
+
+      do ads = 1, this%n_ads_total
+        call this%association%construct(ads, lat, e_pars, this%beta)
       end do
 
     end if
