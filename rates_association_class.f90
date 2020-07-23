@@ -31,6 +31,7 @@ module rates_association_class
 
   type rate_info
     integer(1) :: proc
+    integer(1) :: m
     integer    :: ads_r2
     real(dp)   :: rate
   end type
@@ -86,7 +87,7 @@ module rates_association_class
 
 
     ! List of additional nn directions to scan after association
-!    integer, dimension(:,:), allocatable :: nn_new
+    integer, dimension(:,:), allocatable :: nn_new
 
     ! Number of association channels
     integer :: n_processes
@@ -143,6 +144,16 @@ contains
     logical :: duplicate_error = .false.
     logical ::      r1p1_error = .false.
 
+    n_nn  = lat%n_nn(1)
+    n_nn2 = n_nn/2
+    ! List of additional nn directions to scan after dissociation
+    allocate(association_init%nn_new(n_nn,n_nn2))
+    do m=1,n_nn
+    do i=1,n_nn2
+      association_init%nn_new(m,i) = modulo( m+i-n_nn2, n_nn ) + 1
+    end do
+    end do
+
     ! maximal number of available ads. sites
     max_avail_ads_sites = 1
     do i=1,c_pars%n_species
@@ -160,7 +171,7 @@ contains
     do i=1,lat%n_rows*lat%n_cols
       allocate( association_init%rate_info(i)%list( lat%n_nn(1) * &
                                                      max_avail_ads_sites  ) )
-      association_init%rate_info(i)%list = rate_info( default_int,  default_int, default_rate )
+      association_init%rate_info(i)%list = rate_info( default_int,  default_int,  default_int, default_rate )
     end do
 
     !  read rate definitions from the input file
@@ -481,20 +492,6 @@ contains
     integer :: id_r2, row_r2, col_r2, lst_r2, ast_r2, ads_r2
     integer :: id_p1, row_p1, col_p1, lst_p1, ast_p1
     integer :: channel
-    character(8) :: lst_r1_name, lst_r2_name, lst_p1_name, ast_r1_name, ast_r2_name, ast_p1_name
-
-debug(1) = (ads == 1)
-
-! debug printout header
-if (debug(1)) then
-  print *
-  print '(a)'    ,' Debug printout from rates_association_class subroutine construct'
-  print '(a,i0)' ,' Print of rates as they are calculated.  ads =', ads
-  print '(a)'    ,' --------------------------------------------------------------------------------------'
-  print '(a)'    ,'  ads# proc#  ads_r2#  rate       lst_r1     ast_r1   lst_r2   ast_r2   lst_p1   ast_p1'
-  print '(a)'    ,' --------------------------------------------------------------------------------------'
-
-end if
 
     ! Consider ads as reactant 1
     row_r1 = lat%ads_list(ads)%row
@@ -512,6 +509,7 @@ end if
 
       ! Check if the cell is occupied
       ads_r2 = lat%occupations(row_r2, col_r2)
+
       if (ads_r2/=0) then
 
         ! Consider neighbour m as a possible reactant 2
@@ -536,26 +534,11 @@ end if
             lst_p1 = this%channels(iprocs)%p1_lst
             ast_p1 = this%channels(iprocs)%p1_ast
 
-            this%rate_info(ads)%list(channel)%proc  = iprocs
+            this%rate_info(ads)%list(channel)%proc   = iprocs
+            this%rate_info(ads)%list(channel)%m      = m
             this%rate_info(ads)%list(channel)%ads_r2 = ads_r2
             ! WARNING: Decide later if we need the rate field
             this%rate_info(ads)%list(channel)%rate  = this%channels(iprocs)%rate
-
-if(debug(1))then
-  lst_r1_name = lat_site_names(lst_r1)
-  lst_r2_name = lat_site_names(lst_r2)
-  ast_r1_name = ads_site_names(lat%avail_ads_sites(id_r1, lst_r1 )%list(ast_r1))
-  ast_r2_name = ads_site_names(lat%avail_ads_sites(id_r2, lst_r2 )%list(ast_r2))
-  ast_p1_name = ads_site_names(lat%avail_ads_sites(id_p1, lst_p1 )%list(ast_p1))
-
-  !  ads# chan#  ads_r2#  rate       lst      ast_r   ast_p1   lst_p2   ast_p2
-  !   1    1     1__2.00e+00   terrace  top     fcc      terrace  fcc
-  !0        1         2         3         4        5        6         7
-  !1234567890123456789012345678901234567890123456890124567890123456789012345
-  print '(t4,i0, t9,i0, t15,i0, t16,1pe10.2, t29,A7, 2x,A3, t29,A7, t46,A3, t55,A7, 2x,A3)', &
-        ads, iprocs, ads_r2, this%channels(iprocs)%rate, lst_r1_name, ast_r1_name, lst_r2_name, ast_r2_name, lst_p1_name, ast_p1_name
-end if
-
             ! save the number of channels in the rate_info structure
             this%rate_info(ads)%n_channels = channel
 
@@ -564,11 +547,6 @@ end if
         end do ! iprocs
 
       end if ! occupations
-
-print*,m, ads_r2, channel
-pause
-
-WE ARE HERE
 
     end do ! m
 

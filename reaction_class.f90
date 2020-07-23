@@ -81,9 +81,11 @@ contains
     integer       :: ads, chan, proc
     integer       :: r_id, r_lst, r_ast
     integer       :: p1_id, p1_lst, p1_ast, p2_id, p2_lst, p2_ast
+    integer       :: r1_id, r1_lst, r1_ast, r2_id, r2_lst, r2_ast
     real(dp)      :: rate
     integer       :: m
-    character(8)  :: lst_name, lst_p2_name, ast_r_name, ast_p1_name, ast_p2_name
+    character(8)  :: lst_name, lst_p2_name, ast_r_name, lst_p1_name, ast_p1_name, ast_p2_name
+    character(8)  :: lst_r1_name, lst_r2_name, ast_r1_name, ast_r2_name
 
     ! Hopping
     if (this%hopping%is_defined) then
@@ -117,48 +119,90 @@ contains
 
     end if
 
-! Debugging printout desorption
-print*
-call lat%print_ocs
-print *
-print '(a)' ,' Dissociation channels from reaction class'
-print '(a)' ,' --------------------------------------------------------------------'
-print '(a)', '  ads# proc#  m  rate       lst      ast_r   ast_p1   lst_p2   ast_p2'
-print '(a)' ,' --------------------------------------------------------------------'
-
-do ads = 1, this%n_ads_total
-  do chan= 1, this%dissociation%rate_info(ads)%n_channels
-
-    i = this%dissociation%rate_info(ads)%list(chan)%proc
-
-    r_id  = this%dissociation%channels(i)%r
-    r_ast = this%dissociation%channels(i)%r_ast
-    r_lst = this%dissociation%channels(i)%r_lst
-
-    p1_id  = this%dissociation%channels(i)%p1
-    p1_ast = this%dissociation%channels(i)%p1_ast
-    p1_lst = this%dissociation%channels(i)%p1_lst
-
-    p2_id  = this%dissociation%channels(i)%p2
-    p2_ast = this%dissociation%channels(i)%p2_ast
-    p2_lst = this%dissociation%channels(i)%p2_lst
-
-    rate   = this%dissociation%channels(i)%rate
-
-    m      = this%dissociation%rate_info(ads)%list(chan)%m
-
-    lst_name    = lat_site_names(r_lst)
-    lst_p2_name = lat_site_names(p2_lst)
-    ast_r_name  = ads_site_names(r_ast)
-    ast_p1_name = ads_site_names(p1_ast)
-    ast_p2_name = ads_site_names(p2_ast)
-
-    print '(t4,i0, t9,i0, t15,i0, t16,1pe10.2, t29,A7, 2x,A3, t46,A3, t55,A7, 2x,A3)', &
-            ads, i, m, rate, lst_name, ast_r_name, ast_p1_name, lst_p2_name, ast_p2_name
-
-  end do
-  print*
-end do
+!! Debugging printout dissociation
+!print*
+!call lat%print_ocs
+!print *
+!print '(a)' ,' Dissociation channels from reaction class'
+!print '(a)' ,' --------------------------------------------------------------------'
+!print '(a)', '  ads# proc#  m  rate       lst      ast_r   ast_p1   lst_p2   ast_p2'
+!print '(a)' ,' --------------------------------------------------------------------'
+!
+!do ads = 1, this%n_ads_total
+!  do chan= 1, this%dissociation%rate_info(ads)%n_channels
+!
+!    i = this%dissociation%rate_info(ads)%list(chan)%proc
+!
+!    r_id  = this%dissociation%channels(i)%r
+!    r_ast = this%dissociation%channels(i)%r_ast
+!    r_lst = this%dissociation%channels(i)%r_lst
+!
+!    p1_id  = this%dissociation%channels(i)%p1
+!    p1_ast = this%dissociation%channels(i)%p1_ast
+!    p1_lst = this%dissociation%channels(i)%p1_lst
+!
+!    p2_id  = this%dissociation%channels(i)%p2
+!    p2_ast = this%dissociation%channels(i)%p2_ast
+!    p2_lst = this%dissociation%channels(i)%p2_lst
+!
+!    rate   = this%dissociation%channels(i)%rate
+!
+!    m      = this%dissociation%rate_info(ads)%list(chan)%m
+!
+!    lst_name    = lat_site_names(r_lst)
+!    lst_p2_name = lat_site_names(p2_lst)
+!    ast_r_name  = ads_site_names(r_ast)
+!    ast_p1_name = ads_site_names(p1_ast)
+!    ast_p2_name = ads_site_names(p2_ast)
+!
+!    print '(t4,i0, t9,i0, t15,i0, t16,1pe10.2, t29,A7, 2x,A3, t46,A3, t55,A7, 2x,A3)', &
+!            ads, i, m, rate, lst_name, ast_r_name, ast_p1_name, lst_p2_name, ast_p2_name
+!
+!  end do
+!  if ( this%dissociation%rate_info(ads)%n_channels>0 ) print*
+!end do
+!
+!! Debugging printout association
+!print*
+!print '(a)' ,' Association channels from reaction class'
+!print '(a)'    ,' --------------------------------------------------------------------------------------'
+!print '(a)'    ,'  ads# proc#  ads_r2#  rate       lst_r1   ast_r1    lst_r2   ast_r2   lst_p1   ast_p1'
+!print '(a)'    ,' --------------------------------------------------------------------------------------'
+!
+!do ads = 1, this%n_ads_total
+!  do chan= 1, this%association%rate_info(ads)%n_channels
+!
+!    i = this%association%rate_info(ads)%list(chan)%proc
+!
+!    r1_id  = this%association%channels(i)%r1
+!    r1_ast = this%association%channels(i)%r1_ast
+!    r1_lst = this%association%channels(i)%r1_lst
+!
+!    r2_id  = this%association%channels(i)%r2
+!    r2_ast = this%association%channels(i)%r2_ast
+!    r2_lst = this%association%channels(i)%r2_lst
+!
+!    p1_id  = this%association%channels(i)%p1
+!    p1_ast = this%association%channels(i)%p1_ast
+!    p1_lst = this%association%channels(i)%p1_lst
+!
+!    rate   = this%association%channels(i)%rate
+!
+!    m      = this%association%rate_info(ads)%list(chan)%ads_r2
+!
+!    lst_r1_name = lat_site_names(r1_lst)
+!    lst_r2_name = lat_site_names(r2_lst)
+!    lst_p1_name = lat_site_names(p1_lst)
+!    ast_r1_name = ads_site_names(r1_ast)
+!    ast_r2_name = ads_site_names(r2_ast)
+!    ast_p1_name = ads_site_names(p1_ast)
+!
+!  print '(t4,i0, t9,i0, t15,i0, t20,1pe10.2, t35,A7, 2x,A3, t54,A7, 2x, A3, t72,A7, 2x,A3)', &
+!        ads, i, m, rate, lst_r1_name, ast_r1_name, lst_r2_name, ast_r2_name, lst_p1_name, ast_p1_name
+!
+!  end do
+!  if ( this%dissociation%rate_info(ads)%n_channels>0 ) print*
+!end do
 
   end subroutine construct
 
@@ -194,14 +238,14 @@ end do
       end do
       end do
     end if
-    ! accumulate rate for desorption (= rate for desorption reactions + hopping reactions)
+    ! accumulate rate for desorption (= rate for desorption + hopping)
     acc_rate(desorption_id) = acc_rate(hopping_id)
     if (this%desorption%is_defined) then
       do ads=1,this%n_ads_total
         acc_rate(desorption_id) = acc_rate(desorption_id) + this%desorption%rates(ads)
       end do
     end if
-
+    ! accumulate rate for dissociation (= rate for dissociation + desorption + hopping)
     acc_rate(dissociation_id) = acc_rate(desorption_id)
     if (this%dissociation%is_defined) then
       do ads=1,this%n_ads_total
@@ -211,6 +255,23 @@ end do
       end do
       end do
     end if
+    ! accumulate rate for association (= rate for association + dissociation + desorption + hopping)
+    acc_rate(association_id) = acc_rate(dissociation_id)
+    if (this%association%is_defined) then
+      do ads=1,this%n_ads_total
+      do channel = 1, this%association%rate_info(ads)%n_channels
+        acc_rate(association_id) = acc_rate(association_id) &
+                                  + this%association%rate_info(ads)%list(channel)%rate
+      end do
+      end do
+    end if
+
+    ! Debug printing of total rates
+    print*
+    print'(3A,1pe12.2)','Total rate for ',reaction_names(1), ' is ', acc_rate(1)
+    do i=2, n_reaction_types
+      print'(3A,1pe12.2)','Total rate for ',reaction_names(i), ' is ', acc_rate(i)-acc_rate(i-1)
+    end do
 
     ! Save the total rate value
     this%total_rate = acc_rate(n_reaction_types)
@@ -391,6 +452,114 @@ end do
         do m=1,n_nn
           ! position of neighbor m
           call lat%neighbor(ads,m,row,col)
+          if (lat%occupations(row,col) > 0) then
+            i_change = i_change + 1
+            change_list(i_change) = lat%occupations(row,col)
+          end if
+        end do
+
+        ! Dissociate:
+        ! Find process number
+        proc = this%dissociation%rate_info(ads)%list(channel)%proc
+        ! Get reactant and products info
+        id_r   = lat%ads_list(ads)%id
+        id_p1  = this%dissociation%channels(proc)%p1
+        ast_p1 = this%dissociation%channels(proc)%p1_ast
+        id_p2  = this%dissociation%channels(proc)%p2
+        ast_p2 = this%dissociation%channels(proc)%p2_ast
+        ! Replace reactant with product1 preserving its number
+        lat%ads_list(ads)%id  = id_p1
+        lat%ads_list(ads)%ast = ast_p1
+        lat%n_ads(id_r)  = lat%n_ads(id_r)  - 1
+        lat%n_ads(id_p1) = lat%n_ads(id_p1) + 1
+        ! direction for dissociation
+        m_nn = this%dissociation%rate_info(ads)%list(channel)%m
+        ! position for product 2
+        call lat%neighbor(ads, m_nn ,row_p2,col_p2)
+        ! Add product 2
+        ! increase the total number of adsorbates
+        this%n_ads_total = this%n_ads_total  + 1
+        ! update occupations
+        lat%occupations(row_p2,col_p2) = this%n_ads_total
+        ! update adsorbate list
+        lat%ads_list(this%n_ads_total)%id  =  id_p2
+        lat%ads_list(this%n_ads_total)%row = row_p2
+        lat%ads_list(this%n_ads_total)%col = col_p2
+        lat%ads_list(this%n_ads_total)%ast = ast_p2
+        lat%n_ads(id_p2) = lat%n_ads(id_p2) + 1
+
+        ! scan over neighbors of product 2
+        do m=1,n_nn2
+          ! position of neighbor with direction nn_new(m_nn,m)
+          call lat%neighbor( this%n_ads_total, this%dissociation%nn_new(m_nn,m), row, col)
+          if (lat%occupations(row,col) > 0) then
+            i_change = i_change + 1
+            change_list(i_change) = lat%occupations(row,col)
+          end if
+        end do
+        ! add product 2 to change_list
+        i_change = i_change + 1
+        change_list(i_change) = lat%occupations(row_p2,col_p2)
+
+!print*, 'After dissociation'
+!call lat%print_ocs
+!print*, 'Change list:'
+!print*, 'Number of adsorbates which feel dissociations:', i_change
+!print*, change_list
+!call lat%print_ads
+!pause
+
+        ! Reset the rate info for ads (product 1)
+        do m=1,n_nn
+          this%hopping%rates(ads,m)%list = 0.0_dp
+        end do
+        this%desorption%rates(ads) = 0.0_dp
+        this%dissociation%rate_info(ads)%list = rate_info(0,0,0.0_dp)
+        this%dissociation%rate_info(ads)%n_channels = 0
+        ! Update rate array for the affected adsorbates
+        do i=1,i_change
+          call      this%hopping%construct(change_list(i), lat, e_pars, this%beta)
+          call   this%desorption%construct(change_list(i), lat, e_pars, this%beta)
+          call this%dissociation%construct(change_list(i), lat, e_pars, this%beta)
+        end do
+
+      case(association_id)
+        !print*
+        !print*,'Starting association ...'
+
+        ! determine association channel (ads, channel)
+        temp_dp = acc_rate(dissociation_id)
+        extloop3: do ads=1,this%n_ads_total
+        do channel=1,this%association%rate_info(ads)%n_channels
+          temp_dp = temp_dp + this%association%rate_info(ads)%list(channel)%rate
+          if (u < temp_dp) exit extloop2
+        end do
+        end do extloop3
+
+        ! create a list of adsorbates affected by association
+        change_list = 0
+        i_change = 1
+        ! Put the reactant's (which is to become p1) ads  into the list
+        change_list(i_change) = ads
+WE ARE HERE
+        ! scan over neighbors of reactant 1
+        do m=1,n_nn
+          ! Exclude reactant 2
+          if ( m==this%association%rate_info(ads)%list(channel)%m ) cycle
+          ! position of neighbor m
+          call lat%neighbor(ads,m,row,col)
+          if (lat%occupations(row,col) > 0) then
+            i_change = i_change + 1
+            change_list(i_change) = lat%occupations(row,col)
+          end if
+        end do
+        ! scan over neighbors of reactant 2
+        do m=1,n_nn2
+          ! position of neighbor with direction nn_new(m_nn,m)
+          call lat%neighbor( this%n_ads_total, this%dissociation%nn_new(m_nn,m), row, col)
+          row = lat%ads_list( this%association%rate_info(ads)%list(channel)%ads_r2 )%row
+          col = lat%ads_list( this%association%rate_info(ads)%list(channel)%ads_r2 )%col
+
           if (lat%occupations(row,col) > 0) then
             i_change = i_change + 1
             change_list(i_change) = lat%occupations(row,col)
