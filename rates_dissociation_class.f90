@@ -21,10 +21,10 @@ module rates_dissociation_class
   implicit none
 
   private
-  public    :: dissociation_init, dissociation_type, rate_info
+  public    :: dissociation_init, dissociation_type, rate_info_dissociation
 
 
-  type rate_info
+  type rate_info_dissociation
     integer(1) :: proc
     integer(1) :: m
     real(dp)   :: rate
@@ -32,7 +32,7 @@ module rates_dissociation_class
 
 
   type :: v_list_rate_info
-    type(rate_info), dimension(:), allocatable :: list
+    type(rate_info_dissociation), dimension(:), allocatable :: list
     integer(1) :: n_channels
   end type
 
@@ -168,7 +168,7 @@ contains
       allocate( dissociation_init%rate_info(i)%list( max_avail_ads_sites * &
                                                      max_avail_ads_sites * &
                                                      lat%n_nn(1)) )
-      dissociation_init%rate_info(i)%list = rate_info( 0, 0, 0.0_dp )
+      dissociation_init%rate_info(i)%list = rate_info_dissociation( 0, 0, 0.0_dp )
     end do
 
     !  read rate definitions from the input file
@@ -573,9 +573,6 @@ contains
             end do
             end do
 
-            ! save the number of channels in the rate_info structure
-            this%rate_info(ads)%n_channels = n_channels
-
           end if
 
         end do
@@ -583,6 +580,9 @@ contains
       end if ! occupations
 
     end do ! m
+!!! Moved from line 575
+    ! save the number of channels in the rate_info structure
+    this%rate_info(ads)%n_channels = n_channels
 
  end subroutine construct
 

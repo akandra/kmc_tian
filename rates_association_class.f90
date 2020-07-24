@@ -26,19 +26,19 @@ module rates_association_class
   implicit none
 
   private
-  public    :: association_init, association_type
+  public    :: association_init, association_type, rate_info_association
 
 
-  type rate_info
+  type rate_info_association
     integer(1) :: proc
     integer(1) :: m
-    integer    :: ads_r2
+!!!    integer    :: ads_r2
     real(dp)   :: rate
   end type
 
 
   type :: v_list_rate_info
-    type(rate_info), dimension(:), allocatable :: list
+    type(rate_info_association), dimension(:), allocatable :: list
     integer(1) :: n_channels
   end type
 
@@ -144,6 +144,8 @@ contains
     logical :: duplicate_error = .false.
     logical ::      r1p1_error = .false.
 
+    integer :: n_nn, n_nn2
+
     n_nn  = lat%n_nn(1)
     n_nn2 = n_nn/2
     ! List of additional nn directions to scan after dissociation
@@ -171,7 +173,9 @@ contains
     do i=1,lat%n_rows*lat%n_cols
       allocate( association_init%rate_info(i)%list( lat%n_nn(1) * &
                                                      max_avail_ads_sites  ) )
-      association_init%rate_info(i)%list = rate_info( default_int,  default_int,  default_int, default_rate )
+      association_init%rate_info(i)%list = rate_info_association( default_int,  &
+!!!      default_int,
+                                                        default_int, default_rate )
     end do
 
     !  read rate definitions from the input file
@@ -536,11 +540,9 @@ contains
 
             this%rate_info(ads)%list(channel)%proc   = iprocs
             this%rate_info(ads)%list(channel)%m      = m
-            this%rate_info(ads)%list(channel)%ads_r2 = ads_r2
+!!!            this%rate_info(ads)%list(channel)%ads_r2 = ads_r2
             ! WARNING: Decide later if we need the rate field
             this%rate_info(ads)%list(channel)%rate  = this%channels(iprocs)%rate
-            ! save the number of channels in the rate_info structure
-            this%rate_info(ads)%n_channels = channel
 
           end if
 
@@ -549,8 +551,11 @@ contains
       end if ! occupations
 
     end do ! m
+!!! Moved from line 346
+    ! save the number of channels in the rate_info structure
+    this%rate_info(ads)%n_channels = channel
 
- end subroutine construct
+end subroutine construct
 
 !------------------------------------------------------------------------------
   subroutine print(this, c_pars)
