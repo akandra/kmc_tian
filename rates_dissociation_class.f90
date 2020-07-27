@@ -580,7 +580,7 @@ contains
       end if ! occupations
 
     end do ! m
-!!! Moved from line 575
+
     ! save the number of channels in the rate_info structure
     this%rate_info(ads)%n_channels = n_channels
 

@@ -359,7 +359,6 @@ contains
 
     ! energy for particle ads in its old position
     energy_old = energy(ads, lat, e_pars)
-
     ! Save the old configuration
     row_old = lat%ads_list(ads)%row
     col_old = lat%ads_list(ads)%col

@@ -32,7 +32,6 @@ module rates_association_class
   type rate_info_association
     integer(1) :: proc
     integer(1) :: m
-!!!    integer    :: ads_r2
     real(dp)   :: rate
   end type
 
@@ -173,9 +172,7 @@ contains
     do i=1,lat%n_rows*lat%n_cols
       allocate( association_init%rate_info(i)%list( lat%n_nn(1) * &
                                                      max_avail_ads_sites  ) )
-      association_init%rate_info(i)%list = rate_info_association( default_int,  &
-!!!      default_int,
-                                                        default_int, default_rate )
+      association_init%rate_info(i)%list = rate_info_association( default_int, default_int, default_rate )
     end do
 
     !  read rate definitions from the input file
@@ -540,7 +537,6 @@ contains
 
             this%rate_info(ads)%list(channel)%proc   = iprocs
             this%rate_info(ads)%list(channel)%m      = m
-!!!            this%rate_info(ads)%list(channel)%ads_r2 = ads_r2
             ! WARNING: Decide later if we need the rate field
             this%rate_info(ads)%list(channel)%rate  = this%channels(iprocs)%rate
 
@@ -551,7 +547,7 @@ contains
       end if ! occupations
 
     end do ! m
-!!! Moved from line 346
+
     ! save the number of channels in the rate_info structure
     this%rate_info(ads)%n_channels = channel
 

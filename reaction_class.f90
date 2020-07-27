@@ -39,6 +39,8 @@ module reaction_class
 
   contains
     procedure :: construct
+    procedure :: construct_1
+    procedure :: cleanup_rates
     procedure :: do_reaction
 
   end type
@@ -86,6 +88,7 @@ contains
     integer       :: m
     character(8)  :: lst_name, lst_p2_name, ast_r_name, lst_p1_name, ast_p1_name, ast_p2_name
     character(8)  :: lst_r1_name, lst_r2_name, ast_r1_name, ast_r2_name
+
 
     ! Hopping
     if (this%hopping%is_defined) then
@@ -188,7 +191,7 @@ contains
 !
 !    rate   = this%association%channels(i)%rate
 !
-!!!    m      = this%association%rate_info(ads)%list(chan)%m
+!    m      = this%association%rate_info(ads)%list(chan)%m
 !
 !    lst_r1_name = lat_site_names(r1_lst)
 !    lst_r2_name = lat_site_names(r2_lst)
@@ -205,6 +208,45 @@ contains
 !end do
 
   end subroutine construct
+
+!-----------------------------------------------------------------------------
+  subroutine construct_1(this, ads, lat, e_pars)
+!-----------------------------------------------------------------------------
+    class(reaction_type),     intent(inout) :: this
+    integer,                  intent(in)    :: ads
+    class(mc_lat),            intent(inout) :: lat
+    class(energy_parameters), intent(in)    :: e_pars
+
+    ! Hopping
+    if (this%hopping%is_defined)      call this%hopping%construct(ads, lat, e_pars, this%beta)
+    ! Desorption
+    if (this%desorption%is_defined)   call this%desorption%construct(ads, lat, e_pars, this%beta)
+    ! Dissociation
+    if (this%dissociation%is_defined) call this%dissociation%construct(ads, lat, e_pars, this%beta)
+    ! Association
+    if (this%association%is_defined)  call this%association%construct(ads, lat, e_pars, this%beta)
+
+  end subroutine construct_1
+
+!-----------------------------------------------------------------------------
+  subroutine cleanup_rates(this, ads, lat)
+!-----------------------------------------------------------------------------
+    class(reaction_type),     intent(inout) :: this
+    integer,                  intent(in)    :: ads
+    class(mc_lat),            intent(inout) :: lat
+
+    integer :: m
+
+    do m=1,lat%n_nn(1)
+      this%hopping%rates(ads,m)%list = 0.0_dp
+    end do
+    this%desorption%rates(ads) = 0.0_dp
+    this%dissociation%rate_info(ads)%list = rate_info_dissociation(0,0,0.0_dp)
+    this%dissociation%rate_info(ads)%n_channels = 0
+    this%association%rate_info(ads)%list  = rate_info_association(0,0,0.0_dp)
+    this%association%rate_info(ads)%n_channels = 0
+
+  end subroutine cleanup_rates
 
 !-----------------------------------------------------------------------------
   subroutine do_reaction(this, rand, lat, e_pars)
@@ -357,21 +399,10 @@ call lat%print_ads
         end do
 
         ! Reset the rate info for ads
-        do m=1,n_nn
-          this%hopping%rates(ads,m)%list = 0.0_dp
-        end do
-        this%desorption%rates(ads) = 0.0_dp
-        this%dissociation%rate_info(ads)%list = rate_info_dissociation(0,0,0.0_dp)
-        this%dissociation%rate_info(ads)%n_channels = 0
-        this%association%rate_info(ads)%list  = rate_info_association(0,0,0.0_dp)
-        this%association%rate_info(ads)%n_channels = 0
-
+        call this%cleanup_rates(ads,lat)
         ! Update rate array for the affected adsorbates
         do i=1,i_change
-          call      this%hopping%construct(change_list(i), lat, e_pars, this%beta)
-          call   this%desorption%construct(change_list(i), lat, e_pars, this%beta)
-          call this%dissociation%construct(change_list(i), lat, e_pars, this%beta)
-          call  this%association%construct(change_list(i), lat, e_pars, this%beta)
+          call this%construct_1(change_list(i), lat, e_pars)
         end do
 
         ! Update reaction counter
@@ -426,22 +457,10 @@ call lat%print_ads
         do i=1,i_change
           ! account for the tightening the ads. list
           if (change_list(i) == this%n_ads_total) change_list(i) = ads
-          call      this%hopping%construct(change_list(i), lat, e_pars, this%beta)
-          call   this%desorption%construct(change_list(i), lat, e_pars, this%beta)
-          call this%dissociation%construct(change_list(i), lat, e_pars, this%beta)
-          call  this%association%construct(change_list(i), lat, e_pars, this%beta)
+          call this%construct_1(change_list(i), lat, e_pars)
         end do
-
         ! Reset the rate info for the last adsorbate
-        do m=1,n_nn
-          this%hopping%rates(this%n_ads_total,m)%list = 0.0_dp
-        end do
-        this%desorption%rates(this%n_ads_total) = 0.0_dp
-        this%dissociation%rate_info(this%n_ads_total)%list = rate_info_dissociation(0,0,0.0_dp)
-        this%dissociation%rate_info(this%n_ads_total)%n_channels = 0
-        this%association%rate_info(this%n_ads_total)%list  = rate_info_association(0,0,0.0_dp)
-        this%association%rate_info(this%n_ads_total)%n_channels  = 0
-
+        call this%cleanup_rates(this%n_ads_total,lat)
         ! Update the the number of adsorbates in this
         this%n_ads_total = this%n_ads_total - 1
 
@@ -518,20 +537,10 @@ call lat%print_ads
         change_list(i_change) = lat%occupations(row_p2,col_p2)
 
         ! Reset the rate info for ads (product 1)
-        do m=1,n_nn
-          this%hopping%rates(ads,m)%list = 0.0_dp
-        end do
-        this%desorption%rates(ads) = 0.0_dp
-        this%dissociation%rate_info(ads)%list = rate_info_dissociation(0,0,0.0_dp)
-        this%dissociation%rate_info(ads)%n_channels = 0
-        this%association%rate_info(ads)%list =  rate_info_association(0,0,0.0_dp)
-        this%association%rate_info(ads)%n_channels = 0
+        call this%cleanup_rates(ads, lat)
         ! Update rate array for the affected adsorbates
         do i=1,i_change
-          call      this%hopping%construct(change_list(i), lat, e_pars, this%beta)
-          call   this%desorption%construct(change_list(i), lat, e_pars, this%beta)
-          call this%dissociation%construct(change_list(i), lat, e_pars, this%beta)
-          call  this%association%construct(change_list(i), lat, e_pars, this%beta)
+          call this%construct_1(change_list(i), lat, e_pars)
         end do
 
         ! Update reaction counter
@@ -555,11 +564,9 @@ call lat%print_ads
 
         ! Get the direction to reactant 2
         m_nn   = this%association%rate_info(ads)%list(channel)%m
-!!!        ads_r2 = this%association%rate_info(ads)%list(channel)%ads_r2
         ! scan over neighbors of reactant 1
 
         do m=1,n_nn
-!!! the code in the do loop changed
             ! position of neighbor m
             call lat%neighbor(ads,m,row,col)
             if (lat%occupations(row,col) > 0) then
@@ -610,37 +617,15 @@ call lat%print_ads
           this%association%rate_info(ads_r2)  = this%association%rate_info(this%n_ads_total)
         end if
 
-        ! Reset the rate info for ads (product 1)
-        do m=1,n_nn
-          this%hopping%rates(ads,m)%list = 0.0_dp
-        end do
-        this%desorption%rates(ads) = 0.0_dp
-        this%dissociation%rate_info(ads)%list = rate_info_dissociation(0,0,0.0_dp)
-        this%dissociation%rate_info(ads)%n_channels = 0
-        this%association%rate_info(ads)%list =  rate_info_association(0,0,0.0_dp)
-        this%association%rate_info(ads)%n_channels = 0
-        ! Reset the rate info for the last adsorbate
-        do m=1,n_nn
-          this%hopping%rates(this%n_ads_total,m)%list = 0.0_dp
-        end do
-        this%desorption%rates(this%n_ads_total) = 0.0_dp
-        this%dissociation%rate_info(this%n_ads_total)%list = rate_info_dissociation(0,0,0.0_dp)
-        this%dissociation%rate_info(this%n_ads_total)%n_channels = 0
-        this%association%rate_info(this%n_ads_total)%list =  rate_info_association(0,0,0.0_dp)
-        this%association%rate_info(this%n_ads_total)%n_channels = 0
-
+        ! Reset the rate info for ads (product 1) and for the last adsorbate
+        call this%cleanup_rates(ads,lat)
+        call this%cleanup_rates(this%n_ads_total,lat)
         ! Update rate array for the affected adsorbates
         do i=1,i_change
           ! account for the tightening the ads. list
-WE ARE HERE - BUG FIXED
-!!! the next line is added - here was the bug
           if (change_list(i) == this%n_ads_total) change_list(i) = ads_r2
-          call      this%hopping%construct(change_list(i), lat, e_pars, this%beta)
-          call   this%desorption%construct(change_list(i), lat, e_pars, this%beta)
-          call this%dissociation%construct(change_list(i), lat, e_pars, this%beta)
-          call  this%association%construct(change_list(i), lat, e_pars, this%beta)
+          call this%construct_1(change_list(i), lat, e_pars)
         end do
-
         ! Update the the number of adsorbates
         this%n_ads_total = this%n_ads_total - 1
 
@@ -665,7 +650,7 @@ print*, 'reactant 1:', ads
 print*, 'Number of affected adsorbates:', i_change
 print*, 'Change list:'
 print*, change_list
-if (reaction_id==association_id) pause
+!if (reaction_id==association_id) pause
 
   end subroutine do_reaction
 
