@@ -14,6 +14,7 @@ module reaction_class
   use rates_desorption_class
   use rates_dissociation_class
   use rates_association_class
+  use rates_bimolecular_class
 
   implicit none
 
@@ -27,6 +28,7 @@ module reaction_class
     type(  desorption_type) :: desorption
     type(dissociation_type) :: dissociation
     type( association_type) :: association
+    type( bimolecular_type) :: bimolecular
 
     real(dp) :: beta                    ! inverse thermodynamic temperature
     integer  :: n_ads_total             ! total number of adsorbates
@@ -62,7 +64,8 @@ contains
     reaction_init%desorption   =   desorption_init(c_pars, lat, e_pars)
     reaction_init%dissociation = dissociation_init(c_pars, lat, e_pars)
     reaction_init%association  =  association_init(c_pars, lat, e_pars)
-    call reaction_init%association%print(c_pars)
+    reaction_init%bimolecular  =  bimolecular_init(c_pars, lat, e_pars)
+    call reaction_init%bimolecular%print(c_pars)
 
     reaction_init%beta = 1.0_dp/(kB*c_pars%temperature)
     reaction_init%n_ads_total = lat%n_ads_tot()
@@ -118,6 +121,15 @@ contains
 
       do ads = 1, this%n_ads_total
         call this%association%construct(ads, lat, e_pars, this%beta)
+      end do
+
+    end if
+
+    ! Bimolecular
+    if (this%bimolecular%is_defined) then
+
+      do ads = 1, this%n_ads_total
+        call this%bimolecular%construct(ads, lat, e_pars, this%beta)
       end do
 
     end if
@@ -206,6 +218,55 @@ contains
 !  end do
 !  if ( this%dissociation%rate_info(ads)%n_channels>0 ) print*
 !end do
+! Debugging printout bimolecular
+!print*
+!call lat%print_ocs
+!print *
+!print '(a)' ,' Bimolecular channels from reaction class'
+!print '(a)'    ,' -------------------------------------------------------------------------------------------------------'
+!print '(a)'    ,'  ads# proc#       m   rate       lst_r1   ast_r1    lst_r2   ast_r2   lst_p1   ast_p1   lst_p2   ast_p2'
+!print '(a)'    ,' -------------------------------------------------------------------------------------------------------'
+!
+!do ads = 1, this%n_ads_total
+!  do chan= 1, this%bimolecular%rate_info(ads)%n_channels
+!
+!    i = this%bimolecular%rate_info(ads)%list(chan)%proc
+!
+!    r1_id  = this%bimolecular%channels(i)%r1
+!    r1_ast = this%bimolecular%channels(i)%r1_ast
+!    r1_lst = this%bimolecular%channels(i)%r1_lst
+!
+!    r2_id  = this%bimolecular%channels(i)%r2
+!    r2_ast = this%bimolecular%channels(i)%r2_ast
+!    r2_lst = this%bimolecular%channels(i)%r2_lst
+!
+!    p1_id  = this%bimolecular%channels(i)%p1
+!    p1_ast = this%bimolecular%channels(i)%p1_ast
+!    p1_lst = this%bimolecular%channels(i)%p1_lst
+!
+!    p2_id  = this%bimolecular%channels(i)%p2
+!    p2_ast = this%bimolecular%channels(i)%p2_ast
+!    p2_lst = this%bimolecular%channels(i)%p2_lst
+!
+!    rate   = this%bimolecular%channels(i)%rate
+!
+!    m      = this%bimolecular%rate_info(ads)%list(chan)%m
+!
+!    lst_r1_name = lat_site_names(r1_lst)
+!    lst_r2_name = lat_site_names(r2_lst)
+!    lst_p1_name = lat_site_names(p1_lst)
+!    lst_p2_name = lat_site_names(p2_lst)
+!    ast_r1_name = ads_site_names(r1_ast)
+!    ast_r2_name = ads_site_names(r2_ast)
+!    ast_p1_name = ads_site_names(p1_ast)
+!    ast_p2_name = ads_site_names(p2_ast)
+!
+!  print '(t4,i0, t9,i0, t15,i0, t20,1pe10.2, t35,A7, 2x,A3, t54,A7, 2x, A3, t72,A7, 2x,A3, t90,A7, 2x,A3)', &
+!        ads, i, m, rate, lst_r1_name, ast_r1_name, lst_r2_name, ast_r2_name, lst_p1_name, ast_p1_name, lst_p2_name, ast_p2_name
+!
+!  end do
+!!  if ( this%association%rate_info(ads)%n_channels>0 ) print*
+!end do
 
   end subroutine construct
 
@@ -225,6 +286,8 @@ contains
     if (this%dissociation%is_defined) call this%dissociation%construct(ads, lat, e_pars, this%beta)
     ! Association
     if (this%association%is_defined)  call this%association%construct(ads, lat, e_pars, this%beta)
+    ! Bimolecular
+    if (this%bimolecular%is_defined)  call this%bimolecular%construct(ads, lat, e_pars, this%beta)
 
   end subroutine construct_1
 
@@ -245,6 +308,8 @@ contains
     this%dissociation%rate_info(ads)%n_channels = 0
     this%association%rate_info(ads)%list  = rate_info_association(0,0,0.0_dp)
     this%association%rate_info(ads)%n_channels = 0
+    this%bimolecular%rate_info(ads)%list  = rate_info_bimolecular(0,0,0.0_dp)
+    this%bimolecular%rate_info(ads)%n_channels = 0
 
   end subroutine cleanup_rates
 
@@ -308,7 +373,7 @@ contains
       end do
       end do
     end if
-
+WE ARE HERE
 !    ! Debug printing of total rates
 !    print*
 !    print'(3A,1pe12.2)','Total rate for ',reaction_names(1), ' is ', acc_rate(1)
@@ -391,7 +456,7 @@ call lat%print_ads
         ! scan over additional new neighbors
         do m=1,n_nn2
           ! position of neighbor nn_new(m_nn,m)
-          call lat%neighbor( ads, this%hopping%nn_new(m_nn,m), row, col)
+          call lat%neighbor( ads, lat%nn_new(m_nn,m), row, col)
           if (lat%occupations(row,col) > 0) then
             i_change = i_change + 1
             change_list(i_change) = lat%occupations(row,col)
@@ -526,7 +591,7 @@ call lat%print_ads
         ! scan over neighbors of product 2
         do m=1,n_nn2
           ! position of neighbor with direction nn_new(m_nn,m)
-          call lat%neighbor( this%n_ads_total, this%dissociation%nn_new(m_nn,m), row, col)
+          call lat%neighbor( this%n_ads_total, lat%nn_new(m_nn,m), row, col)
           if (lat%occupations(row,col) > 0) then
             i_change = i_change + 1
             change_list(i_change) = lat%occupations(row,col)
@@ -581,7 +646,7 @@ call lat%print_ads
         ! scan over neighbors of reactant 2
         do m=1,n_nn2
           ! position of neighbor with direction nn_new(m_nn,m)
-          call lat%neighbor( ads_r2, this%association%nn_new(m_nn,m), row, col)
+          call lat%neighbor( ads_r2, lat%nn_new(m_nn,m), row, col)
           if (lat%occupations(row,col) > 0) then
             i_change = i_change + 1
             change_list(i_change) = lat%occupations(row,col)

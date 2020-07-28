@@ -38,6 +38,8 @@ module mc_lat_class
     ! shellwise number of neighbors
     integer, dimension(n_shells) :: n_nn
     integer, dimension(:,:,:), allocatable  :: shell_list
+    ! List of additional nn directions to scan after reaction
+    integer, dimension(:,:), allocatable :: nn_new
     ! initial number of adsorbates and adsorbates list
     integer, dimension(:), allocatable :: n_ads
     type(adsorbate), dimension(:), allocatable  :: ads_list
@@ -65,9 +67,9 @@ contains
 
     type(control_parameters), intent(inout) :: control_pars
     type(energy_parameters),     intent(in) :: energy_pars
-    type(mc_lat)               :: lat
+    type(mc_lat)                            :: lat
 
-    integer :: i, j, k, ios
+    integer :: i, j, k, m, ios
     integer :: counter, s_counter, current_species
     integer :: n_rows_in, n_cols_in, step_period_in
     character(len=max_string_length) :: line
@@ -126,7 +128,7 @@ contains
     lat%shell_list(3,5,:) = (/-2, 0/)
     lat%shell_list(3,6,:) = (/-2, 2/)
 
-    ! Check the distances to the neibours
+    ! Check the distances to the neighbours
 !    print*, sqrt( &
 !                 ( lat%shell_list(2,:,1)*cos(pi/3.0_dp) &
 !                  +lat%shell_list(2,:,2)               )**2    &
@@ -134,6 +136,14 @@ contains
 !                 ( lat%shell_list(2,:,1)*sin(pi/3.0_dp))**2    &
 !        )
 !    stop
+
+    ! List of additional nn directions for hex lattice to scan after a reaction
+    allocate(lat%nn_new( lat%n_nn(1), lat%n_nn(1)/2) )
+    do m=1,lat%n_nn(1)
+    do i=1,lat%n_nn(1)/2
+      lat%nn_new(m,i) = modulo( m + i - lat%n_nn(1)/2, lat%n_nn(1) ) + 1
+    end do
+    end do
 
     lat%n_max_ads_sites = n_max_ads_sites
 

@@ -17,6 +17,7 @@ module rates_dissociation_class
   use energy_mod
   use open_file
   use utilities
+  use temperature_laws
 
   implicit none
 
@@ -81,11 +82,6 @@ module rates_dissociation_class
     !                                 .
     type(v_list_rate_info), dimension(:), allocatable :: rate_info
 
-
-
-    ! List of additional nn directions to scan after hop
-    integer, dimension(:,:), allocatable :: nn_new
-
     ! Number of dissociation channels
     integer :: n_processes
 
@@ -139,16 +135,6 @@ contains
 
     logical :: duplicate_error = .false.
 
-    n_nn  = lat%n_nn(1)
-    n_nn2 = n_nn/2
-    ! List of additional nn directions to scan after dissociation
-    allocate(dissociation_init%nn_new(n_nn,n_nn2))
-    do m=1,n_nn
-    do i=1,n_nn2
-      dissociation_init%nn_new(m,i) = modulo( m+i-n_nn2, n_nn ) + 1
-    end do
-    end do
-
     ! maximal number of available ads. sites
     max_avail_ads_sites = 1
     do i=1,c_pars%n_species
@@ -157,7 +143,6 @@ contains
       if (max_avail_ads_sites < i1) max_avail_ads_sites = i1
     end do
     end do
-
 
     !---------------------------------------------------------------------------
     !  Allocate and Intialize rate_info structure
@@ -613,39 +598,5 @@ contains
     print*
 
   end subroutine print
-
-!-----------------------------------------------------------------------------
-!             Temperature dependence law subroutines
-!-----------------------------------------------------------------------------
-
-!-----------------------------------------------------------------------------
-  real(dp) function arrhenius(temperature, parameters)
-!-----------------------------------------------------------------------------
-    real(dp), intent(in) :: temperature
-    real(dp), dimension(:), intent(in) :: parameters
-    real(dp) :: prefactor, act_energy
-
-    prefactor  = parameters(1)
-    act_energy = parameters(2)
-
-    arrhenius = prefactor*exp(-act_energy/(kB*temperature))
-
-  end function arrhenius
-
-!-----------------------------------------------------------------------------
-  real(dp) function extArrhenius(temperature, parameters)
-!-----------------------------------------------------------------------------
-    real(dp), intent(in) :: temperature
-    real(dp), dimension(:), intent(in) :: parameters
-    real(dp) :: prefactor, act_energy, power, kT
-
-      prefactor  = parameters(1)
-      act_energy = parameters(2)
-      power = parameters(3)
-      kT = kB*temperature
-
-      extArrhenius = prefactor*exp(-act_energy/kT)/(kT**power)
-
-  end function extArrhenius
 
 end module rates_dissociation_class

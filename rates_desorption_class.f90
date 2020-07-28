@@ -7,6 +7,7 @@ module rates_desorption_class
   use energy_mod
   use open_file
   use utilities
+  use temperature_laws
 
   implicit none
 
@@ -341,39 +342,5 @@ contains
     print*
 
   end subroutine print
-
-!-----------------------------------------------------------------------------
-!             Temperature dependence law subroutines
-!-----------------------------------------------------------------------------
-
-!-----------------------------------------------------------------------------
-  real(dp) function arrhenius(temperature, parameters)
-!-----------------------------------------------------------------------------
-    real(dp), intent(in) :: temperature
-    real(dp), dimension(:), intent(in) :: parameters
-    real(dp) :: prefactor, act_energy
-
-    prefactor  = parameters(1)
-    act_energy = parameters(2)
-
-    arrhenius = prefactor*exp(-act_energy/(kB*temperature))
-
-  end function arrhenius
-
-!-----------------------------------------------------------------------------
-  real(dp) function extArrhenius(temperature, parameters)
-!-----------------------------------------------------------------------------
-    real(dp), intent(in) :: temperature
-    real(dp), dimension(:), intent(in) :: parameters
-    real(dp) :: prefactor, act_energy, power, kT
-
-      prefactor  = parameters(1)
-      act_energy = parameters(2)
-      power = parameters(3)
-      kT = kB*temperature
-
-      extArrhenius = prefactor*exp(-act_energy/kT)/(kT**power)
-
-  end function extArrhenius
 
 end module rates_desorption_class
