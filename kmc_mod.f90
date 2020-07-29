@@ -23,7 +23,7 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
   type(control_parameters), intent(inout) :: c_pars
   type(energy_parameters ), intent(in)    :: e_pars
 
-  type(reaction_type) :: r
+  type(reaction_type) :: r, r_save
 
   character(len=max_string_length) :: buffer, n_ads_fmt
   integer :: itraj, ibin, ibin_new
@@ -40,18 +40,11 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
 
   integer :: j, k, n_chan  ! only for debug printout
 
-  type(mc_lat) :: lat_save
-
   ! initialize vector of conditions for debug trap
   debug =  .false.
 
-  ! save the initial lattice structre for restore on each trajectory
-  lat_save = lat
-
   ! Create a rate structure
   r = reaction_init(c_pars, lat, e_pars)
-
-
 
 !!------------------------------------------------------------------------------
 !!  debug printing
@@ -71,7 +64,6 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
 !stop 111
 
 
-
   ! time binning for distributions
   step_bin = c_pars%t_end/c_pars%n_bins
 
@@ -79,6 +71,8 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
 
   ! Loop over trajectories
   do itraj=1, c_pars%n_trajs
+
+    debug(1) = (itraj==2)
 
     call progress_bar( 'current trajectory ', 0* 100*itraj/c_pars%n_trajs , '   total', 0)
 
@@ -89,8 +83,14 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
     call random_seed(put=itraj*randseed*42)
 
     write(buffer,'(i6.6)') itraj
-    ! Restore initial lattice (WARNING: think more on this and eternity)
-    lat = lat_save
+
+    ! Restore initial lattice and adjust the respective records in reaction variable
+    call lat%restore
+    r%n_ads_total = lat%n_ads_tot()
+    r%counter = 0
+
+    !-------- Construct rates arrays
+    call r%construct(lat, e_pars)
 
     ! write initial state of the lattice into a file
     call open_for_write(outcfg_unit,trim(c_pars%file_name_base)//trim(buffer)//'.confs')
@@ -113,12 +113,31 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
     r%counter = 0
     ! open file for saving cluster size histogram
     call open_for_write(outhst_unit,trim(c_pars%file_name_base)//trim(buffer)//'.hist')
-    ! Initialize cluster histogram
-    hist = 0
-
-    !-------- Construct rates arrays
-    call r%construct(lat, e_pars)
-
+    !-----Save histogram with cluster sizes
+    if (r%n_ads_total>0) then
+    ! Output formats
+      write(n_ads_fmt,'(i10)') r%n_ads_total
+      n_ads_fmt = '('//trim(adjustl(n_ads_fmt))//'i8)'
+      ! Calculate histogram
+      hist = 0
+      do species=1,c_pars%n_species
+        call lat%hoshen_kopelman(species, cluster_label, largest_label)
+        call lat%cluster_size(species, cluster_label, cluster_sizes)
+        do i=1,largest_label
+          if (cluster_sizes(i) > 0) &
+            hist(species,cluster_sizes(i)) = hist(species,cluster_sizes(i)) + 1
+        end do
+      end do
+      ! Save cluster size histogram
+      write(outhst_unit,'(A6,1pe12.3)') "time ",0.0_dp
+      do species=1,c_pars%n_species
+        write(outhst_unit,*) species
+        write(outhst_unit,n_ads_fmt) (hist(species,i), i=1,lat%n_ads(species))
+      end do
+    else
+      ! No histogram output when no adsorbates
+      write(outhst_unit,'(A6,1pe12.3)') "time ",0.0_dp
+    end if
     ! start time propagation
     time = big_bang
     do while (time<c_pars%t_end)
@@ -171,7 +190,8 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
           ! Output formats
           write(n_ads_fmt,'(i10)') r%n_ads_total
           n_ads_fmt = '('//trim(adjustl(n_ads_fmt))//'i8)'
-
+          ! Reset the histogram
+          hist = 0
           ! Calculate histogram
           do species=1,c_pars%n_species
             call lat%hoshen_kopelman(species, cluster_label, largest_label)
@@ -187,7 +207,6 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
             write(outhst_unit,*) species
             write(outhst_unit,n_ads_fmt) (hist(species,i), i=1,lat%n_ads(species))
           end do
-          hist = 0
 
         else
           ! No histogram output when no adsorbates

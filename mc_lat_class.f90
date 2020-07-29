@@ -40,9 +40,10 @@ module mc_lat_class
     integer, dimension(:,:,:), allocatable  :: shell_list
     ! List of additional nn directions to scan after reaction
     integer, dimension(:,:), allocatable :: nn_new
-    ! initial number of adsorbates and adsorbates list
+    ! number of adsorbates per species
     integer, dimension(:), allocatable :: n_ads
-    type(adsorbate), dimension(:), allocatable  :: ads_list
+    ! initial and current adsorbates lists
+    type(adsorbate), dimension(:), allocatable  :: ads_list_ini, ads_list
     ! Available adsorbtion sites list (n_species x n_max_lat_site_types x (n_avail_ads_sites))
     type(v_list), dimension(:,:), allocatable :: avail_ads_sites
 
@@ -56,6 +57,7 @@ module mc_lat_class
       procedure :: n_ads_tot  => mc_lat_n_ads_total
       procedure :: hoshen_kopelman
       procedure :: cluster_size => count_cluster_sizes
+      procedure :: restore    => mc_lat_restore
       procedure, nopass, public :: mc_lat_init
 
   end type mc_lat
@@ -154,11 +156,13 @@ contains
                              control_pars%n_cols))
     allocate(lat%n_ads(control_pars%n_species))
     ! Warning: the allocation assumes 1 ads. per unit cell
-    allocate(lat%ads_list(control_pars%n_rows*control_pars%n_cols))
+    allocate(lat%ads_list(    control_pars%n_rows*control_pars%n_cols))
+    allocate(lat%ads_list_ini(control_pars%n_rows*control_pars%n_cols))
     ! Initialize arrays
-    lat%occupations = 0
-    lat%n_ads       = control_pars%n_ads
-    lat%ads_list    = adsorbate(0,0,0,0)
+    lat%occupations  = 0
+    lat%n_ads        = control_pars%n_ads
+    lat%ads_list     = adsorbate(0,0,0,0)
+    lat%ads_list_ini = adsorbate(0,0,0,0)
 
     lat%lst = terrace_site
     ! Define where steps and corners are
@@ -277,7 +281,37 @@ contains
 
     end if
 
-  end function
+    ! Save initial adsorbate list
+    lat%ads_list_ini = lat%ads_list
+
+  end function mc_lat_init
+
+! ---------------------------------------------------------------------
+! Subroutine restoring mc_lat structure from initial adsorbate list
+! ---------------------------------------------------------------------
+  subroutine mc_lat_restore(this)
+
+    class(mc_lat), intent(inout) :: this
+
+    integer, dimension(size(this%n_ads)) :: n_ads_counter
+    integer :: i, ads_id
+
+    ! Restore the ads list
+    this%ads_list = this%ads_list_ini
+    ! Restore species-specific numbers of adsorbates
+    n_ads_counter = 0
+    do i=1,size(this%ads_list)
+      ads_id = this%ads_list(i)%id
+      if (ads_id>0) n_ads_counter(ads_id) = n_ads_counter(ads_id) + 1
+    end do
+    this%n_ads = n_ads_counter
+    ! Clean up and restore occupations
+    this%occupations = 0
+    do i=1,this%n_ads_tot()
+      this%occupations(this%ads_list(i)%row, this%ads_list(i)%col) = i
+    end do
+
+  end subroutine
 
 !------------------------------------------------------------------------------
 !  subroutine mc_lat_print_ocs
@@ -370,6 +404,9 @@ contains
 
   end subroutine
 
+! ---------------------------------------------------------------------
+! Subroutine finding  position of neighbor accounting for PBCs
+! ---------------------------------------------------------------------
   subroutine mc_lat_neighbor_with_pbc(this,i,ihop, row, col)
 
     class(mc_lat), intent(in) :: this
@@ -383,6 +420,9 @@ contains
 
   end subroutine
 
+! ---------------------------------------------------------------------
+! Function returning the total number of adsorbates
+! ---------------------------------------------------------------------
   integer function mc_lat_n_ads_total(this) result(n_ads_total)
 
     class(mc_lat), intent(in) :: this
@@ -427,13 +467,14 @@ contains
   do col=1,this%n_cols
 
     i_ads = this%occupations(row,col)
+
     if ( i_ads > 0 ) then
       if ( this%ads_list(i_ads)%id == species ) then
 
         do m=1,nnn2
 
           ! Take previously scan neighbours
-          call this%hop(i_ads,nnn2+m,row_nn(m),col_nn(m), ads_site)
+          call this%neighbor(i_ads,nnn2+m,row_nn(m),col_nn(m))
           i_ads_nn = this%occupations(row_nn(m), col_nn(m))
 
           scanned_nn_occs(m) = 0
@@ -453,14 +494,14 @@ contains
         select case (sum(scanned_nn_occs))
 
           case (0)
-            !print*
-            !print*,"Case 0"
+!            print*
+!            print*,"Case 0"
             largest_label = largest_label + 1
             cluster_label(row,col) = largest_label
 
           case (1)
-            !print*
-            !print*,"Case 1"
+!            print*
+!            print*,"Case 1"
             do m=1,nnn2
               if (scanned_nn_occs(m) == 1) then
                 cluster_label(row,col) = &
@@ -469,8 +510,8 @@ contains
             end do
 
           case (2)
-            !print*
-            !print*,"Case 2"
+!            print*
+!            print*,"Case 2"
             do m=1,nnn2-1
               itemp = cluster_label(row_nn(m),col_nn(m))
             do n=m+1,nnn2
@@ -482,8 +523,8 @@ contains
             end do
 
           case (3)
-            !print*
-            !print*,"Case 3"
+!            print*
+!            print*,"Case 3"
             itemp = cluster_label(row_nn(1),col_nn(1))
             call lunion(itemp, cluster_label(row_nn(2),col_nn(2)),labels)
             call lunion(itemp, cluster_label(row_nn(3),col_nn(3)),labels)
@@ -514,7 +555,7 @@ contains
     ip = cluster_label(row,1)
     if (ip > 0) then
       do m=1,nnn2
-        call this%hop(this%occupations(row,1),nnn2+m,row_new,col_new, ads_site)
+        call this%neighbor(this%occupations(row,1),nnn2+m,row_new,col_new)
         jp = cluster_label(row_new,col_new)
         if (jp > 0) call lunion(ip,jp,labels)
       end do
@@ -525,7 +566,7 @@ contains
     ip = cluster_label(1,col)
     if (ip > 0) then
       do m=1,nnn2
-        call this%hop(this%occupations(1,col),nnn2+m,row_new,col_new, ads_site)
+        call this%neighbor(this%occupations(1,col),nnn2+m,row_new,col_new)
         jp = cluster_label(row_new,col_new)
         if (jp > 0) call lunion(ip,jp,labels)
       end do

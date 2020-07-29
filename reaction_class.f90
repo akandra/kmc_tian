@@ -65,7 +65,7 @@ contains
     reaction_init%dissociation = dissociation_init(c_pars, lat, e_pars)
     reaction_init%association  =  association_init(c_pars, lat, e_pars)
     reaction_init%bimolecular  =  bimolecular_init(c_pars, lat, e_pars)
-    call reaction_init%bimolecular%print(c_pars)
+!    call reaction_init%bimolecular%print(c_pars)
 
     reaction_init%beta = 1.0_dp/(kB*c_pars%temperature)
     reaction_init%n_ads_total = lat%n_ads_tot()
@@ -373,7 +373,17 @@ contains
       end do
       end do
     end if
-WE ARE HERE
+    ! accumulate rate for bimolecular reaction (= rate for bimolecular + association + dissociation + desorption + hopping)
+    acc_rate(bimolecular_id) = acc_rate(association_id)
+    if (this%bimolecular%is_defined) then
+      do ads=1,this%n_ads_total
+      do channel = 1, this%bimolecular%rate_info(ads)%n_channels
+        acc_rate(bimolecular_id) = acc_rate(bimolecular_id) &
+                                  + this%bimolecular%rate_info(ads)%list(channel)%rate
+      end do
+      end do
+    end if
+
 !    ! Debug printing of total rates
 !    print*
 !    print'(3A,1pe12.2)','Total rate for ',reaction_names(1), ' is ', acc_rate(1)
@@ -396,12 +406,11 @@ WE ARE HERE
     end do
 
 ! Debug printing
-print*
-print*
-print *, 'Before ', trim(reaction_names(reaction_id)),':'
-call lat%print_ocs
-call lat%print_ads
-
+!print*
+!print*
+!print *, 'Before ', trim(reaction_names(reaction_id)),':'
+!call lat%print_ocs
+!call lat%print_ads
 
     select case (reaction_id)
 
@@ -698,6 +707,78 @@ call lat%print_ads
         this%counter(reaction_id,id_r1) = this%counter(reaction_id,id_r1) + 1
         this%counter(reaction_id,id_r2) = this%counter(reaction_id,id_r2) + 1
 
+      case(bimolecular_id)
+        ! determine bimolecular reaction channel (ads, channel)
+        temp_dp = acc_rate(association_id)
+        extloop4: do ads=1,this%n_ads_total
+        do channel=1,this%bimolecular%rate_info(ads)%n_channels
+          temp_dp = temp_dp + this%bimolecular%rate_info(ads)%list(channel)%rate
+          if (u < temp_dp) exit extloop4
+        end do
+        end do extloop4
+
+        ! create a list of adsorbates affected by bimolecular reaction
+        change_list = 0
+        i_change = 1
+        ! Put the  the first reactant's (which is to become p1) ads  into the list
+        change_list(i_change) = ads
+
+        ! Get the direction to reactant 2
+        m_nn   = this%bimolecular%rate_info(ads)%list(channel)%m
+
+        ! scan over neighbors of reactant 1
+        do m=1,n_nn
+            ! position of neighbor m
+            call lat%neighbor(ads,m,row,col)
+            if (lat%occupations(row,col) > 0) then
+              if (m==m_nn) ads_r2 = lat%occupations(row,col)
+              i_change = i_change + 1
+              change_list(i_change) = lat%occupations(row,col)
+            end if
+        end do
+        ! scan over neighbors of reactant 2
+        do m=1,n_nn2
+          ! position of neighbor with direction nn_new(m_nn,m)
+          call lat%neighbor( ads_r2, lat%nn_new(m_nn,m), row, col)
+          if (lat%occupations(row,col) > 0) then
+            i_change = i_change + 1
+            change_list(i_change) = lat%occupations(row,col)
+          end if
+        end do
+
+        ! --------------Do bimolecular reaction:
+        ! Find process number
+        proc = this%bimolecular%rate_info(ads)%list(channel)%proc
+        ! Get reactants' and products' info
+        id_r1  = lat%ads_list(ads   )%id
+        id_r2  = lat%ads_list(ads_r2)%id
+        id_p1  = this%bimolecular%channels(proc)%p1
+        ast_p1 = this%bimolecular%channels(proc)%p1_ast
+        id_p2  = this%bimolecular%channels(proc)%p2
+        ast_p2 = this%bimolecular%channels(proc)%p2_ast
+        ! Replace reactant 1 with product 1 preserving reactant's number
+        lat%ads_list(ads)%id  = id_p1
+        lat%ads_list(ads)%ast = ast_p1
+        lat%n_ads(id_r1) = lat%n_ads(id_r1) - 1
+        lat%n_ads(id_p1) = lat%n_ads(id_p1) + 1
+        ! Replace reactant 2 with product 2 preserving reactant's number
+        lat%ads_list(ads_r2)%id  = id_p2
+        lat%ads_list(ads_r2)%ast = ast_p2
+        lat%n_ads(id_r2) = lat%n_ads(id_r2) - 1
+        lat%n_ads(id_p2) = lat%n_ads(id_p2) + 1
+
+        ! Reset the rate info for ads (product 1) and for ads_r2 (product 2)
+        call this%cleanup_rates(ads,lat)
+        call this%cleanup_rates(ads_r2,lat)
+        ! Update rate array for the affected adsorbates
+        do i=1,i_change
+          call this%construct_1(change_list(i), lat, e_pars)
+        end do
+
+        ! Update reaction counter
+        this%counter(reaction_id,id_r1) = this%counter(reaction_id,id_r1) + 1
+        this%counter(reaction_id,id_r2) = this%counter(reaction_id,id_r2) + 1
+
       case default
         print*
         print*, "reaction id is ", reaction_id
@@ -707,15 +788,15 @@ call lat%print_ads
     end select
 
 ! Debug printing
-print*
-print*, 'After ', trim(reaction_names(reaction_id)),':'
-call lat%print_ocs
-call lat%print_ads
-print*, 'reactant 1:', ads
-print*, 'Number of affected adsorbates:', i_change
-print*, 'Change list:'
-print*, change_list
-!if (reaction_id==association_id) pause
+!print*
+!print*, 'After ', trim(reaction_names(reaction_id)),':'
+!call lat%print_ocs
+!call lat%print_ads
+!print*, 'reactant 1:', ads
+!print*, 'Number of affected adsorbates:', i_change
+!print*, 'Change list:'
+!print*, change_list
+!if (reaction_id==bimolecular_id) pause
 
   end subroutine do_reaction
 
