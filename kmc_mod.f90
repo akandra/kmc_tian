@@ -72,7 +72,7 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
   ! Loop over trajectories
   do itraj=1, c_pars%n_trajs
 
-    debug(1) = (itraj==2)
+    debug(1) = (itraj==3)
 
     call progress_bar( 'current trajectory ', 0* 100*itraj/c_pars%n_trajs , '   total', 0)
 
@@ -93,7 +93,7 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
     call r%construct(lat, e_pars)
 
     ! write initial state of the lattice into a file
-    call open_for_write(outcfg_unit,trim(c_pars%file_name_base)//trim(buffer)//'.confs')
+    call open_for_write(outcfg_unit,trim(c_pars%file_name_base)//'_'//trim(buffer)//'.confs')
     write(outcfg_unit,'(A10,A10,A15)') &
                   "# rows","# cols","step_period"
     write(outcfg_unit,'(3i10)') lat%n_rows, lat%n_cols, c_pars%step_period
@@ -102,17 +102,17 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
     write(outcfg_unit,'(100i10)') lat%n_ads
     call lat%print_ads(outcfg_unit)
     ! write initial total energy of the system
-    call open_for_write(outeng_unit,trim(c_pars%file_name_base)//trim(buffer)//'.en')
+    call open_for_write(outeng_unit,trim(c_pars%file_name_base)//'_'//trim(buffer)//'.en')
     write(outeng_unit,'(2A12)') 'time(s)', ' energy(eV)'
     write(outeng_unit,'(1pe12.3,1pe12.3)') 0.0_dp, total_energy(lat,e_pars)
     ! open file for saving reaction counts
-    call open_for_write(outcnt_unit,trim(c_pars%file_name_base)//trim(buffer)//'.counts')
+    call open_for_write(outcnt_unit,trim(c_pars%file_name_base)//'_'//trim(buffer)//'.counts')
     write(outcnt_unit,'(A12,100A20)') 'time(s)', &
       ((' '//trim(c_pars%ads_names(j))//'_'//trim(reaction_names(k)), k=1,n_reaction_types), j=1,c_pars%n_species)
     ! Initialize reaction counters
     r%counter = 0
     ! open file for saving cluster size histogram
-    call open_for_write(outhst_unit,trim(c_pars%file_name_base)//trim(buffer)//'.hist')
+    call open_for_write(outhst_unit,trim(c_pars%file_name_base)//'_'//trim(buffer)//'.hist')
     !-----Save histogram with cluster sizes
     if (r%n_ads_total>0) then
     ! Output formats

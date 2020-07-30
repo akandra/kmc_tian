@@ -406,11 +406,13 @@ contains
     end do
 
 ! Debug printing
-!print*
-!print*
-!print *, 'Before ', trim(reaction_names(reaction_id)),':'
-!call lat%print_ocs
-!call lat%print_ads
+!if (debug(1)) then
+!  print*
+!  print *, 'Before ', trim(reaction_names(reaction_id)),':'
+!  call lat%print_ocs
+!  call lat%print_ads
+!  print*, 'Accumulated rates are ', acc_rate
+!end if
 
     select case (reaction_id)
 
@@ -525,6 +527,7 @@ contains
           this%desorption%rates(ads)       = this%desorption%rates(this%n_ads_total)
           this%dissociation%rate_info(ads) = this%dissociation%rate_info(this%n_ads_total)
           this%association%rate_info(ads)  = this%association%rate_info(this%n_ads_total)
+          this%bimolecular%rate_info(ads)  = this%bimolecular%rate_info(this%n_ads_total)
         end if
 
         ! Update rate array for the affected adsorbates
@@ -788,15 +791,18 @@ contains
     end select
 
 ! Debug printing
-!print*
-!print*, 'After ', trim(reaction_names(reaction_id)),':'
-!call lat%print_ocs
-!call lat%print_ads
-!print*, 'reactant 1:', ads
-!print*, 'Number of affected adsorbates:', i_change
-!print*, 'Change list:'
-!print*, change_list
-!if (reaction_id==bimolecular_id) pause
+!if (debug(1)) then
+!  print*
+!  print*, 'After ', trim(reaction_names(reaction_id)),':'
+!  call lat%print_ocs
+!  call lat%print_ads
+!  print*, 'reactant 1:', ads
+!  print*, 'Number of affected adsorbates:', i_change
+!  print*, 'Change list:'
+!  print*, change_list
+!  !if (reaction_id==bimolecular_id) pause
+!end if
+
 
   end subroutine do_reaction
 
