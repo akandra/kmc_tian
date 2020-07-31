@@ -26,7 +26,7 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
   type(reaction_type) :: r, r_save
 
   character(len=max_string_length) :: buffer, n_ads_fmt
-  integer :: itraj, ibin, ibin_new
+  integer :: itraj, ibin, ibin_new, ibin_current
   integer :: i, species
   integer :: kmc_nsteps
   integer, dimension(lat%n_rows,lat%n_cols) :: cluster_label
@@ -111,6 +111,7 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
       ((' '//trim(c_pars%ads_names(j))//'_'//trim(reaction_names(k)), k=1,n_reaction_types), j=1,c_pars%n_species)
     ! Initialize reaction counters
     r%counter = 0
+    write(outcnt_unit,'(1pe12.3,100i20)') 0.0_dp, r%counter
     ! open file for saving cluster size histogram
     call open_for_write(outhst_unit,trim(c_pars%file_name_base)//'_'//trim(buffer)//'.hist')
     !-----Save histogram with cluster sizes
@@ -170,18 +171,19 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
 
       ibin_new = int(time_new/step_bin)
 
-      if (ibin_new - ibin > 0 ) then
+      ! Do write when switched to the next bin taking into account jumps over more than 1 by repeating output values
+      do ibin_current=ibin+1,ibin_new
 
         !-----Save configuration
-        write(outcfg_unit,'(A6,1pe12.3)') "time ",ibin_new*step_bin
+        write(outcfg_unit,'(A6,1pe12.3)') "time ",ibin_current*step_bin
         write(outcfg_unit,'(100i10)') lat%n_ads
         call lat%print_ads(outcfg_unit)
 
         !-----Save energy
-        write(outeng_unit,'(1pe12.3,1pe12.3)') ibin_new*step_bin, total_energy(lat,e_pars)
+        write(outeng_unit,'(1pe12.3,1pe12.3)') ibin_current*step_bin, total_energy(lat,e_pars)
 
         !-----Save reaction counts
-        write(outcnt_unit,'(1pe12.3,100i20)') ibin_new*step_bin, r%counter
+        write(outcnt_unit,'(1pe12.3,100i20)') ibin_current*step_bin, r%counter
         ! Reset reaction counters
         r%counter = 0
 
@@ -202,7 +204,7 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
             end do
           end do
           ! Save cluster size histogram
-          write(outhst_unit,'(A6,1pe12.3)') "time ",ibin_new*step_bin
+          write(outhst_unit,'(A6,1pe12.3)') "time ",ibin_current*step_bin
           do species=1,c_pars%n_species
             write(outhst_unit,*) species
             write(outhst_unit,n_ads_fmt) (hist(species,i), i=1,lat%n_ads(species))
@@ -210,11 +212,11 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
 
         else
           ! No histogram output when no adsorbates
-          write(outhst_unit,'(A6,1pe12.3)') "time ",ibin_new*step_bin
+          write(outhst_unit,'(A6,1pe12.3)') "time ",ibin_current*step_bin
 
         end if
 
-      end if
+      end do
 
       ibin = ibin_new
       time = time_new ! time shift
