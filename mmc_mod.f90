@@ -93,13 +93,15 @@ subroutine metropolis(lat, c_pars, e_pars)
 
         delta_E = energy(i, lat, e_pars) - energy_old
 
-        if (exp(- beta*delta_E) < ran1()) then
-          ! reject the hop
-          lat%occupations(new_row,new_col) = 0
-          lat%occupations(old_row,old_col) = i
-          lat%ads_list(i)%row = old_row
-          lat%ads_list(i)%col = old_col
-          lat%ads_list(i)%ast = old_ads_site
+        if ( delta_E > 0.0_dp ) then  ! to prevent overflow
+          if ( exp(- beta*delta_E) < ran1() ) then
+            ! reject the hop
+            lat%occupations(new_row,new_col) = 0
+            lat%occupations(old_row,old_col) = i
+            lat%ads_list(i)%row = old_row
+            lat%ads_list(i)%col = old_col
+            lat%ads_list(i)%ast = old_ads_site
+          end if
         end if
 
       end if
