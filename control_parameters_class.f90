@@ -156,11 +156,11 @@ contains
 
           case('energy')
             if (nwords/=2) stop err // "energy must have 1 parameter."
-            read(words(2),*) control_parameters_init%energy_file_name
+            control_parameters_init%energy_file_name = words(2)
 
           case('start_conf')
             if (nwords/=2) stop err // "start_conf must have 1 parameter."
-            read(words(2),*) control_parameters_init%cfg_file_name
+            control_parameters_init%cfg_file_name = words(2)
 
           case('mmc_save_period')
             if (nwords/=2) stop err // "save_period must have 1 parameter."
@@ -188,7 +188,7 @@ contains
 
           case('kmc_rates')
             if (nwords/=2) stop err // "kmc_rates must have 1 parameter."
-            read(words(2),*) control_parameters_init%rate_file_name
+            control_parameters_init%rate_file_name = words(2)
 
           case('')
 
