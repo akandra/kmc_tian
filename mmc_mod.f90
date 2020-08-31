@@ -43,14 +43,15 @@ subroutine metropolis(lat, c_pars, e_pars)
                 "# rows","# cols","step_period"
   write(outcfg_unit,'(3i10)') lat%n_rows, lat%n_cols, c_pars%step_period
   write(outcfg_unit,'(100A10)') adjustr(c_pars%ads_names)
-  write(outcfg_unit,'(A10,i0)') "mmc step ", 0
+  write(outcfg_unit,'(A10,i0)') "mmc_step ", 0
   write(outcfg_unit,'(100i10)') lat%n_ads
 !  write(outcfg_unit,'(5A10)') "#","row","col","ads_site", "species"
   call lat%print_ads(outcfg_unit)
 
   ! write initial total energy of the system
   call open_for_write(outeng_unit,trim(c_pars%file_name_base)//'.en')
-  write(outeng_unit,*) 0, total_energy(lat,e_pars)
+  write(outeng_unit,'(2A12)') 'mmc_step', ' energy(eV)'
+  write(outeng_unit,'(i12,1pe12.3)') 0, total_energy(lat,e_pars)
 
   ! open file for saving cluster size histogram
   if (c_pars%hist_period > 0) &
@@ -148,7 +149,7 @@ subroutine metropolis(lat, c_pars, e_pars)
 
   ! Save the last configuration
   if (mod(c_pars%n_mmc_steps, c_pars%save_period) /= 0) then
-    write(outcfg_unit,'(A10,i0)') "mmc step ",c_pars%n_mmc_steps
+    write(outcfg_unit,'(A10,i0)') "mmc_step ",c_pars%n_mmc_steps
     write(outcfg_unit,'(100i10)') lat%n_ads
     call lat%print_ads(outcfg_unit)
   end if
