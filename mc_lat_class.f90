@@ -407,16 +407,21 @@ contains
 ! ---------------------------------------------------------------------
 ! Subroutine finding  position of neighbor accounting for PBCs
 ! ---------------------------------------------------------------------
-  subroutine mc_lat_neighbor_with_pbc(this,i,ihop, row, col)
+  subroutine mc_lat_neighbor_with_pbc(this,i,ihop, row, col, shell)
 
     class(mc_lat), intent(in) :: this
     integer, intent(in)  :: i, ihop
     integer, intent(out) :: row, col
+    integer, intent(in), optional :: shell
 
+    integer :: ishell
+
+    ishell = 1
+    if (present(shell)) ishell = shell
     row = modulo(this%ads_list(i)%row &
-               + this%shell_list(1,ihop,1) - 1, this%n_rows) + 1
+               + this%shell_list(ishell,ihop,1) - 1, this%n_rows) + 1
     col = modulo(this%ads_list(i)%col &
-               + this%shell_list(1,ihop,2) - 1, this%n_cols) + 1
+               + this%shell_list(ishell,ihop,2) - 1, this%n_cols) + 1
 
   end subroutine
 
@@ -448,14 +453,15 @@ contains
   integer, dimension(:,:), intent(out) :: cluster_label
   integer, intent(out) :: largest_label
 
-  integer :: i, j, m, n, nnn2, row, col, row_new,col_new
+  integer :: i, j, m, n, row, col, row_new,col_new, shell
   integer :: itemp, ip, jp, i_ads, i_ads_nn
   integer :: ads_site
 
+  integer, dimension(n_shells) :: nnn2
   integer, dimension(this%n_ads(species)) :: labels
-  integer, dimension(this%n_nn(1)/2) :: scanned_nn_occs, row_nn, col_nn
+  integer, dimension(n_shells, maxval(this%n_nn)/2) :: scanned_nn_occs, row_nn, col_nn
 
-  nnn2 = this%n_nn(1)/2
+  nnn2 = this%n_nn/2
   scanned_nn_occs = 0
   cluster_label   = 0
   do i=1,this%n_ads(species)
@@ -471,27 +477,38 @@ contains
     if ( i_ads > 0 ) then
       if ( this%ads_list(i_ads)%id == species ) then
 
-        do m=1,nnn2
+        do shell=1,n_shells
+        do m=1,nnn2(shell)
 
-          ! Take previously scan neighbours
-          call this%neighbor(i_ads,nnn2+m,row_nn(m),col_nn(m))
-          i_ads_nn = this%occupations(row_nn(m), col_nn(m))
+          ! Take previously scanned neighbours
+          call this%neighbor(i_ads,nnn2(shell)+m,row_nn(shell,m),col_nn(shell,m), shell)
+          i_ads_nn = this%occupations(row_nn(shell,m), col_nn(shell,m))
 
-          scanned_nn_occs(m) = 0
+          scanned_nn_occs(shell,m) = 0
           if ( i_ads_nn > 0 ) then
-            if ( this%ads_list(i_ads_nn)%id == species ) scanned_nn_occs(m) = 1
+            if ( this%ads_list(i_ads_nn)%id == species ) scanned_nn_occs(shell,m) = 1
           end if
 
-          ! Switch off periodic boundary conditions
-          ! Warning: works only for hexagonal lattice,
-          !          maybe, because of Corona virus
-          if (row==1) scanned_nn_occs(2:3) = 0
-          if (col==1) scanned_nn_occs(1) = 0
-          if (col==this%n_cols) scanned_nn_occs(3) = 0
+        end do
+        end do
+
+        ! Switch off periodic boundary conditions
+        ! Warning: works only for hexagonal lattice, because of Corona virus
+        do m=1,nnn2(shell)
+WE ARE HERE
+          ! 1st shell
+          if (row==1) scanned_nn_occs(1,2:3) = 0
+          if (col==1) scanned_nn_occs(1,1) = 0
+          if (col==this%n_cols) scanned_nn_occs(1,3) = 0
+
+          ! 2nd shell
+          if (row==1) scanned_nn_occs(1,2:3) = 0
+          if (col==1) scanned_nn_occs(1,1) = 0
+          if (col==this%n_cols) scanned_nn_occs(1,3) = 0
 
         end do
 
-        select case (sum(scanned_nn_occs))
+       select case (sum(scanned_nn_occs))
 
           case (0)
 !            print*
