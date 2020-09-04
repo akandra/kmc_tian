@@ -99,13 +99,15 @@ contains
     lat%n_nn = [6,6,6]
 
     ! NN list for the hexagonal structure
-    !  11    12*   13*   14
+    !  11    12    13***  14**  15***
     !
-    !     21*   22*   23*   24
+    !     21    22**   23*   24*   25**
     !
-    !        31*   32*   33    34
+    !        31*** 32*   33    34*   35***
     !
-    !           41    42    43    44
+    !           41**  42*   43*   44**  45
+    !
+    !              51*** 52**  53*** 54    55
 
     allocate(lat%shell_list(n_shells,maxval(lat%n_nn),2))
     ! Nearest-neigbour (1st) shell (d = 1))
@@ -453,13 +455,20 @@ contains
   integer, dimension(:,:), intent(out) :: cluster_label
   integer, intent(out) :: largest_label
 
+  type nn_position
+    integer :: shell,m
+  end type nn_position
+
   integer :: i, j, m, n, row, col, row_new,col_new, shell
-  integer :: itemp, ip, jp, i_ads, i_ads_nn
+  integer :: itemp, ip, jp, i_ads, i_ads_nn, n_nn
   integer :: ads_site
 
   integer, dimension(n_shells) :: nnn2
   integer, dimension(this%n_ads(species)) :: labels
   integer, dimension(n_shells, maxval(this%n_nn)/2) :: scanned_nn_occs, row_nn, col_nn
+  type(nn_position), dimension(sum(this%n_nn)/2) :: scanned_nn_list
+
+WE ARE HERE
 
   nnn2 = this%n_nn/2
   scanned_nn_occs = 0
@@ -494,21 +503,39 @@ contains
 
         ! Switch off periodic boundary conditions
         ! Warning: works only for hexagonal lattice, because of Corona virus
+
+        ! 1st shell
+        if (row==1) scanned_nn_occs(1,2:3) = 0
+        if (col==1) scanned_nn_occs(1,1) = 0
+        if (col==this%n_cols) scanned_nn_occs(1,3) = 0
+
+        ! 2nd shell
+        if (row==1) scanned_nn_occs(2,:) = 0
+        if (row==2) scanned_nn_occs(2,2) = 0
+        if (col==1) scanned_nn_occs(2,1) = 0
+        if (col==this%n_cols) scanned_nn_occs(2,2:3) = 0
+        if (col==this%n_cols-1) scanned_nn_occs(2,3) = 0
+
+        ! 3rd shell
+        if (row==1 .or. row==2) scanned_nn_occs(3,2:3) = 0
+        if (col==1 .or. col==2) scanned_nn_occs(3,1) = 0
+        if (col==this%n_cols .or. col==this%n_cols-1) scanned_nn_occs(3,3) = 0
+
+        ! create list of neighbors
+        nn = 0
+        scanned_nn_list = nn_position(0,0)
+        do shell=1,n_shells
         do m=1,nnn2(shell)
-WE ARE HERE
-          ! 1st shell
-          if (row==1) scanned_nn_occs(1,2:3) = 0
-          if (col==1) scanned_nn_occs(1,1) = 0
-          if (col==this%n_cols) scanned_nn_occs(1,3) = 0
-
-          ! 2nd shell
-          if (row==1) scanned_nn_occs(1,2:3) = 0
-          if (col==1) scanned_nn_occs(1,1) = 0
-          if (col==this%n_cols) scanned_nn_occs(1,3) = 0
-
+          if ( scanned_nn_occs(shell,m) == 1 ) then
+            nn = nn + 1
+            scanned_nn_list(nn)%shell = shell
+            scanned_nn_list(nn)%m     = m
+          end if
+        end do
         end do
 
-       select case (sum(scanned_nn_occs))
+!       nn = sum(scanned_nn_occs)
+       select case (nn)
 
           case (0)
 !            print*
@@ -519,32 +546,21 @@ WE ARE HERE
           case (1)
 !            print*
 !            print*,"Case 1"
-            do m=1,nnn2
-              if (scanned_nn_occs(m) == 1) then
-                cluster_label(row,col) = &
-                        lfind( cluster_label(row_nn(m),col_nn(m)), labels)
-                end if
-            end do
+            shell = scanned_nn_list(1)%shell
+            m     = scanned_nn_list(1)%m
+            cluster_label(row,col) = lfind( cluster_label(row_nn(shell,m),col_nn(shell,m)), labels)
 
-          case (2)
+          case (2:sum(this%n_nn)/2)
 !            print*
 !            print*,"Case 2"
-            do m=1,nnn2-1
-              itemp = cluster_label(row_nn(m),col_nn(m))
-            do n=m+1,nnn2
-              if (scanned_nn_occs(m) == 1 .and. scanned_nn_occs(n) == 1) then
-                call lunion(itemp,cluster_label(row_nn(n),col_nn(n)),labels)
-                cluster_label(row,col) = lfind(itemp, labels)
-              end if
+            shell = scanned_nn_list(1)%shell
+            m     = scanned_nn_list(1)%m
+            itemp = cluster_label(row_nn(shell,m),col_nn(shell,m))
+            do i=2,nn
+              shell = scanned_nn_list(i)%shell
+              n     = scanned_nn_list(i)%m
+              call lunion(itemp,cluster_label(row_nn(shell,n),col_nn(shell,n)),labels)
             end do
-            end do
-
-          case (3)
-!            print*
-!            print*,"Case 3"
-            itemp = cluster_label(row_nn(1),col_nn(1))
-            call lunion(itemp, cluster_label(row_nn(2),col_nn(2)),labels)
-            call lunion(itemp, cluster_label(row_nn(3),col_nn(3)),labels)
             cluster_label(row,col) = lfind(itemp, labels)
 
           case default
