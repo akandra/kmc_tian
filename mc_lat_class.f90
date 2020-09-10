@@ -460,7 +460,7 @@ contains
   end type nn_position
 
   integer :: i, j, m, n, row, col, row_new,col_new, shell
-  integer :: itemp, ip, jp, i_ads, i_ads_nn, n_nn
+  integer :: itemp, ip, jp, i_ads, i_ads_nn, n_neighbors
   integer :: ads_site
 
   integer, dimension(n_shells) :: nnn2
@@ -468,7 +468,6 @@ contains
   integer, dimension(n_shells, maxval(this%n_nn)/2) :: scanned_nn_occs, row_nn, col_nn
   type(nn_position), dimension(sum(this%n_nn)/2) :: scanned_nn_list
 
-WE ARE HERE
 
   nnn2 = this%n_nn/2
   scanned_nn_occs = 0
@@ -522,20 +521,19 @@ WE ARE HERE
         if (col==this%n_cols .or. col==this%n_cols-1) scanned_nn_occs(3,3) = 0
 
         ! create list of neighbors
-        nn = 0
+        n_neighbors = 0
         scanned_nn_list = nn_position(0,0)
         do shell=1,n_shells
         do m=1,nnn2(shell)
           if ( scanned_nn_occs(shell,m) == 1 ) then
-            nn = nn + 1
-            scanned_nn_list(nn)%shell = shell
-            scanned_nn_list(nn)%m     = m
+            n_neighbors = n_neighbors + 1
+            scanned_nn_list(n_neighbors)%shell = shell
+            scanned_nn_list(n_neighbors)%m     = m
           end if
         end do
         end do
 
-!       nn = sum(scanned_nn_occs)
-       select case (nn)
+       select case (n_neighbors)
 
           case (0)
 !            print*
@@ -550,21 +548,16 @@ WE ARE HERE
             m     = scanned_nn_list(1)%m
             cluster_label(row,col) = lfind( cluster_label(row_nn(shell,m),col_nn(shell,m)), labels)
 
-          case (2:sum(this%n_nn)/2)
-!            print*
-!            print*,"Case 2"
+          case default
             shell = scanned_nn_list(1)%shell
             m     = scanned_nn_list(1)%m
             itemp = cluster_label(row_nn(shell,m),col_nn(shell,m))
-            do i=2,nn
+            do i=2,n_neighbors
               shell = scanned_nn_list(i)%shell
               n     = scanned_nn_list(i)%m
               call lunion(itemp,cluster_label(row_nn(shell,n),col_nn(shell,n)),labels)
             end do
             cluster_label(row,col) = lfind(itemp, labels)
-
-          case default
-            stop 'Hoshen-Kopelman: too many neighbors'
 
         end select
 
@@ -577,36 +570,46 @@ WE ARE HERE
 !  print*
 !  call this%print_ocs
 !  print*
-!  write(*,'(8i4)') transpose(cluster_label)
-!  print*
+!  print*,'cluster labels before applying PBC:'
+!  write(*,'(20i4)') transpose(cluster_label)
+!  print*,'cluster labels list:'
 !  do i=1,largest_label
 !      print('(i3,a5,i3)'), i, ' --> ' , labels(i)
 !  end do
 
   ! Apply PBC
   do row=1,this%n_rows
-    ip = cluster_label(row,1)
+  do col=1,2
+    ip = cluster_label(row,col)
     if (ip > 0) then
-      do m=1,nnn2
-        call this%neighbor(this%occupations(row,1),nnn2+m,row_new,col_new)
+      do shell=1,n_shells
+      do m=1,this%n_nn(shell)
+        call this%neighbor(this%occupations(row,col),m,row_new,col_new,shell)
         jp = cluster_label(row_new,col_new)
         if (jp > 0) call lunion(ip,jp,labels)
+      end do
       end do
     end if
   end do
+  end do
 
-  do col=2,this%n_cols-1
-    ip = cluster_label(1,col)
+  do col=3,this%n_cols-2
+  do row=1,2
+    ip = cluster_label(row,col)
     if (ip > 0) then
-      do m=1,nnn2
-        call this%neighbor(this%occupations(1,col),nnn2+m,row_new,col_new)
+      do shell=1, n_shells
+      do m=1,this%n_nn(shell)
+        call this%neighbor(this%occupations(row,col),m,row_new,col_new,shell)
         jp = cluster_label(row_new,col_new)
         if (jp > 0) call lunion(ip,jp,labels)
       end do
+      end do
     end if
+  end do
   end do
 
 !  print*
+!  print*,'cluster labels list after PBC:'
 !  do i=1,largest_label
 !      print('(i3,a5,i3)'), i, ' --> ' , labels(i)
 !  end do
@@ -620,7 +623,9 @@ WE ARE HERE
   end do
 
 !  print*
-!  write(*,'(8i4)') transpose(cluster_label)
+!  print*,'cluster labels after PBC and rooting:'
+!  write(*,'(20i4)') transpose(cluster_label)
+!  pause
 
   contains
 
