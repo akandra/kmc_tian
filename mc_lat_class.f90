@@ -35,6 +35,8 @@ module mc_lat_class
     integer, dimension(:,:), allocatable  :: occupations  !  n_rows x n_cols
     ! array of lattice site types
     integer, dimension(:,:), allocatable  :: lst          !  n_rows x n_cols
+    ! lattice vectors
+    real(dp), dimension(2) :: lat_vec_1, lat_vec_2
     ! shellwise number of neighbors
     integer, dimension(n_shells) :: n_nn
     integer, dimension(:,:,:), allocatable  :: shell_list
@@ -54,7 +56,7 @@ module mc_lat_class
       procedure :: print_ads  => mc_lat_print_ads
       procedure :: hop        => mc_lat_hop_with_pbc
       procedure :: neighbor   => mc_lat_neighbor_with_pbc
-      procedure :: pbc        => mc_lat_pbc
+      procedure :: distance   => mc_lat_distance_with_pbc
       procedure :: n_ads_tot  => mc_lat_n_ads_total
       procedure :: hoshen_kopelman
       procedure :: cluster_size => count_cluster_sizes
@@ -85,17 +87,19 @@ contains
     lat%n_cols = control_pars%n_cols
 
     ! Adsorption sites on the unit hex cell
-    !  T. . . . .B1 . . . . .           1 top       (T)
-    !   .  .              .  .          2 fcc       (F)
-    !    .     F         .    .         3 hcp       (H)
-    !     .        .   .       .        4 bridge 1  (B1)
+    !  T---------B1---------.           1 top       (T)
+    !   \  .              .  .          2 fcc       (F)
+    !    \     F         .    .         3 hcp       (H)
+    !     \        .   .       .        4 bridge 1  (B1)
     !      B3        B2         .       5 bridge 2  (B2)
-    !       .       .     .      .      6 bridge 3  (B3)
-    !        .    .          H    .
-    !         . .                  .
-    !          .. . . . . . . . . . .
+    !       \       .     .      .      6 bridge 3  (B3)
+    !        \    .          H    .
+    !         \ .                  .
+    !          \. . . . . . . . . . .
 
-
+    ! lattice vectors for hex lattice
+    lat%lat_vec_1 = [ 1.0_dp, 0.0_dp]
+    lat%lat_vec_2 = [ 0.5_dp,-cos(pi/3)]
 
     ! Shellwise number of neighbors for hex lattice
     lat%n_nn = [6,6,6]
@@ -430,23 +434,26 @@ contains
   end subroutine
 
 ! ---------------------------------------------------------------------
-! Subroutine applying PBCs
+! Subroutine applying PBCs to calculate distance
 ! ---------------------------------------------------------------------
-  subroutine mc_lat_pbc(this,i,ihop, row, col, shell)
+  subroutine mc_lat_distance_with_pbc(this, ads1, ads2, r)
 
     class(mc_lat), intent(in) :: this
-    integer, intent(in)  :: i, ihop
-    integer, intent(out) :: row, col
-    integer, intent(in), optional :: shell
+    integer, intent(in)   :: ads1, ads2
+    real(dp), intent(out) :: r
 
-    integer :: ishell
+    integer :: d_row, d_col
 
-    ishell = 1
-    if (present(shell)) ishell = shell
-    row = modulo(this%ads_list(i)%row &
-               + this%shell_list(ishell,ihop,1) - 1, this%n_rows) + 1
-    col = modulo(this%ads_list(i)%col &
-               + this%shell_list(ishell,ihop,2) - 1, this%n_cols) + 1
+    d_row = this%ads_list(ads1)%row - this%ads_list(ads2)%row
+    d_col = this%ads_list(ads1)%col - this%ads_list(ads2)%col
+
+    itemp = (2*d_row)/this%n_rows
+    d_row = d_row - itemp*this%n_rows/2
+    itemp = (2*d_col)/this%n_cols
+    d_col = d_col - itemp*this%n_cols/2
+
+    r = sqrt( (this%lat_vec_1(1)*d_col + this%lat_vec_2(1)*d_col)**2 &
+             +(this%lat_vec_1(2)*d_row + this%lat_vec_2(2)*d_row)**2  )
 
   end subroutine
 
@@ -720,7 +727,6 @@ contains
   implicit none
 
   class (mc_lat), intent(in) :: this
-  integer, intent(in) :: species
   integer, dimension(:),  intent(out) :: rdf
 
   integer :: ads1, row1, col1
