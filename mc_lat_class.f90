@@ -54,9 +54,11 @@ module mc_lat_class
       procedure :: print_ads  => mc_lat_print_ads
       procedure :: hop        => mc_lat_hop_with_pbc
       procedure :: neighbor   => mc_lat_neighbor_with_pbc
+      procedure :: pbc        => mc_lat_pbc
       procedure :: n_ads_tot  => mc_lat_n_ads_total
       procedure :: hoshen_kopelman
       procedure :: cluster_size => count_cluster_sizes
+      procedure :: rdf => radial_distribution_function
       procedure :: restore    => mc_lat_restore
       procedure, nopass, public :: mc_lat_init
 
@@ -428,6 +430,27 @@ contains
   end subroutine
 
 ! ---------------------------------------------------------------------
+! Subroutine applying PBCs
+! ---------------------------------------------------------------------
+  subroutine mc_lat_pbc(this,i,ihop, row, col, shell)
+
+    class(mc_lat), intent(in) :: this
+    integer, intent(in)  :: i, ihop
+    integer, intent(out) :: row, col
+    integer, intent(in), optional :: shell
+
+    integer :: ishell
+
+    ishell = 1
+    if (present(shell)) ishell = shell
+    row = modulo(this%ads_list(i)%row &
+               + this%shell_list(ishell,ihop,1) - 1, this%n_rows) + 1
+    col = modulo(this%ads_list(i)%col &
+               + this%shell_list(ishell,ihop,2) - 1, this%n_cols) + 1
+
+  end subroutine
+
+! ---------------------------------------------------------------------
 ! Function returning the total number of adsorbates
 ! ---------------------------------------------------------------------
   integer function mc_lat_n_ads_total(this) result(n_ads_total)
@@ -686,6 +709,39 @@ contains
         cluster_sizes(i_label) = cluster_sizes(i_label) + 1
       end if
     end do
+
+  end subroutine
+
+! ---------------------------------------------------------------------
+! Subroutine calculating radial distribution function
+! ---------------------------------------------------------------------
+  subroutine radial_distribution_function(this, rdf)
+
+  implicit none
+
+  class (mc_lat), intent(in) :: this
+  integer, intent(in) :: species
+  integer, dimension(:),  intent(out) :: rdf
+
+  integer :: ads1, row1, col1
+  integer :: ads2, row2, col2
+  integer :: n_ads_total
+
+  n_ads_total = this%n_ads_tot()
+  do ads1 = 1, n_ads_total-1
+  do ads2 = ads1+1, n_ads_total
+
+    row1 = this%ads_list(ads1)%row
+    col1 = this%ads_list(ads1)%col
+
+    row2 = this%ads_list(ads2)%row
+    col2 = this%ads_list(ads2)%col
+
+    d_row = row2 - row1
+    d_col = col2 - col1
+
+  end do
+  end do
 
   end subroutine
 
