@@ -98,8 +98,8 @@ contains
     !          \. . . . . . . . . . .
 
     ! lattice vectors for hex lattice
-    lat%lat_vec_1 = [ 1.0_dp, 0.0_dp]
-    lat%lat_vec_2 = [ 0.5_dp,-cos(pi/3)]
+    lat%lat_vec_1 = [ cos(0.0_dp),    -sin(0.0_dp)   ]
+    lat%lat_vec_2 = [ cos(pi/3.0_dp), -sin(pi/3.0_dp)]
 
     ! Shellwise number of neighbors for hex lattice
     lat%n_nn = [6,6,6]
@@ -442,18 +442,27 @@ contains
     integer, intent(in)   :: ads1, ads2
     real(dp), intent(out) :: r
 
-    integer :: d_row, d_col
+    integer :: d_row, d_col, n_rows_2, n_cols_2
 
+    n_rows_2 = this%n_rows/2
+    n_cols_2 = this%n_cols/2
+    ! calculate delta_row and delta_col
     d_row = this%ads_list(ads1)%row - this%ads_list(ads2)%row
     d_col = this%ads_list(ads1)%col - this%ads_list(ads2)%col
-
-    itemp = (2*d_row)/this%n_rows
-    d_row = d_row - itemp*this%n_rows/2
-    itemp = (2*d_col)/this%n_cols
-    d_col = d_col - itemp*this%n_cols/2
-
-    r = sqrt( (this%lat_vec_1(1)*d_col + this%lat_vec_2(1)*d_col)**2 &
-             +(this%lat_vec_1(2)*d_row + this%lat_vec_2(2)*d_row)**2  )
+    ! apply periodic boundary conditions
+    if (d_row > n_rows_2 ) then
+      d_row = d_row - this%n_rows
+    else if (d_row < -n_rows_2 ) then
+      d_row = d_row + this%n_rows
+    end if
+    if (d_col > n_cols_2 ) then
+      d_col = d_col - this%n_cols
+    else if (d_col < -n_cols_2 ) then
+      d_col = d_col + this%n_cols
+    end if
+    ! calculate the distance
+    r = sqrt(  ( d_col*this%lat_vec_1(1) + d_row*this%lat_vec_2(1) )**2 &
+             + ( d_col*this%lat_vec_1(2) + d_row*this%lat_vec_2(2) )**2  )
 
   end subroutine
 
