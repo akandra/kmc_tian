@@ -25,6 +25,9 @@ module control_parameters_class
                    energy_file_name,& ! name of the file with adsorption and interaction energies
                    cfg_file_name,   & ! name of the file with initial configuration
                    file_name_base     ! filename base for output files
+    integer  :: rdf_period            ! period for rdf_hist calculations
+    real(dp) :: rdf_bin_size          ! size (in init cell) of the bin for rdf calculation
+    integer  :: rdf_n_bins            ! number of bins for rdf_hist calculations
 
     ! MMC-specific parameters
 
@@ -75,6 +78,9 @@ contains
     control_parameters_init%energy_file_name = 'none'
     control_parameters_init%cfg_file_name    = 'none'
     control_parameters_init%file_name_base   = 'none'
+    control_parameters_init%rdf_bin_size     = -1.0_dp
+    control_parameters_init%rdf_n_bins       = -1
+    control_parameters_init%rdf_period       = -1
     ! MMC-specific parameters
     control_parameters_init%n_mmc_steps      = -1
     control_parameters_init%hist_period      = -1
@@ -189,6 +195,12 @@ contains
           case('kmc_rates')
             if (nwords/=2) stop err // "kmc_rates must have 1 parameter."
             control_parameters_init%rate_file_name = words(2)
+
+          case('rdf')
+            if (nwords/=4) stop err // "rdf must have 3 parameters."
+            read(words(2),*) control_parameters_init%rdf_period
+            read(words(3),*) control_parameters_init%rdf_bin_size
+            read(words(4),*) control_parameters_init%rdf_n_bins
 
           case('')
 

@@ -60,7 +60,7 @@ module mc_lat_class
       procedure :: n_ads_tot  => mc_lat_n_ads_total
       procedure :: hoshen_kopelman
       procedure :: cluster_size => count_cluster_sizes
-      procedure :: rdf => radial_distribution_function
+      procedure :: rdf_hist
       procedure :: restore    => mc_lat_restore
       procedure, nopass, public :: mc_lat_init
 
@@ -729,31 +729,36 @@ contains
   end subroutine
 
 ! ---------------------------------------------------------------------
-! Subroutine calculating radial distribution function
+! Subroutine calculating a histogram for the radial distribution function
 ! ---------------------------------------------------------------------
-  subroutine radial_distribution_function(this, rdf)
+  subroutine rdf_hist(this, cpars, hist)
 
   implicit none
 
   class (mc_lat), intent(in) :: this
-  integer, dimension(:),  intent(out) :: rdf
+  class(control_parameters), intent(in) :: cpars
+  integer, dimension(:,:,:),  intent(inout) :: hist
 
-  integer :: ads1, row1, col1
-  integer :: ads2, row2, col2
-  integer :: n_ads_total
+  integer :: ads1, spec1
+  integer :: ads2, spec2
+  integer :: n_ads_total, bin, n_bins
+  real(dp):: r, inv_bin_size
 
   n_ads_total = this%n_ads_tot()
+  inv_bin_size = 1.0_dp/cpars%rdf_bin_size
+  n_bins = cpars%rdf_n_bins
+
   do ads1 = 1, n_ads_total-1
   do ads2 = ads1+1, n_ads_total
 
-    row1 = this%ads_list(ads1)%row
-    col1 = this%ads_list(ads1)%col
-
-    row2 = this%ads_list(ads2)%row
-    col2 = this%ads_list(ads2)%col
-
-    d_row = row2 - row1
-    d_col = col2 - col1
+    spec1 = this%ads_list(ads1)%id
+    spec2 = this%ads_list(ads2)%id
+    call this%distance(ads1, ads2, r)
+    bin = floor(r*inv_bin_size) + 1
+    if (bin <= n_bins) then
+      hist(spec1,spec2,bin) = hist(spec1,spec2,bin) + 1
+      hist(spec2,spec1,bin) = hist(spec2,spec1,bin) + 1
+    end if
 
   end do
   end do

@@ -90,6 +90,7 @@ module constants
   integer, parameter :: outeng_unit  = 11
   integer, parameter :: outhst_unit  = 12
   integer, parameter :: outcnt_unit  = 13
+  integer, parameter :: outrdf_unit  = 14
 
   ! Internal program constants
   integer, parameter :: randseed(13) = [7,5,3,11,9,1,17,2,9,6,4,5,8]

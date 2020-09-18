@@ -25,9 +25,9 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
 
   type(reaction_type) :: r, r_save
 
-  character(len=max_string_length) :: buffer, n_ads_fmt
+  character(len=max_string_length) :: buffer, n_ads_fmt, rdf_fmt
   integer :: itraj, ibin, ibin_new, ibin_current
-  integer :: i, species
+  integer :: i, species, species1, species2
   integer :: kmc_nsteps
   integer, dimension(lat%n_rows,lat%n_cols) :: cluster_label
   ! Warning: size of cluster_sizes and hist array are large
@@ -37,6 +37,10 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
   integer, dimension(c_pars%n_species,lat%n_rows*lat%n_cols) :: hist
   real(dp) :: time
   real(dp) :: delta_t, time_new, step_bin
+
+  integer, dimension(c_pars%n_species,c_pars%n_species,c_pars%rdf_n_bins) :: rdf_hist
+  real(dp) :: unit_cell_area
+  real(dp), dimension(c_pars%rdf_n_bins) :: dr2
 
   integer :: j, k, n_chan  ! only for debug printout
 
@@ -114,9 +118,27 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
     write(outcnt_unit,'(1pe12.3,100i20)') 0.0_dp, r%counter
     ! open file for saving cluster size histogram
     call open_for_write(outhst_unit,trim(c_pars%file_name_base)//'_'//trim(buffer)//'.hist')
-    !-----Save histogram with cluster sizes
+
+    ! open file for saving rdf and define rdf-specific variables
+    if (c_pars%rdf_period > 0) then
+      call open_for_write(outrdf_unit,trim(c_pars%file_name_base)//'_'//trim(buffer)//'.rdf')
+
+      ! Output formats
+      write(rdf_fmt,'(i10)') c_pars%rdf_n_bins
+      rdf_fmt = '('//trim(adjustl(rdf_fmt))//'(1pe12.3))'
+
+      ! array of inverse bin areas for rdf calculation
+      unit_cell_area = abs(lat%lat_vec_1(1)*lat%lat_vec_2(2) - lat%lat_vec_1(2)*lat%lat_vec_2(1))
+      do i=1,c_pars%rdf_n_bins
+        dr2(i) = unit_cell_area / ( pi*(2*i - 1)*c_pars%rdf_bin_size**2)
+      end do
+    end if
+
     if (r%n_ads_total>0) then
-    ! Output formats
+
+    !-----Save histogram with cluster sizes
+
+      ! Output formats
       write(n_ads_fmt,'(i10)') r%n_ads_total
       n_ads_fmt = '('//trim(adjustl(n_ads_fmt))//'i8)'
       ! Calculate histogram
@@ -135,10 +157,34 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
         write(outhst_unit,*) species
         write(outhst_unit,n_ads_fmt) (hist(species,i), i=1,lat%n_ads(species))
       end do
+
+    !-----Save rdf
+
+      if (c_pars%rdf_period > 0) then
+        ! Calculate rdf
+        rdf_hist = 0
+        call lat%rdf_hist(c_pars, rdf_hist)
+        ! Write it out
+        write(outrdf_unit,'(A6,1pe12.3)') "time ",0.0_dp
+        do species1=1,c_pars%n_species
+        do species2=1,c_pars%n_species
+          write(outrdf_unit,*) species1, species2
+          if (lat%n_ads(species1) > 0) then
+            write(outrdf_unit,rdf_fmt) dr2*rdf_hist(species1,species2,:)/lat%n_ads(species1)
+          else
+            write(outrdf_unit,rdf_fmt) dr2*rdf_hist(species1,species2,:)
+          end if
+        end do
+        end do
+      end if
+
     else
-      ! No histogram output when no adsorbates
+      ! No output when no adsorbates
       write(outhst_unit,'(A6,1pe12.3)') "time ",0.0_dp
+      write(outrdf_unit,'(A6,1pe12.3)') "time ",0.0_dp
+
     end if
+
     ! start time propagation
     time = big_bang
     do while (time<c_pars%t_end)
@@ -188,7 +234,9 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
         r%counter = 0
 
         if (r%n_ads_total>0) then
+
           !-----Save histogram with cluster sizes
+
           ! Output formats
           write(n_ads_fmt,'(i10)') r%n_ads_total
           n_ads_fmt = '('//trim(adjustl(n_ads_fmt))//'i8)'
@@ -210,9 +258,30 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
             write(outhst_unit,n_ads_fmt) (hist(species,i), i=1,lat%n_ads(species))
           end do
 
+          !-----Save rdf
+
+          if (c_pars%rdf_period > 0) then
+            ! Calculate rdf
+            rdf_hist = 0
+            call lat%rdf_hist(c_pars, rdf_hist)
+            ! Write it out
+            write(outrdf_unit,'(A6,1pe12.3)') "time ",ibin_current*step_bin
+            do species1=1,c_pars%n_species
+            do species2=1,c_pars%n_species
+              write(outrdf_unit,*) species1, species2
+              if (lat%n_ads(species1) > 0) then
+                write(outrdf_unit,rdf_fmt) dr2*rdf_hist(species1,species2,:)/lat%n_ads(species1)
+              else
+                write(outrdf_unit,rdf_fmt) dr2*rdf_hist(species1,species2,:)
+              end if
+            end do
+            end do
+          end if
+
         else
           ! No histogram output when no adsorbates
           write(outhst_unit,'(A6,1pe12.3)') "time ",ibin_current*step_bin
+          write(outrdf_unit,'(A6,1pe12.3)') "time ",ibin_current*step_bin
 
         end if
 
@@ -227,6 +296,7 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
     close(outcfg_unit)
     close(outeng_unit)
     close(outhst_unit)
+    if (c_pars%rdf_period > 0) close(outrdf_unit)
     close(outcnt_unit)
 
   end do ! over trajectories

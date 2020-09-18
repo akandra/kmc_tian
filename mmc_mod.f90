@@ -20,21 +20,31 @@ subroutine metropolis(lat, c_pars, e_pars)
   type(control_parameters), intent(in) :: c_pars
   type(energy_parameters ), intent(in) :: e_pars
 
-  integer :: i, istep, ihop, species
+  integer :: i, istep, ihop, species, species1, species2
   integer :: new_row, new_col, new_ads_site, old_row, old_col, old_ads_site
-  real(dp) :: energy_old, beta, delta_E
-  character(len=max_string_length) :: n_ads_fmt
+  real(dp) :: energy_old, beta, delta_E, unit_cell_area
+  character(len=max_string_length) :: n_ads_fmt, rdf_fmt
   integer, dimension(lat%n_rows,lat%n_cols) :: cluster_label
   integer, dimension(maxval(lat%n_ads)) :: cluster_sizes
-  integer :: largest_label, hist_counter
+  integer :: largest_label, hist_counter, rdf_counter
   integer, dimension(c_pars%n_species,maxval(lat%n_ads)) :: hist
+  integer, dimension(c_pars%n_species,c_pars%n_species,c_pars%rdf_n_bins) :: rdf_hist
+  real(dp), dimension(c_pars%rdf_n_bins) :: dr2
 
   ! inverse thermodynamic temperature
   beta = 1.0_dp/(kB*c_pars%temperature)
+  ! array of inverse bin areas for rdf calculation
+  unit_cell_area = abs(lat%lat_vec_1(1)*lat%lat_vec_2(2) - lat%lat_vec_1(2)*lat%lat_vec_2(1))
+  do i=1,c_pars%rdf_n_bins
+    dr2(i) = unit_cell_area / ( pi*(2*i - 1)*c_pars%rdf_bin_size**2)
+  end do
+
 
   ! Output formats
   write(n_ads_fmt,'(i10)') lat%n_ads_tot()
   n_ads_fmt = '('//trim(adjustl(n_ads_fmt))//'i8)'
+  write(rdf_fmt,'(i10)') c_pars%rdf_n_bins
+  rdf_fmt = '('//trim(adjustl(rdf_fmt))//'(1pe12.3))'
 
   ! write initial state of the lattice to a file
   call open_for_write(outcfg_unit,trim(c_pars%file_name_base)//'.confs')
@@ -54,11 +64,16 @@ subroutine metropolis(lat, c_pars, e_pars)
   write(outeng_unit,'(i12,1pe12.3)') 0, total_energy(lat,e_pars)
 
   ! open file for saving cluster size histogram
-  if (c_pars%hist_period > 0) &
-    call open_for_write(outhst_unit,trim(c_pars%file_name_base)//'.hist')
-  ! Initialize cluster histogram counters
+  if (c_pars%hist_period > 0) call open_for_write(outhst_unit,trim(c_pars%file_name_base)//'.hist')
+  ! Initialize cluster histogram and counters
   hist_counter = 0
   hist = 0
+
+  ! open file for saving rdf
+  if (c_pars%rdf_period > 0) call open_for_write(outrdf_unit,trim(c_pars%file_name_base)//'.rdf')
+  ! rdf histogram and counters
+  rdf_counter = 0
+  rdf_hist = 0
 
   write(*,'(20X,A)') "M.M.C. Code's progress report:"
   call progress_bar(0)
@@ -109,8 +124,10 @@ subroutine metropolis(lat, c_pars, e_pars)
 
     enddo
 
+    ! Calculate the cluster size histogramm
     if (c_pars%hist_period > 0 .and. mod(istep, c_pars%hist_period) == 0) then
       hist_counter = hist_counter + 1
+
       do species=1,c_pars%n_species
         call lat%hoshen_kopelman(species, cluster_label, largest_label)
         call lat%cluster_size(species, cluster_label, cluster_sizes)
@@ -123,16 +140,28 @@ subroutine metropolis(lat, c_pars, e_pars)
 !        print*,'hist:',hist(species,:)
 !        print*
       end do
+
+    end if
+
+    ! Calculate rdf
+    if (c_pars%rdf_period > 0 .and. mod(istep, c_pars%rdf_period) == 0) then
+
+      rdf_counter = rdf_counter + 1
+      call lat%rdf_hist(c_pars,rdf_hist)
+
     end if
 
     if (mod(istep, c_pars%save_period) == 0) then
       call progress_bar(100*istep/c_pars%n_mmc_steps)
+
       ! Save configuration
       write(outcfg_unit,'(A10,i0)') "mmc step ",istep
       write(outcfg_unit,'(100i10)') lat%n_ads
       call lat%print_ads(outcfg_unit)
+
       ! Save energy
       write(outeng_unit,*) istep, total_energy(lat,e_pars)
+
       ! Save cluster size histogram
       if (c_pars%hist_period > 0) then
         write(outhst_unit,*) 'counts ', hist_counter
@@ -143,6 +172,24 @@ subroutine metropolis(lat, c_pars, e_pars)
         hist_counter = 0
         hist = 0
       end if
+
+      ! Save rdf
+      if (c_pars%rdf_period > 0) then
+        write(outrdf_unit,*) 'counts ', rdf_counter
+        do species1=1,c_pars%n_species
+        do species2=1,c_pars%n_species
+          write(outrdf_unit,*) species1, species2
+          if (lat%n_ads(species1) > 0) then
+            write(outrdf_unit,rdf_fmt) dr2*rdf_hist(species1,species2,:)/lat%n_ads(species1)
+          else
+            write(outrdf_unit,rdf_fmt) dr2*rdf_hist(species1,species2,:)
+          end if
+        end do
+        end do
+        rdf_counter = 0
+        rdf_hist = 0
+      end if
+
     end if
 
   enddo ! over mmc steps
@@ -157,6 +204,7 @@ subroutine metropolis(lat, c_pars, e_pars)
   close(outcfg_unit)
   close(outeng_unit)
   if (c_pars%hist_period > 0) close(outhst_unit)
+  if (c_pars%rdf_period  > 0) close(outrdf_unit)
 
 end subroutine metropolis
 
