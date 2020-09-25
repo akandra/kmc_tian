@@ -58,14 +58,14 @@ contains
     type(mc_lat)            , intent(in)    :: lat
     type(energy_parameters) , intent(in)    :: e_pars
 
-
     ! Create a rate structure
     reaction_init%hopping      =      hopping_init(c_pars, lat, e_pars)
     reaction_init%desorption   =   desorption_init(c_pars, lat, e_pars)
     reaction_init%dissociation = dissociation_init(c_pars, lat, e_pars)
     reaction_init%association  =  association_init(c_pars, lat, e_pars)
     reaction_init%bimolecular  =  bimolecular_init(c_pars, lat, e_pars)
-!    call reaction_init%bimolecular%print(c_pars)
+
+!    call reaction_init%association%print(c_pars)
 
     reaction_init%beta = 1.0_dp/(kB*c_pars%temperature)
     reaction_init%n_ads_total = lat%n_ads_tot()
@@ -82,15 +82,7 @@ contains
     class(mc_lat),            intent(inout) :: lat
     class(energy_parameters), intent(in)    :: e_pars
 
-    integer       :: i
-    integer       :: ads, chan, proc
-    integer       :: r_id, r_lst, r_ast
-    integer       :: p1_id, p1_lst, p1_ast, p2_id, p2_lst, p2_ast
-    integer       :: r1_id, r1_lst, r1_ast, r2_id, r2_lst, r2_ast
-    real(dp)      :: rate
-    integer       :: m
-    character(8)  :: lst_name, lst_p2_name, ast_r_name, lst_p1_name, ast_p1_name, ast_p2_name
-    character(8)  :: lst_r1_name, lst_r2_name, ast_r1_name, ast_r2_name
+    integer       :: ads
 
 
     ! Hopping
@@ -324,7 +316,7 @@ contains
     integer :: i, m, ads, iads, reaction_id, i_change, channel
     integer :: n_nn, n_nn2, m_nn, col_p2, row_p2, proc, ads_r2
     integer :: id_r, id_r1, id_r2, id_p1, id_p2
-    integer :: ast_r, ast_p1, ast_p2
+    integer :: ast_p1, ast_p2
     integer :: row, col, row_new, col_new, lst_new, ast_new
     real(dp), dimension(n_reaction_types) :: acc_rate
     integer, dimension(2*lat%n_nn(1)) :: change_list

@@ -59,11 +59,9 @@ contains
     character(len=max_string_length)                :: buffer
     character(len=max_string_length)                :: words(100)
     character(len=len(trim(c_pars%rate_file_name))) :: file_name
-    character(1)                                    :: answer
 
     character(len=10)     :: current_species_name
     integer               :: current_species_id
-    character(len=20)     :: current_law_name
     integer               :: current_law_id
 
     integer               :: parse_state
@@ -77,19 +75,22 @@ contains
     integer,  parameter   :: default_int = 0
     real(dp), parameter   :: default_rate  = -1.0_dp
 
-    integer :: row, col, site, id
     integer :: n_nn, n_nn2, max_avail_ads_sites
 
     n_nn  = lat%n_nn(1)
     n_nn2 = n_nn/2
     ! maximal number of available ads. sites
     max_avail_ads_sites = 1
+
     do i=1,c_pars%n_species
-    do m=1,n_max_lat_site_types
+    do m=1,size(lat%avail_ads_sites(i,:))
+
       i1 = size(lat%avail_ads_sites(i,m)%list)
       if (max_avail_ads_sites < i1) max_avail_ads_sites = i1
+
     end do
     end do
+
     ! Allocate and initialize rates array
     allocate( hopping_init%rates(lat%n_rows*lat%n_cols,n_nn) )
     do i=1,lat%n_rows*lat%n_cols
@@ -113,8 +114,6 @@ contains
     parse_state = parse_state_default
     line_number = 0
     undefined_energy = .false.
-
-
 
     do while (ios == 0)
 

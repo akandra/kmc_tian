@@ -23,7 +23,7 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
   type(control_parameters), intent(inout) :: c_pars
   type(energy_parameters ), intent(in)    :: e_pars
 
-  type(reaction_type) :: r, r_save
+  type(reaction_type) :: r
 
   character(len=max_string_length) :: buffer, n_ads_fmt, rdf_fmt
   integer :: itraj, ibin, ibin_new, ibin_current
@@ -50,18 +50,18 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
   ! Create a rate structure
   r = reaction_init(c_pars, lat, e_pars)
 
-!!------------------------------------------------------------------------------
-!!  debug printing
-!!------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
+!  debug printing
+!------------------------------------------------------------------------------
 !print *, 'debug printouts'
-!print '(A, i0)', ' n_processes = ', r%dissociation%n_processes
-!print '(A, i0)', ' lat%n_ads   = ', lat%n_ads
+!print '(A, i0)', ' n_processes = ', r%association%n_processes
+!print *, ' lat%n_ads   = ', lat%n_ads
 !
 !print '(A)', ' n_chan'
 !do i=1, lat%n_ads(1)
-!  n_chan = size(r%dissociation%rate_info(i)%list)
+!  n_chan = size(r%association%rate_info(i)%list)
 !  write(*, '(i4, i6)',advance='no') i, n_chan
-!  print*, r%dissociation%rate_info(i)%list(1)%rate
+!  print*, r%association%rate_info(i)%list(:)%rate
 !
 !end do
 !

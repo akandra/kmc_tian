@@ -104,17 +104,14 @@ contains
 
     integer :: i, ios, nwords, line_number, i1, i2, i3, i4, i5, i6, m
 
-    integer :: species, st1, st2, ast1, ast2
-    logical :: e_defined1, e_defined2, r_defined, undefined_rate, undefined_energy
+    logical :: undefined_energy
 
     character(len=max_string_length)                :: buffer
     character(len=max_string_length)                :: words(100)
     character(len=len(trim(c_pars%rate_file_name))) :: file_name
-    character(1)                                    :: answer
 
     character(len=10)     :: current_reactant_name, current_product1_name, current_product2_name
     integer               :: current_reactant_id, current_product1_id, current_product2_id
-    character(len=20)     :: current_law_name
     integer               :: current_law_id
 
     integer               :: parse_state
@@ -128,8 +125,7 @@ contains
     integer,  parameter   :: default_int = 0
     real(dp), parameter   :: default_rate  = -1.0_dp
 
-    integer :: row, col, site, id
-    integer :: n_nn, n_nn2, max_avail_ads_sites
+    integer :: max_avail_ads_sites
     integer :: n_dissociation_channels = 0
     integer :: dissociation_counter = 0
 
@@ -138,7 +134,7 @@ contains
     ! maximal number of available ads. sites
     max_avail_ads_sites = 1
     do i=1,c_pars%n_species
-    do m=1,n_max_lat_site_types
+    do m=1,size(lat%avail_ads_sites(i,:))
       i1 = size(lat%avail_ads_sites(i,m)%list)
       if (max_avail_ads_sites < i1) max_avail_ads_sites = i1
     end do
@@ -475,10 +471,8 @@ contains
 
     integer :: id_r, id_p1, id_p2, m, iprocs, i_ast_p1, i_ast_p2
     integer :: row, col, lst, ast
-    integer :: row_2, col_2, lst_2, ast_2
+    integer :: row_2, col_2, lst_2
     integer :: n_channels
-    integer :: i
-    character(8) :: lst_name, lst_p2_name, ast_r_name, ast_p1_name, ast_p2_name
 
 !debug(1) = (ads == 10)
 !debug(1) = .false.

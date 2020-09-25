@@ -110,16 +110,14 @@ contains
 
     integer :: i, j, ios, nwords, line_number, m
 
-    logical :: e_defined1, e_defined2, r_defined, undefined_rate, undefined_energy
+    logical :: undefined_energy
 
     character(len=max_string_length)                :: buffer
     character(len=max_string_length)                :: words(100)
     character(len=len(trim(c_pars%rate_file_name))) :: file_name
-    character(1)                                    :: answer
 
     character(len=10)     :: r1_name, r2_name, p1_name, p2_name
     integer               :: r1_id,   r2_id,   p1_id,   p2_id
-    character(len=20)     :: law_name
     integer               :: law_id
 
     integer               :: parse_state
@@ -146,7 +144,7 @@ contains
     ! maximal number of available ads. sites
     max_avail_ads_sites = 1
     do i=1,c_pars%n_species
-    do m=1,n_max_lat_site_types
+    do m=1,size(lat%avail_ads_sites(i,:))
       j = size(lat%avail_ads_sites(i,m)%list)
       if (max_avail_ads_sites < j) max_avail_ads_sites = j
     end do
@@ -497,11 +495,9 @@ contains
     class(energy_parameters), intent(in) :: e_pars
     real(dp), intent(in) :: beta
 
-    integer :: m, iprocs, i_ast_p1, i_ast_p2
+    integer :: m, iprocs
     integer :: id_r1, row_r1, col_r1, lst_r1, ast_r1
     integer :: id_r2, row_r2, col_r2, lst_r2, ast_r2, ads_r2
-    integer :: id_p1, row_p1, col_p1, lst_p1, ast_p1
-    integer :: id_p2, row_p2, col_p2, lst_p2, ast_p2
     integer :: channel
 
     ! Consider ads as reactant 1

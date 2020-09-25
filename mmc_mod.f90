@@ -22,29 +22,33 @@ subroutine metropolis(lat, c_pars, e_pars)
 
   integer :: i, istep, ihop, species, species1, species2
   integer :: new_row, new_col, new_ads_site, old_row, old_col, old_ads_site
-  real(dp) :: energy_old, beta, delta_E, unit_cell_area
+  real(dp) :: energy_old, beta, delta_E
   character(len=max_string_length) :: n_ads_fmt, rdf_fmt
   integer, dimension(lat%n_rows,lat%n_cols) :: cluster_label
   integer, dimension(maxval(lat%n_ads)) :: cluster_sizes
   integer :: largest_label, hist_counter, rdf_counter
   integer, dimension(c_pars%n_species,maxval(lat%n_ads)) :: hist
   integer, dimension(c_pars%n_species,c_pars%n_species,c_pars%rdf_n_bins) :: rdf_hist
-  real(dp), dimension(c_pars%rdf_n_bins) :: dr2
+!  real(dp), dimension(c_pars%rdf_n_bins) :: dr2
+!  real(dp), dimension(c_pars%n_species) :: coverage
+!  real(dp) :: unit_cell_area
 
   ! inverse thermodynamic temperature
   beta = 1.0_dp/(kB*c_pars%temperature)
-  ! array of inverse bin areas for rdf calculation
-  unit_cell_area = abs(lat%lat_vec_1(1)*lat%lat_vec_2(2) - lat%lat_vec_1(2)*lat%lat_vec_2(1))
-  do i=1,c_pars%rdf_n_bins
-    dr2(i) = unit_cell_area / ( pi*(2*i - 1)*c_pars%rdf_bin_size**2)
-  end do
+  ! Factors to calculate rdf from adsorbate counts
+!  unit_cell_area = abs(lat%lat_vec_1(1)*lat%lat_vec_2(2) - lat%lat_vec_1(2)*lat%lat_vec_2(1))
+!  coverage = c_pars%n_ads/float(c_pars%n_rows*c_pars%n_cols)
+!  dr2(1) = 1.0_dp
+!  do i=2,c_pars%rdf_n_bins
+!    dr2(i) = unit_cell_area / (2*pi*(i - 1)*c_pars%rdf_bin_size**2)
+!  end do
 
 
   ! Output formats
   write(n_ads_fmt,'(i10)') lat%n_ads_tot()
   n_ads_fmt = '('//trim(adjustl(n_ads_fmt))//'i8)'
   write(rdf_fmt,'(i10)') c_pars%rdf_n_bins
-  rdf_fmt = '('//trim(adjustl(rdf_fmt))//'(1pe12.3))'
+  rdf_fmt = '('//trim(adjustl(rdf_fmt))//'i8)'
 
   ! write initial state of the lattice to a file
   call open_for_write(outcfg_unit,trim(c_pars%file_name_base)//'.confs')
@@ -155,7 +159,7 @@ subroutine metropolis(lat, c_pars, e_pars)
       call progress_bar(100*istep/c_pars%n_mmc_steps)
 
       ! Save configuration
-      write(outcfg_unit,'(A10,i0)') "mmc step ",istep
+      write(outcfg_unit,'(A10,i0)') "mmc_step ",istep
       write(outcfg_unit,'(100i10)') lat%n_ads
       call lat%print_ads(outcfg_unit)
 
@@ -179,11 +183,13 @@ subroutine metropolis(lat, c_pars, e_pars)
         do species1=1,c_pars%n_species
         do species2=1,c_pars%n_species
           write(outrdf_unit,*) species1, species2
-          if (lat%n_ads(species1) > 0) then
-            write(outrdf_unit,rdf_fmt) dr2*rdf_hist(species1,species2,:)/lat%n_ads(species1)
-          else
-            write(outrdf_unit,rdf_fmt) dr2*rdf_hist(species1,species2,:)
-          end if
+          write(outrdf_unit,rdf_fmt) rdf_hist(species1,species2,:)
+!          if (lat%n_ads(species1) > 0) then
+!            write(outrdf_unit,rdf_fmt) &
+!              dr2*rdf_hist(species1,species2,:)/(lat%n_ads(species1)*coverage(species2))
+!          else
+!            write(outrdf_unit,rdf_fmt) dr2*rdf_hist(species1,species2,:)
+!          end if
         end do
         end do
         rdf_counter = 0

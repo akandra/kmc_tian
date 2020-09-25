@@ -116,7 +116,7 @@ contains
     integer             :: i
     character(len=1)    :: cr = char(13)
     character(len=1)    :: symb
-    character(len=56)   :: hdr = "    0   10   20   30   40   50   60   70   80   90  100 "
+!    character(len=56)   :: hdr = "    0   10   20   30   40   50   60   70   80   90  100 "
     character(len=56)   :: bar = "???%|                                                  |"
 
     symb = '*'

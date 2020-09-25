@@ -45,7 +45,7 @@ contains
     type(mc_lat)            , intent(in)    :: lat
     type(energy_parameters) , intent(in)    :: e_pars
 
-    integer :: i, ios, nwords, line_number, i1, i2, m
+    integer :: ios, nwords, line_number, i1, i2
 
     integer :: species, st1, ast1
     logical :: e_defined1, r_defined, undefined_rate, undefined_energy
@@ -53,11 +53,9 @@ contains
     character(len=max_string_length)                :: buffer
     character(len=max_string_length)                :: words(100)
     character(len=len(trim(c_pars%rate_file_name))) :: file_name
-    character(1)                                    :: answer
 
     character(len=10)     :: current_species_name
     integer               :: current_species_id
-    character(len=20)     :: current_law_name
     integer               :: current_law_id
 
     integer               :: parse_state
@@ -71,7 +69,6 @@ contains
     integer,  parameter   :: default_int = 0
     real(dp), parameter   :: default_rate  = -1.0_dp
 
-    integer :: row, col, site, id
 
     ! Allocate rates array
     allocate( desorption_init%rates(lat%n_rows*lat%n_cols) )

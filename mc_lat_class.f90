@@ -80,7 +80,7 @@ contains
     integer :: n_rows_in, n_cols_in, step_period_in
     character(len=max_string_length) :: line
     character(len=max_string_length) :: ads_names_in(100)
-    integer :: nw, n_species_in, n_site_types, ads_site
+    integer :: n_species_in, n_site_types, ads_site
     integer, allocatable :: n_ads_in(:)
 
     lat%n_rows = control_pars%n_rows
@@ -498,9 +498,8 @@ contains
     integer :: shell,m
   end type nn_position
 
-  integer :: i, j, m, n, row, col, row_new,col_new, shell
+  integer :: i, m, n, row, col, row_new,col_new, shell
   integer :: itemp, ip, jp, i_ads, i_ads_nn, n_neighbors
-  integer :: ads_site
 
   integer, dimension(n_shells) :: nnn2
   integer, dimension(this%n_ads(species)) :: labels
@@ -754,7 +753,7 @@ contains
     spec1 = this%ads_list(ads1)%id
     spec2 = this%ads_list(ads2)%id
     call this%distance(ads1, ads2, r)
-    bin = floor(r*inv_bin_size) + 1
+    bin = floor(r*inv_bin_size + 0.5_dp) + 1
     if (bin <= n_bins) then
       hist(spec1,spec2,bin) = hist(spec1,spec2,bin) + 1
       hist(spec2,spec1,bin) = hist(spec2,spec1,bin) + 1
