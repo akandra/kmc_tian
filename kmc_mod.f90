@@ -207,18 +207,17 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
 
       if (time_new > c_pars%t_end) time_new = c_pars%t_end
 
+      ibin_new = int(time_new/step_bin)
 
-      call progress_bar(                  &
+      ! Do write when switched to the next bin taking into account jumps over more than 1 by repeating output values
+      do ibin_current=ibin+1,ibin_new
+
+        call progress_bar(                  &
           'current trajectory',           &
           int(100*time_new/c_pars%t_end), &
           '   total',                     &
           ! total =  % completed trajs + contribution form current trajctory
           100*(itraj-1)/c_pars%n_trajs + int(100.*time_new/(c_pars%t_end*c_pars%n_trajs)))
-
-      ibin_new = int(time_new/step_bin)
-
-      ! Do write when switched to the next bin taking into account jumps over more than 1 by repeating output values
-      do ibin_current=ibin+1,ibin_new
 
         !-----Save configuration
         write(outcfg_unit,'(A6,1pe12.3)') "time ",ibin_current*step_bin
