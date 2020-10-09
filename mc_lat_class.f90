@@ -45,7 +45,7 @@ module mc_lat_class
     ! number of adsorbates per species
     integer, dimension(:), allocatable :: n_ads
     ! initial and current adsorbates lists
-    type(adsorbate), dimension(:), allocatable  :: ads_list_ini, ads_list
+    type(adsorbate), dimension(:), allocatable  :: ads_list
     ! Available adsorbtion sites list (n_species x n_max_lat_site_types x (n_avail_ads_sites))
     type(v_list), dimension(:,:), allocatable :: avail_ads_sites
     integer :: n_ini_confs  ! Number of available confs in the start-conf file
@@ -76,13 +76,8 @@ contains
     type(energy_parameters),     intent(in) :: e_pars
     type(mc_lat)                            :: lat
 
-    integer :: i, j, k, m, ios
-    integer :: counter, s_counter, current_species
-    integer :: n_rows_in, n_cols_in, step_period_in
-    character(len=max_string_length) :: line
-    character(len=max_string_length) :: ads_names_in(100)
-    integer :: n_species_in, n_site_types, ads_site
-    integer, allocatable :: n_ads_in(:)
+    integer :: i, j, k, m
+    integer :: n_site_types, counter
 
     lat%n_rows = c_pars%n_rows
     lat%n_cols = c_pars%n_cols
@@ -164,12 +159,8 @@ contains
     allocate(lat%n_ads(c_pars%n_species))
     ! Warning: the allocation assumes 1 ads. per unit cell
     allocate(lat%ads_list(    c_pars%n_rows*c_pars%n_cols))
-    allocate(lat%ads_list_ini(c_pars%n_rows*c_pars%n_cols))
     ! Initialize arrays
-    lat%occupations  = 0
-    lat%n_ads        = c_pars%n_ads
     lat%ads_list     = adsorbate(0,0,0,0)
-    lat%ads_list_ini = adsorbate(0,0,0,0)
 
     lat%lst = terrace_site
     ! Define where steps and corners are
@@ -216,126 +207,140 @@ contains
 !end do
 !----------------------------------------------------------------------------------
 
+    ! initialize lattice
     lat%n_ini_confs = 0
-    if (c_pars%cfg_file_name=='none') then
-      ! Populate the lattice
-      counter = 0
-      s_counter = 0
-      current_species = 1
-      loop1: do j=1,lat%n_cols
-      do i=1,lat%n_rows
-        counter   = counter + 1
-        s_counter = s_counter+1
-        if (s_counter>lat%n_ads(current_species)) then
-          s_counter = 1
-          current_species = current_species + 1
-        end if
-        lat%occupations(i,j) = counter
-        ! Warning: arbitrary choice for the ads. site (the 1st available)!
-        ads_site = lat%avail_ads_sites(current_species,lat%lst(i,j))%list(1)
-        lat%ads_list(counter) = adsorbate(i,j,ads_site,current_species)
-        if (counter == lat%n_ads_tot()) exit loop1
-      end do
-      end do loop1
-    else
-      ! Read in the last conf from the file
-      ! and define how many confs the file has
-      call lat%conf_init(c_pars)
-    end if
-
-
-    ! Save initial adsorbate list
-    lat%ads_list_ini = lat%ads_list
+    call lat%conf_init(c_pars)
 
   end function mc_lat_init
 
 ! ---------------------------------------------------------------------
-! Subroutine setting mc_lat structure
-! from the adsorbate list read in from start_conf file
+! Subroutine setting mc_lat structure as defined by (itraj mod nconfs)th record in conf-file
+!   call without optional argument
+!     - selecting the last conf from conf-file and counts the number of confs in it
+!     - producing artificial conf if no conf-file defined
+!
 ! ---------------------------------------------------------------------
-  subroutine mc_lat_conf_init(this,c_pars, conf)
+  subroutine mc_lat_conf_init(this,c_pars, itraj)
 
     class(mc_lat), intent(inout) :: this
     type(control_parameters), intent(in) :: c_pars
-    integer, optional, intent(in) :: conf
+    integer, optional, intent(in) :: itraj
 
     integer :: n_rows_in, n_cols_in, step_period_in
     character(len=max_string_length) :: line
-    integer :: n_species_in, n_site_types, ads_site
+    integer :: n_species_in
     character(len=max_string_length) :: ads_names_in(100)
     integer, allocatable :: n_ads_in(:)
-    integer :: ios, iconf, i, idummy, conf_max
+    integer :: ios, iconf, i, j, idummy, conf
+    integer :: counter, s_counter, current_species, ads_site
 
-    conf_max = huge(1)
-    ! Read info from the configuration file
-    call open_for_read(inp_unit,trim(c_pars%cfg_file_name))
-    read(inp_unit,'(A)') line
-    read(inp_unit,*) n_rows_in, n_cols_in, step_period_in
-    ! Check consistency with control parameters
-    if (n_rows_in      /= c_pars%n_rows .OR.&
-        n_cols_in      /= c_pars%n_cols .OR.&
-        step_period_in /= c_pars%step_period) then
-      print*, 'Error in mc_lat_conf_init:'
-      print*, ' inconsistency in control and configuration files:'
-      print*, '  lattice definition'
-      stop
-    end if
+    ! Clean up lattice structure
+    this%occupations = 0
+    ! Set n_ads as in control file
+    this%n_ads = c_pars%n_ads
 
-    read(inp_unit,'(A)') line
-    call split_string (line, ads_names_in, n_species_in)
-    allocate(n_ads_in(n_species_in))
+    ! add adsorbates to the lattice
+    if (c_pars%cfg_file_name=='none') then
 
-    if (present(conf)) then
-      conf_max = conf
-      if (conf > this%n_ini_confs) then
-        print*, 'Error! '
-        print*, 'mc_lat_conf_init:'
-        print*, ' number of initial configuration', conf
-        print*, ' is larger than the number of available confs', this%n_ini_confs
-        stop
-      end if
-    end if
-
-    do iconf=1,conf_max
-      read(inp_unit, '(A)', iostat=ios) line
-      if (ios /= 0) exit
-      read(inp_unit,*) n_ads_in
-      ! Read the configuration
-      do i=1, sum(n_ads_in)
-        read(inp_unit, *, iostat=ios) idummy,this%ads_list(i)
-        if (ios == -1) then
-          print*, 'mc_lat_conf_init:'
-          stop " Error in control file: premature end of the final configuration"
+      ! create artificial population
+      counter = 0
+      s_counter = 0
+      current_species = 1
+      loop1: do j=1,this%n_cols
+      do i=1,this%n_rows
+        counter   = counter   + 1
+        s_counter = s_counter + 1
+        if (s_counter>this%n_ads(current_species)) then
+          s_counter = 1
+          current_species = current_species + 1
         end if
-        if (ios /= 0) then
-          print*, 'mc_lat_conf_init:'
-          print*, " Error reading conf-file: ios = ",ios
+        this%occupations(i,j) = counter
+        ! Warning: arbitrary choice for the ads. site (the 1st available)!
+        ads_site = this%avail_ads_sites(current_species,this%lst(i,j))%list(1)
+        this%ads_list(counter) = adsorbate(i,j,ads_site,current_species)
+        if (counter == this%n_ads_tot()) exit loop1
+      end do
+      end do loop1
+
+    else
+      ! Read in a conf from conf-file
+
+      if (present(itraj)) then
+        if (this%n_ini_confs == 0) then
+          print*, 'Error: mc_lat_conf_init called with two arguments without prior initialization.'
           stop
         end if
+        ! number of conf to read from conf-file
+        conf = mod(itraj-1,this%n_ini_confs)+1
+      else
+        ! allows to read the last conf from conf-file
+        conf = huge(1)
+      end if
+
+      ! Read info from the configuration file
+      call open_for_read(inp_unit,trim(c_pars%cfg_file_name))
+      read(inp_unit,'(A)') line
+      read(inp_unit,*) n_rows_in, n_cols_in, step_period_in
+      ! Check consistency with control parameters
+      if (n_rows_in      /= c_pars%n_rows .OR.&
+          n_cols_in      /= c_pars%n_cols .OR.&
+          step_period_in /= c_pars%step_period) then
+        print*, 'Error in mc_lat_conf_init:'
+        print*, ' inconsistency in control and configuration files:'
+        print*, '  lattice definition'
+        stop
+      end if
+
+      read(inp_unit,'(A)') line
+      call split_string (line, ads_names_in, n_species_in)
+      if ( n_species_in /= c_pars%n_species ) then
+        print*, 'Error in mc_lat_conf_init:'
+        print*, '  inconsistent number of species in control and configuration files.'
+        stop
+      end if
+      if ( any(ads_names_in(1:n_species_in) /= c_pars%ads_names) ) then
+        print*, 'Error in mc_lat_conf_init:'
+        print*, '  inconsistent adsorbate names in control and configuration files.'
+        stop
+      end if
+      allocate(n_ads_in(n_species_in))
+
+      do iconf=1,conf
+
+        read(inp_unit, '(A)', iostat=ios) line
+        if (ios /= 0) exit
+        read(inp_unit,*) n_ads_in
+        if ( any(n_ads_in /= c_pars%n_ads) ) then
+          print*, 'Error in mc_lat_conf_init:'
+          print*, '  inconsistent number of adsorbates in control and configuration files.'
+          stop
+        end if
+        ! Read the configuration
+        do i=1, sum(n_ads_in)
+          read(inp_unit, *, iostat=ios) idummy,this%ads_list(i)
+          if (ios == -1) then
+            print*, 'mc_lat_conf_init:'
+            stop " Error in control file: premature end of the final configuration"
+          end if
+          if (ios /= 0) then
+            print*, 'mc_lat_conf_init:'
+            print*, " Error reading conf-file: ios = ",ios
+            stop
+          end if
+        end do
+
+      end do
+      ! save number of confs in the conf-file
+      if (.not.present(itraj)) this%n_ini_confs = iconf - 1
+
+      close(inp_unit)
+
+      ! put adsorbates to lattice
+      do i=1,this%n_ads_tot()
+        this%occupations(this%ads_list(i)%row, this%ads_list(i)%col) = i
       end do
 
-    end do
-
-    if (.not.present(conf)) this%n_ini_confs = iconf - 1
-
-    close(inp_unit)
-
-    ! Check consistency with control parameters
-    if ( n_species_in /= c_pars%n_species .OR. any(n_ads_in /= c_pars%n_ads) ) then
-      print*, 'Error in mc_lat_conf_init:'
-      print*, '  inconsistency in control and configuration files:'
-      print*, '  adsorbates definition'
-      stop
     end if
-
-    ! Set species-specific numbers of adsorbates
-    this%n_ads = n_ads_in
-
-    ! Clean up occupations and fill the lattice with adsorbates
-    this%occupations = 0
-    do i=1,this%n_ads_tot()
-      this%occupations(this%ads_list(i)%row, this%ads_list(i)%col) = i
-    end do
 
   end subroutine
 

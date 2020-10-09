@@ -92,11 +92,6 @@ module constants
   integer, parameter :: outcnt_unit  = 13
   integer, parameter :: outrdf_unit  = 14
 
-  ! output keys definition
-  integer, parameter :: output_key_all = 1
-  integer, parameter :: output_key_gz  = 2
-  integer, parameter :: output_key_avg = 3
-
   ! Internal program constants
   integer, parameter :: randseed(13) = [7,5,3,11,9,1,17,2,9,6,4,5,8]
   integer, parameter :: max_string_length    = 1000

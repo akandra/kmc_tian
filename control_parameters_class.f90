@@ -28,7 +28,6 @@ module control_parameters_class
     integer  :: rdf_period            ! period for rdf_hist calculations
     real(dp) :: rdf_bin_size          ! size (in init cell) of the bin for rdf calculation
     integer  :: rdf_n_bins            ! number of bins for rdf_hist calculations
-    integer  :: output_key            ! how to store trajectory files (all, compressed, avg_only)
 
     ! MMC-specific parameters
 
@@ -37,6 +36,7 @@ module control_parameters_class
 
     ! kMC-specific parameters
 
+    integer  :: start_traj          ! starting kMC trajectory number
     integer  :: n_trajs             ! number of kMC trajectories
     integer  :: n_bins              ! number of time intervals in kmc simulations
     real(dp) :: t_end               ! kmc simulation time
@@ -82,11 +82,11 @@ contains
     control_parameters_init%rdf_bin_size     = -1.0_dp
     control_parameters_init%rdf_n_bins       = -1
     control_parameters_init%rdf_period       = -1
-    control_parameters_init%output_key       = -1
     ! MMC-specific parameters
     control_parameters_init%n_mmc_steps      = -1
     control_parameters_init%hist_period      = -1
     ! kMC-specific parameters
+    control_parameters_init%start_traj       =  1
     control_parameters_init%n_trajs          = -1
     control_parameters_init%n_bins           = default_int
     control_parameters_init%t_end            = -1.0_dp
@@ -188,8 +188,9 @@ contains
             read(words(2),*) control_parameters_init%hist_period
 
           case('kmc_ntrajs')
-            if (nwords/=2) stop err // "kmc_ntrajs_period must have 1 parameter."
+            if ( nwords/=2 .and. nwords/=3 ) stop err // "kmc_ntrajs_period must have 1 parameter."
             read(words(2),*) control_parameters_init%n_trajs
+            if (nwords==3) read(words(3),*) control_parameters_init%start_traj
 
           case('kmc_time')
             if (nwords/=2) stop err // "kmc_time must have 1 parameter."
@@ -202,20 +203,6 @@ contains
           case('kmc_rates')
             if (nwords/=2) stop err // "kmc_rates must have 1 parameter."
             control_parameters_init%rate_file_name = words(2)
-
-          case('kmc_output')
-
-            if (nwords/=2) stop err // "kmc_output must have 1 parameter."
-            select case (words(2))
-              case ('all')
-                control_parameters_init%output_key = output_key_all
-              case ('compressed')
-                control_parameters_init%output_key = output_key_gz
-              case ('avg_only')
-                control_parameters_init%output_key = output_key_avg
-              case default
-                stop err // "unknown kmc_output key."
-            end select
 
           case('')
 
