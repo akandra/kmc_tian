@@ -298,4 +298,30 @@ contains
 
   end subroutine
 
+!------------------------------------------------------------------------------
+  subroutine compress(file_name_base, ext)
+!------------------------------------------------------------------------------
+    character(*), intent(in)      :: file_name_base, ext
+
+    integer :: cstat, estat
+    character(len=100) :: cmsg
+    character(len=max_string_length) :: command
+
+    command = "tar -czf " // &
+              trim(file_name_base)//"-"//trim(ext)//".tar.gz "//&
+              trim(file_name_base)//"_*."//trim(ext)
+
+    call execute_command_line(command, exitstat=estat, cmdstat=cstat,cmdmsg=cmsg)
+
+    if (cstat > 0) then
+      print "(A6,2A)", ext,": compression failed with error ", trim(cmsg)
+    else if (cstat < 0) then
+      print *, ext,": compression command execution not supported"
+    else
+      print "(A6,A,I5)", ext,": compression completed with status", estat
+      call execute_command_line("rm "//trim(file_name_base)//"_*."//trim(ext))
+    end if
+
+  end subroutine
+
 end module utilities

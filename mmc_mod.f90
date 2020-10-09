@@ -184,12 +184,6 @@ subroutine metropolis(lat, c_pars, e_pars)
         do species2=1,c_pars%n_species
           write(outrdf_unit,*) species1, species2
           write(outrdf_unit,rdf_fmt) rdf_hist(species1,species2,:)
-!          if (lat%n_ads(species1) > 0) then
-!            write(outrdf_unit,rdf_fmt) &
-!              dr2*rdf_hist(species1,species2,:)/(lat%n_ads(species1)*coverage(species2))
-!          else
-!            write(outrdf_unit,rdf_fmt) dr2*rdf_hist(species1,species2,:)
-!          end if
         end do
         end do
         rdf_counter = 0

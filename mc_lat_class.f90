@@ -48,6 +48,7 @@ module mc_lat_class
     type(adsorbate), dimension(:), allocatable  :: ads_list_ini, ads_list
     ! Available adsorbtion sites list (n_species x n_max_lat_site_types x (n_avail_ads_sites))
     type(v_list), dimension(:,:), allocatable :: avail_ads_sites
+    integer :: n_ini_confs  ! Number of available confs in the start-conf file
 
     contains
 
@@ -61,7 +62,7 @@ module mc_lat_class
       procedure :: hoshen_kopelman
       procedure :: cluster_size => count_cluster_sizes
       procedure :: rdf_hist
-      procedure :: restore    => mc_lat_restore
+      procedure :: conf_init  => mc_lat_conf_init
       procedure, nopass, public :: mc_lat_init
 
   end type mc_lat
@@ -69,10 +70,10 @@ module mc_lat_class
 
 contains
 
-  function mc_lat_init(control_pars, energy_pars) result(lat)
+  function mc_lat_init(c_pars, e_pars) result(lat)
 
-    type(control_parameters), intent(inout) :: control_pars
-    type(energy_parameters),     intent(in) :: energy_pars
+    type(control_parameters), intent(inout) :: c_pars
+    type(energy_parameters),     intent(in) :: e_pars
     type(mc_lat)                            :: lat
 
     integer :: i, j, k, m, ios
@@ -83,8 +84,8 @@ contains
     integer :: n_species_in, n_site_types, ads_site
     integer, allocatable :: n_ads_in(:)
 
-    lat%n_rows = control_pars%n_rows
-    lat%n_cols = control_pars%n_cols
+    lat%n_rows = c_pars%n_rows
+    lat%n_cols = c_pars%n_cols
 
     ! Adsorption sites on the unit hex cell
     !  T---------B1---------.           1 top       (T)
@@ -158,24 +159,22 @@ contains
     lat%n_max_ads_sites = n_max_ads_sites
 
     ! Allocate arrays
-    allocate(lat%occupations(control_pars%n_rows,&
-                             control_pars%n_cols))
-    allocate(lat%lst  (control_pars%n_rows,&
-                             control_pars%n_cols))
-    allocate(lat%n_ads(control_pars%n_species))
+    allocate(lat%occupations(c_pars%n_rows,c_pars%n_cols))
+    allocate(lat%lst(        c_pars%n_rows,c_pars%n_cols))
+    allocate(lat%n_ads(c_pars%n_species))
     ! Warning: the allocation assumes 1 ads. per unit cell
-    allocate(lat%ads_list(    control_pars%n_rows*control_pars%n_cols))
-    allocate(lat%ads_list_ini(control_pars%n_rows*control_pars%n_cols))
+    allocate(lat%ads_list(    c_pars%n_rows*c_pars%n_cols))
+    allocate(lat%ads_list_ini(c_pars%n_rows*c_pars%n_cols))
     ! Initialize arrays
     lat%occupations  = 0
-    lat%n_ads        = control_pars%n_ads
+    lat%n_ads        = c_pars%n_ads
     lat%ads_list     = adsorbate(0,0,0,0)
     lat%ads_list_ini = adsorbate(0,0,0,0)
 
     lat%lst = terrace_site
     ! Define where steps and corners are
-    if ( control_pars%step_period > 0) then
-      do j=1,lat%n_cols,control_pars%step_period
+    if ( c_pars%step_period > 0) then
+      do j=1,lat%n_cols,c_pars%step_period
           lat%lst(:,j)   = step_site
           lat%lst(:,j+1) = corner_site
       end do
@@ -184,20 +183,20 @@ contains
       n_site_types = 1
     end if
 
-    allocate(lat%avail_ads_sites(control_pars%n_species,n_site_types))
+    allocate(lat%avail_ads_sites(c_pars%n_species,n_site_types))
 
-    do i=1,control_pars%n_species
+    do i=1,c_pars%n_species
     do j=1,n_site_types
       counter = 0
       do k=1,n_max_ads_sites
-        if (energy_pars%ads_energy(i,j,k) < energy_pars%undefined_energy) then
+        if (e_pars%ads_energy(i,j,k) < e_pars%undefined_energy) then
           counter = counter + 1
         end if
       end do
       allocate(lat%avail_ads_sites(i,j)%list(counter))
       counter = 0
       do k=1,n_max_ads_sites
-        if (energy_pars%ads_energy(i,j,k) < energy_pars%undefined_energy) then
+        if (e_pars%ads_energy(i,j,k) < e_pars%undefined_energy) then
           counter = counter + 1
           lat%avail_ads_sites(i,j)%list(counter) = k
         end if
@@ -208,16 +207,17 @@ contains
 !!----------------------------------------------------------------------------------
 !! debug printout for construction of avail_ads_sites
 !print *, 'debug printout for construction of avail_ads_sites mc_lat_class line 191'
-!do i=1,control_pars%n_species
+!do i=1,c_pars%n_species
 !do j=1,n_site_types
-!  write(*, '(A, A5, A, A10)',advance='no')' species = ',control_pars%ads_names(i),'site type =',lat_site_names(j)
+!  write(*, '(A, A5, A, A10)',advance='no')' species = ',c_pars%ads_names(i),'site type =',lat_site_names(j)
 !  print '(A,A5,1x,A,1x,A,1x,A,1x,A,1x)','  list = ',(ads_site_names(lat%avail_ads_sites(i,j)%list(k)), &
 !                    k=1,size(lat%avail_ads_sites(i,j)%list))
 !  end do
 !end do
 !----------------------------------------------------------------------------------
 
-    if (control_pars%cfg_file_name=='none') then
+    lat%n_ini_confs = 0
+    if (c_pars%cfg_file_name=='none') then
       ! Populate the lattice
       counter = 0
       s_counter = 0
@@ -237,57 +237,12 @@ contains
         if (counter == lat%n_ads_tot()) exit loop1
       end do
       end do loop1
-
     else
-      ! Read info from the configuration file
-      call open_for_read(inp_unit,trim(control_pars%cfg_file_name))
-      read(inp_unit,'(A)') line
-      read(inp_unit,*) n_rows_in, n_cols_in, step_period_in
-      ! Check consistency with control parameters
-      if (n_rows_in /= control_pars%n_rows .OR.&
-          n_cols_in /= control_pars%n_cols .OR.&
-          step_period_in /= control_pars%step_period) then
-        print*, 'Error! '
-        print*, ' inconsistency in input and configuration files:'
-        print*, ' lattice definition'
-        stop
-      end if
-
-      read(inp_unit,'(A)') line
-      call split_string (line, ads_names_in, n_species_in)
-      allocate(n_ads_in(n_species_in))
-
-      ios = 0
-      do while (ios == 0)
-        read(inp_unit, '(A)', iostat=ios) line
-        if (ios /= 0) exit
-        read(inp_unit,*) n_ads_in
-        ! Check consistency with control parameters
-        if (n_species_in /= control_pars%n_species &
-        !.OR. any(n_ads_in /= control_pars%n_ads) --- Get rid of that line when our wisdom get improved
-          ) then
-          print*, 'Error! '
-          print*, ' inconsistency in input and configuration files:'
-          print*, ' adsorbates definition'
-          stop
-        end if
-        ! Read the configuration
-        do i=1,lat%n_ads_tot()
-          read(inp_unit, *, iostat=ios) j,lat%ads_list(i)
-          if (ios /= 0) then
-            stop "Error in control file: premature end of the final configuration"
-          end if
-        end do
-      end do ! ios
-
-      close(inp_unit)
-
-      ! Fill the lattice with adsorbates
-      do i=1,lat%n_ads_tot()
-        lat%occupations(lat%ads_list(i)%row, lat%ads_list(i)%col) = i
-      end do
-
+      ! Read in the last conf from the file
+      ! and define how many confs the file has
+      call lat%conf_init(c_pars)
     end if
+
 
     ! Save initial adsorbate list
     lat%ads_list_ini = lat%ads_list
@@ -295,25 +250,88 @@ contains
   end function mc_lat_init
 
 ! ---------------------------------------------------------------------
-! Subroutine restoring mc_lat structure from initial adsorbate list
+! Subroutine setting mc_lat structure
+! from the adsorbate list read in from start_conf file
 ! ---------------------------------------------------------------------
-  subroutine mc_lat_restore(this)
+  subroutine mc_lat_conf_init(this,c_pars, conf)
 
     class(mc_lat), intent(inout) :: this
+    type(control_parameters), intent(in) :: c_pars
+    integer, optional, intent(in) :: conf
 
-    integer, dimension(size(this%n_ads)) :: n_ads_counter
-    integer :: i, ads_id
+    integer :: n_rows_in, n_cols_in, step_period_in
+    character(len=max_string_length) :: line
+    integer :: n_species_in, n_site_types, ads_site
+    character(len=max_string_length) :: ads_names_in(100)
+    integer, allocatable :: n_ads_in(:)
+    integer :: ios, iconf, i, idummy, conf_max
 
-    ! Restore the ads list
-    this%ads_list = this%ads_list_ini
-    ! Restore species-specific numbers of adsorbates
-    n_ads_counter = 0
-    do i=1,size(this%ads_list)
-      ads_id = this%ads_list(i)%id
-      if (ads_id>0) n_ads_counter(ads_id) = n_ads_counter(ads_id) + 1
+    conf_max = huge(1)
+    ! Read info from the configuration file
+    call open_for_read(inp_unit,trim(c_pars%cfg_file_name))
+    read(inp_unit,'(A)') line
+    read(inp_unit,*) n_rows_in, n_cols_in, step_period_in
+    ! Check consistency with control parameters
+    if (n_rows_in      /= c_pars%n_rows .OR.&
+        n_cols_in      /= c_pars%n_cols .OR.&
+        step_period_in /= c_pars%step_period) then
+      print*, 'Error in mc_lat_conf_init:'
+      print*, ' inconsistency in control and configuration files:'
+      print*, '  lattice definition'
+      stop
+    end if
+
+    read(inp_unit,'(A)') line
+    call split_string (line, ads_names_in, n_species_in)
+    allocate(n_ads_in(n_species_in))
+
+    if (present(conf)) then
+      conf_max = conf
+      if (conf > this%n_ini_confs) then
+        print*, 'Error! '
+        print*, 'mc_lat_conf_init:'
+        print*, ' number of initial configuration', conf
+        print*, ' is larger than the number of available confs', this%n_ini_confs
+        stop
+      end if
+    end if
+
+    do iconf=1,conf_max
+      read(inp_unit, '(A)', iostat=ios) line
+      if (ios /= 0) exit
+      read(inp_unit,*) n_ads_in
+      ! Read the configuration
+      do i=1, sum(n_ads_in)
+        read(inp_unit, *, iostat=ios) idummy,this%ads_list(i)
+        if (ios == -1) then
+          print*, 'mc_lat_conf_init:'
+          stop " Error in control file: premature end of the final configuration"
+        end if
+        if (ios /= 0) then
+          print*, 'mc_lat_conf_init:'
+          print*, " Error reading conf-file: ios = ",ios
+          stop
+        end if
+      end do
+
     end do
-    this%n_ads = n_ads_counter
-    ! Clean up and restore occupations
+
+    if (.not.present(conf)) this%n_ini_confs = iconf - 1
+
+    close(inp_unit)
+
+    ! Check consistency with control parameters
+    if ( n_species_in /= c_pars%n_species .OR. any(n_ads_in /= c_pars%n_ads) ) then
+      print*, 'Error in mc_lat_conf_init:'
+      print*, '  inconsistency in control and configuration files:'
+      print*, '  adsorbates definition'
+      stop
+    end if
+
+    ! Set species-specific numbers of adsorbates
+    this%n_ads = n_ads_in
+
+    ! Clean up occupations and fill the lattice with adsorbates
     this%occupations = 0
     do i=1,this%n_ads_tot()
       this%occupations(this%ads_list(i)%row, this%ads_list(i)%col) = i
