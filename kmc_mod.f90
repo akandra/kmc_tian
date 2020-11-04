@@ -26,7 +26,8 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
   type(reaction_type) :: r
 
   character(len=max_string_length) :: buffer, n_ads_fmt, rdf_fmt
-  integer :: itraj, ibin, ibin_new, ibin_current
+  integer :: itraj, ibin, ibin_new, ibin_current, bin_shift
+  integer :: time_segment, time_segment_old, time_segment_new
   integer :: i, species, species1, species2
   integer :: kmc_nsteps
   integer, dimension(lat%n_rows,lat%n_cols) :: cluster_label
@@ -35,8 +36,9 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
   integer, dimension(lat%n_rows*lat%n_cols) :: cluster_sizes
   integer :: largest_label
   integer, dimension(c_pars%n_species,lat%n_rows*lat%n_cols) :: hist
-  real(dp) :: time
-  real(dp) :: delta_t, time_new, step_bin
+  real(dp) :: time, end_of_time, time_bin, time_shift
+  real(dp) :: delta_t, time_new
+  real(dp), dimension(size(c_pars%t_end)) :: time_limits, step_bin
 
   integer, dimension(c_pars%n_species,c_pars%n_species,c_pars%rdf_n_bins) :: rdf_hist
 
@@ -67,6 +69,10 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
 
   ! time binning for distributions
   step_bin = c_pars%t_end/c_pars%n_bins
+  time_limits(1) = c_pars%t_end(1)
+  do i=2, size(c_pars%t_end)
+    time_limits(i) = time_limits(i-1) + c_pars%t_end(i)
+  end do
 
   write(*,'(20X,A)') "B.K.L. Code's progress report:"
 
@@ -181,15 +187,20 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
 
     end if
 
-
-    ! start time propagation
+    ! set the time span
     time = big_bang
-    do while (time<c_pars%t_end)
+    end_of_time = time_limits( size(time_limits) )
+    time_segment_old = 1
+    time_segment_new = 1
+    bin_shift = 0
+    time_shift = 0.0_dp
+    ! start time propagation
+    time_loop: do while ( time < end_of_time )
 
       ! do reaction based on a random number
       call r%do_reaction(ran1(), lat, e_pars)
 
-      ! End the trajectory if there processes left
+      ! End the trajectory if there's no processes left
       if (r%total_rate == 0.0_dp) then
         print*
         print *, 'total rate is zero: exiting kMC loop'
@@ -202,97 +213,124 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
       time_new = time + delta_t
       kmc_nsteps = kmc_nsteps + 1
 
-      if (time_new > c_pars%t_end) time_new = c_pars%t_end
+      ! set time to the final value at the end of trajectory
+      if (time_new > end_of_time) time_new = end_of_time
 
-      ibin_new = int(time_new/step_bin)
-
-      ! Do write when switched to the next bin taking into account jumps over more than 1 by repeating output values
-      do ibin_current=ibin+1,ibin_new
-
-        call progress_bar(                  &
-          'current trajectory',           &
-          int(100*time_new/c_pars%t_end), &
-          '   total',                     &
-          ! total =  % completed trajs + contribution form current trajctory
-          100*(itraj-c_pars%start_traj)/c_pars%n_trajs + int(100.*time_new/(c_pars%t_end*c_pars%n_trajs)))
-
-        if (r%n_ads_total>0) then
-
-          ! Reset the histogram
-          hist = 0
-          ! Calculate histogram
-          do species=1,c_pars%n_species
-            call lat%hoshen_kopelman(species, cluster_label, largest_label)
-            call lat%cluster_size(species, cluster_label, cluster_sizes)
-            do i=1,largest_label
-              if (cluster_sizes(i) > 0) &
-                hist(species,cluster_sizes(i)) = hist(species,cluster_sizes(i)) + 1
-            end do
-          end do
-
-          if (c_pars%rdf_period > 0) then
-            ! Calculate rdf
-            rdf_hist = 0
-            call lat%rdf_hist(c_pars, rdf_hist)
-          end if
-
-        end if
-
-        ! write into trajectory files
-
-        ! configuration
-        write(outcfg_unit,'(A6,1pe12.3)') "time ",ibin_current*step_bin
-        write(outcfg_unit,'(100i10)') lat%n_ads
-        call lat%print_ads(outcfg_unit)
-
-        ! energy
-        write(outeng_unit,'(1pe12.3,1pe12.3)') ibin_current*step_bin, total_energy(lat,e_pars)
-
-        ! reaction counts
-        write(outcnt_unit,'(1pe12.3,100i20)') ibin_current*step_bin, r%counter
-
-        if (r%n_ads_total>0) then
-
-          ! histogram with cluster sizes
-
-          ! Output formats
-          write(n_ads_fmt,'(i10)') r%n_ads_total
-          n_ads_fmt = '('//trim(adjustl(n_ads_fmt))//'i8)'
-          ! Save cluster size histogram
-          write(outhst_unit,'(A6,1pe12.3)') "time ",ibin_current*step_bin
-          do species=1,c_pars%n_species
-            write(outhst_unit,*) species
-            write(outhst_unit,n_ads_fmt) (hist(species,i), i=1,lat%n_ads(species))
-          end do
-
-          ! rdf
-
-          if (c_pars%rdf_period > 0) then
-            write(outrdf_unit,'(A6,1pe12.3)') "time ",ibin_current*step_bin
-            do species1=1,c_pars%n_species
-            do species2=1,c_pars%n_species
-              write(outrdf_unit,*) species1, species2
-              write(outrdf_unit,rdf_fmt) rdf_hist(species1,species2,:)
-            end do
-            end do
-          end if
-
-        else
-          ! No histogram output when no adsorbates
-          write(outhst_unit,'(A6,1pe12.3)') "time ",ibin_current*step_bin
-          write(outrdf_unit,'(A6,1pe12.3)') "time ",ibin_current*step_bin
-
-        end if
-
+      ! Conditionally jump over time segments
+      do while ( time_new > time_limits(time_segment_new) )
+        time_segment_new = time_segment_new + 1
       end do
 
-      ! Reset reaction counters
-      r%counter = 0
+      do time_segment = time_segment_old, time_segment_new
 
-      ibin = ibin_new
+        if (time_segment == time_segment_new) then
+          ibin_new = bin_shift + int( (time_new - time_shift)/step_bin(time_segment) )
+        else
+          time_shift = time_limits(time_segment)
+          bin_shift  = bin_shift + c_pars%n_bins(time_segment)
+          ibin_new = bin_shift
+        end if
+
+        ! Do write when switched to the next bin taking into account jumps over more than 1 by repeating output values
+        do ibin_current=ibin+1,ibin_new
+
+          call progress_bar(                  &
+            'current trajectory',           &
+            int(100*time_new/end_of_time), &
+            '   total',                     &
+            ! total =  % completed trajs + contribution form current trajctory
+            100*(itraj-c_pars%start_traj)/c_pars%n_trajs + int(100.*time_new/(end_of_time*c_pars%n_trajs)))
+
+          if (r%n_ads_total>0) then
+
+            ! Reset the histogram
+            hist = 0
+            ! Calculate histogram
+            do species=1,c_pars%n_species
+              call lat%hoshen_kopelman(species, cluster_label, largest_label)
+              call lat%cluster_size(species, cluster_label, cluster_sizes)
+              do i=1,largest_label
+                if (cluster_sizes(i) > 0) &
+                  hist(species,cluster_sizes(i)) = hist(species,cluster_sizes(i)) + 1
+              end do
+            end do
+
+            if (c_pars%rdf_period > 0) then
+              ! Calculate rdf
+              rdf_hist = 0
+              call lat%rdf_hist(c_pars, rdf_hist)
+            end if
+
+          end if
+
+          ! write into trajectory files
+          time_bin = time_shift + (ibin_current - bin_shift)*step_bin(time_segment)
+
+          ! configuration
+          write(outcfg_unit,'(A6,1pe12.3)') "time ", time_bin
+          write(outcfg_unit,'(100i10)') lat%n_ads
+          call lat%print_ads(outcfg_unit)
+
+          ! energy
+          write(outeng_unit,'(1pe12.3,1pe12.3)') time_bin, total_energy(lat,e_pars)
+
+          ! reaction counts
+          write(outcnt_unit,'(1pe12.3,100i20)') time_bin, r%counter
+          ! Reset reaction counters
+          r%counter = 0
+
+          if (r%n_ads_total>0) then
+
+            ! histogram with cluster sizes
+            ! Output formats
+            write(n_ads_fmt,'(i10)') r%n_ads_total
+            n_ads_fmt = '('//trim(adjustl(n_ads_fmt))//'i8)'
+            ! Save cluster size histogram
+            write(outhst_unit,'(A6,1pe12.3)') "time ",time_bin
+            do species=1,c_pars%n_species
+              write(outhst_unit,*) species
+              write(outhst_unit,n_ads_fmt) (hist(species,i), i=1,lat%n_ads(species))
+            end do
+
+            ! rdf
+            if (c_pars%rdf_period > 0) then
+              write(outrdf_unit,'(A6,1pe12.3)') "time ",time_bin
+              do species1=1,c_pars%n_species
+              do species2=1,c_pars%n_species
+                write(outrdf_unit,*) species1, species2
+                write(outrdf_unit,rdf_fmt) rdf_hist(species1,species2,:)
+              end do
+              end do
+            end if
+
+          else
+
+            ! No histogram output when no adsorbates
+            write(outhst_unit,'(A6,1pe12.3)') "time ",time_bin
+            write(outrdf_unit,'(A6,1pe12.3)') "time ",time_bin
+
+          end if
+
+    ! WARNING - This is a hack, crude crude hack
+          ! End the trajectory if there's no species called B anymore
+          if (lat%n_ads(2) == 0) then
+    !        print*
+    !        print *, 'species ', c_pars%ads_names(2), ' extinct: exiting kMC loop'
+    !        print *, 'if ', c_pars%ads_names(2), ' is not B, complain to UN'
+    !        print*
+            exit time_loop
+          end if
+
+        end do ! ibin
+
+        ibin = ibin_new
+
+      end do ! time segment
+
+      time_segment_old = time_segment_new
       time = time_new ! time shift
 
-    end do ! over time
+    end do time_loop
 !-------------------------------------------------------------
 
     close(outcfg_unit)

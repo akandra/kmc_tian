@@ -36,10 +36,10 @@ module control_parameters_class
 
     ! kMC-specific parameters
 
-    integer  :: start_traj          ! starting kMC trajectory number
-    integer  :: n_trajs             ! number of kMC trajectories
-    integer  :: n_bins              ! number of time intervals in kmc simulations
-    real(dp) :: t_end               ! kmc simulation time
+    integer  :: start_traj             ! starting kMC trajectory number
+    integer  :: n_trajs                ! number of kMC trajectories
+    integer, allocatable  :: n_bins(:) ! number of time intervals in kmc simulations
+    real(dp), allocatable :: t_end(:)  ! kmc simulation times
     character(len=max_string_length) ::&
                    rate_file_name   ! name of the file with rate parameters
   contains
@@ -88,8 +88,6 @@ contains
     ! kMC-specific parameters
     control_parameters_init%start_traj       =  1
     control_parameters_init%n_trajs          = -1
-    control_parameters_init%n_bins           = default_int
-    control_parameters_init%t_end            = -1.0_dp
     control_parameters_init%rate_file_name   = 'none'
 
     control_parameters_init%file_name_base = file_name_base
@@ -193,12 +191,18 @@ contains
             if (nwords==3) read(words(3),*) control_parameters_init%start_traj
 
           case('kmc_time')
-            if (nwords/=2) stop err // "kmc_time must have 1 parameter."
-            read(words(2),*) control_parameters_init%t_end
+            if (nwords==1) stop err // "kmc_time must have at least 1 parameter."
+            allocate(control_parameters_init%t_end(nwords - 1))
+            do i=1,nwords-1
+              read(words(i+1),*) control_parameters_init%t_end(i)
+            end do
 
           case('kmc_nbins')
-            if (nwords/=2) stop err // "kmc_nbins must have 1 parameter."
-            read(words(2),*) control_parameters_init%n_bins
+            if (nwords==1) stop err // "kmc_nbins must have at least 1 parameter."
+            allocate(control_parameters_init%n_bins(nwords - 1))
+            do i=1,nwords-1
+              read(words(i+1),*) control_parameters_init%n_bins(i)
+            end do
 
           case('kmc_rates')
             if (nwords/=2) stop err // "kmc_rates must have 1 parameter."
@@ -220,6 +224,8 @@ contains
 
     if (size(coverage) /= size(control_parameters_init%ads_names))&
       stop err // "adsorbates and coverages are inconsistent"
+
+
 
     if (control_parameters_init%step_period > 0 &
         .and. mod(control_parameters_init%n_cols,&
@@ -243,13 +249,22 @@ contains
         stop err // "mmc_save_period is negative."
 
     case('bkl')
-      ! Check kmc_nbins
-      if (control_parameters_init%n_bins == 0 ) control_parameters_init%n_bins = 1
-      if (control_parameters_init%n_bins == default_int )&
-        stop err // "kmc_nbins is undefined."
-      if (control_parameters_init%n_bins < 0 )&
-        stop err // "kmc_nbins is negative."
+      ! Check kmc_nbins and kmc_time
 
+      if ( .not.allocated(control_parameters_init%n_bins) ) stop err // "kmc_nbins is undefined."
+      if ( .not.allocated(control_parameters_init%t_end)  ) stop err // "kmc_time is undefined."
+
+      if ( size(control_parameters_init%n_bins) /=  size(control_parameters_init%t_end) ) &
+        stop err // "kmc_bins and kmc_time are inconsistent."
+
+      do i=1,size(control_parameters_init%n_bins)
+        if (control_parameters_init%n_bins(i) == 0 ) control_parameters_init%n_bins(i) = 1
+        if (control_parameters_init%n_bins(i) < 0 ) stop err // "kmc_nbins is negative."
+      end do
+
+      do i=1,size(control_parameters_init%t_end)
+        if (control_parameters_init%t_end(i) <= 0 ) stop err // "kmc_time is not positive."
+      end do
 
     end select
 
