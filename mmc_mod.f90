@@ -206,6 +206,9 @@ subroutine metropolis(lat, c_pars, e_pars)
   if (c_pars%hist_period > 0) close(outhst_unit)
   if (c_pars%rdf_period  > 0) close(outrdf_unit)
 
+  print*
+  print*,"MMC done. Goodbye."
+
 end subroutine metropolis
 
 

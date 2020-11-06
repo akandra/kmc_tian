@@ -39,6 +39,8 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
   real(dp) :: time, end_of_time, time_bin, time_shift
   real(dp) :: delta_t, time_new
   real(dp), dimension(size(c_pars%t_end)) :: time_limits, step_bin
+  logical :: bin_log_scale
+  real(dp) :: log_t1
 
   integer, dimension(c_pars%n_species,c_pars%n_species,c_pars%rdf_n_bins) :: rdf_hist
 
@@ -67,8 +69,16 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
 !
 !stop 111
 
-  ! time binning for distributions
-  step_bin = c_pars%t_end/c_pars%n_bins
+  bin_log_scale = c_pars%log_scale_t1 > 0.0_dp
+  ! do linear time binning for distributions
+  if (bin_log_scale) then
+    log_t1 = log10(c_pars%log_scale_t1)
+    step_bin(1) = ( log10(c_pars%t_end(1)) - log_t1 )/c_pars%n_bins(1)
+  else
+    step_bin = c_pars%t_end/c_pars%n_bins
+  end if
+
+  ! calculate cumulative times for segments
   time_limits(1) = c_pars%t_end(1)
   do i=2, size(c_pars%t_end)
     time_limits(i) = time_limits(i-1) + c_pars%t_end(i)
@@ -81,7 +91,8 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
 
     debug(1) = (itraj==3)
 
-    call progress_bar( 'current trajectory ', 0* 100*(itraj-c_pars%start_traj+1)/c_pars%n_trajs , '   total', 0)
+    call progress_bar( 'current trajectory', 0 , &
+                                 '   total', 100*(itraj-c_pars%start_traj)/c_pars%n_trajs )
     ibin = 0
     kmc_nsteps = 0
 
@@ -224,11 +235,24 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
       do time_segment = time_segment_old, time_segment_new
 
         if (time_segment == time_segment_new) then
-          ibin_new = bin_shift + int( (time_new - time_shift)/step_bin(time_segment) )
+
+          if (bin_log_scale) then
+            ! Exclude possible negative values of ibin_new for small kmc_times
+            if (time_new <= c_pars%log_scale_t1) then
+              ibin_new = 0
+            else
+              ibin_new = int( ( log10(time_new) - log_t1 )/step_bin(time_segment) )
+            end if
+          else
+            ibin_new = bin_shift + int( (time_new - time_shift)/step_bin(time_segment) )
+          end if
+
         else
+
           time_shift = time_limits(time_segment)
           bin_shift  = bin_shift + c_pars%n_bins(time_segment)
           ibin_new = bin_shift
+
         end if
 
         ! Do write when switched to the next bin taking into account jumps over more than 1 by repeating output values
@@ -264,7 +288,11 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
           end if
 
           ! write into trajectory files
-          time_bin = time_shift + (ibin_current - bin_shift)*step_bin(time_segment)
+          if (bin_log_scale) then
+            time_bin = 10**( log_t1 + ibin_current*step_bin(time_segment) )
+          else
+            time_bin = time_shift + (ibin_current - bin_shift)*step_bin(time_segment)
+          end if
 
           ! configuration
           write(outcfg_unit,'(A6,1pe12.3)') "time ", time_bin
@@ -340,6 +368,9 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
     close(outcnt_unit)
 
   end do ! over trajectories
+
+  print*
+  print*,"kMC done. Goodbye."
 
 end subroutine Bortz_Kalos_Lebowitz
 
