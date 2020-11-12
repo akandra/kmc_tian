@@ -308,9 +308,9 @@ contains
 !-----------------------------------------------------------------------------
   subroutine do_reaction(this, rand, lat, e_pars)
 !-----------------------------------------------------------------------------
-    class(reaction_type), intent(inout)     :: this
-    real(dp),             intent(in)        :: rand
-    class(mc_lat),        intent(inout)     :: lat
+    class(reaction_type),     intent(inout)     :: this
+    real(dp),                 intent(in)        :: rand
+    class(mc_lat),            intent(inout)     :: lat
     class(energy_parameters), intent(in)    :: e_pars
 
     integer :: i, m, ads, iads, reaction_id, i_change, channel

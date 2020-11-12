@@ -37,7 +37,7 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
   integer :: largest_label
   integer, dimension(c_pars%n_species,lat%n_rows*lat%n_cols) :: hist
   real(dp) :: time, end_of_time, time_bin, time_shift
-  real(dp) :: delta_t, time_new
+  real(dp) :: delta_t
   real(dp), dimension(size(c_pars%t_end)) :: time_limits, step_bin
   logical :: bin_log_scale
   real(dp) :: log_t1
@@ -92,7 +92,7 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
     debug(1) = (itraj==3)
 
     call progress_bar( 'current trajectory', 0 , &
-                                 '   total', 100*(itraj-c_pars%start_traj)/c_pars%n_trajs )
+                                 '   total', 100*(itraj-c_pars%start_traj+1)/c_pars%n_trajs )
     ibin = 0
     kmc_nsteps = 0
 
@@ -205,30 +205,18 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
     time_segment_new = 1
     bin_shift = 0
     time_shift = 0.0_dp
+
     ! start time propagation
     time_loop: do while ( time < end_of_time )
 
-      ! do reaction based on a random number
-      call r%do_reaction(ran1(), lat, e_pars)
-
-      ! End the trajectory if there's no processes left
-      if (r%total_rate == 0.0_dp) then
-        print*
-        print *, 'total rate is zero: exiting kMC loop'
-        print*
-        exit
-      end if
-
-      ! update time
-      delta_t = -log(ran1())/r%total_rate   ! when does a reaction occur?
-      time_new = time + delta_t
-      kmc_nsteps = kmc_nsteps + 1
-
+      ! propagate the time
+      delta_t = -log(ran1())/r%total_rate   ! when does a reaction should occur?
+      time = time + delta_t
       ! set time to the final value at the end of trajectory
-      if (time_new > end_of_time) time_new = end_of_time
+      if (time > end_of_time) time = end_of_time
 
       ! Conditionally jump over time segments
-      do while ( time_new > time_limits(time_segment_new) )
+      do while ( time > time_limits(time_segment_new) )
         time_segment_new = time_segment_new + 1
       end do
 
@@ -238,13 +226,13 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
 
           if (bin_log_scale) then
             ! Exclude possible negative values of ibin_new for small kmc_times
-            if (time_new <= c_pars%log_scale_t1) then
+            if (time <= c_pars%log_scale_t1) then
               ibin_new = 0
             else
-              ibin_new = int( ( log10(time_new) - log_t1 )/step_bin(time_segment) )
+              ibin_new = int( ( log10(time) - log_t1 )/step_bin(time_segment) )
             end if
           else
-            ibin_new = bin_shift + int( (time_new - time_shift)/step_bin(time_segment) )
+            ibin_new = bin_shift + int( (time - time_shift)/step_bin(time_segment) )
           end if
 
         else
@@ -260,10 +248,10 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
 
           call progress_bar(                  &
             'current trajectory',           &
-            int(100*time_new/end_of_time), &
+            int(100*time/end_of_time), &
             '   total',                     &
             ! total =  % completed trajs + contribution form current trajctory
-            100*(itraj-c_pars%start_traj)/c_pars%n_trajs + int(100.*time_new/(end_of_time*c_pars%n_trajs)))
+            100*(itraj-c_pars%start_traj)/c_pars%n_trajs + int(100.*time/(end_of_time*c_pars%n_trajs)))
 
           if (r%n_ads_total>0) then
 
@@ -339,16 +327,6 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
 
           end if
 
-    ! WARNING - This is a hack, crude crude hack
-          ! End the trajectory if there's no species called B anymore
-          if (lat%n_ads(2) == 0) then
-    !        print*
-    !        print *, 'species ', c_pars%ads_names(2), ' extinct: exiting kMC loop'
-    !        print *, 'if ', c_pars%ads_names(2), ' is not B, complain to UN'
-    !        print*
-            exit time_loop
-          end if
-
         end do ! ibin
 
         ibin = ibin_new
@@ -356,7 +334,29 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
       end do ! time segment
 
       time_segment_old = time_segment_new
-      time = time_new ! time shift
+
+      ! do reaction based on a random number
+      call r%do_reaction(ran1(), lat, e_pars)
+
+      ! End the trajectory if there's no processes left
+      if (r%total_rate == 0.0_dp) then
+        print*
+        print *, 'total rate is zero: exiting kMC loop'
+        print*
+        exit
+      end if
+
+! WARNING - This is a hack, crude crude hack
+      ! End the trajectory if there's no species called B anymore
+      if (lat%n_ads(2) == 0) then
+!        print*
+!        print *, 'species ', c_pars%ads_names(2), ' extinct: exiting kMC loop'
+!        print *, 'if ', c_pars%ads_names(2), ' is not B, complain to UN'
+!        print*
+        exit
+      end if
+
+      kmc_nsteps = kmc_nsteps + 1
 
     end do time_loop
 !-------------------------------------------------------------
