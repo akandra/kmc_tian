@@ -30,9 +30,9 @@ module reaction_class
     type( association_type) :: association
     type( bimolecular_type) :: bimolecular
 
-    real(dp) :: beta                    ! inverse thermodynamic temperature
-    integer  :: n_ads_total             ! total number of adsorbates
-    real(dp) :: total_rate              ! sum over all relevant rates
+    real(dp) :: beta                                    ! inverse thermodynamic temperature
+    integer  :: n_ads_total                             ! total number of adsorbates
+    real(dp), dimension(n_reaction_types) :: acc_rate   ! accumulated rate for reaction types
     ! reaction counters
     !                  reaction
     !                  . species
@@ -40,6 +40,7 @@ module reaction_class
     integer, dimension(:,:), allocatable :: counter
 
   contains
+    procedure :: accumulate_rates
     procedure :: construct
     procedure :: construct_1
     procedure :: cleanup_rates
@@ -76,6 +77,78 @@ contains
   end function reaction_init
 
 !-----------------------------------------------------------------------------
+  subroutine accumulate_rates(this, lat)
+!-----------------------------------------------------------------------------
+    class(reaction_type),     intent(inout) :: this
+    class(mc_lat),            intent(inout) :: lat
+
+    integer :: n_nn, i, m, ads, channel
+
+    n_nn  = lat%n_nn(1)
+
+    ! initialize the accumulated rate for hopping
+    this%acc_rate(hopping_id) = 0.0_dp
+    ! rate for hopping reactions
+    if (this%hopping%is_defined) then
+      do ads=1,this%n_ads_total
+      do m=1,n_nn
+        this%acc_rate(hopping_id) = this%acc_rate(hopping_id) + sum(this%hopping%rates(ads,m)%list)
+      end do
+      end do
+    end if
+
+    ! accumulate rate for desorption (= rate for desorption + hopping)
+    this%acc_rate(desorption_id) = this%acc_rate(hopping_id)
+    if (this%desorption%is_defined) then
+      do ads=1,this%n_ads_total
+        this%acc_rate(desorption_id) = this%acc_rate(desorption_id) + this%desorption%rates(ads)
+      end do
+    end if
+
+    ! accumulate rate for dissociation (= rate for dissociation + desorption + hopping)
+    this%acc_rate(dissociation_id) = this%acc_rate(desorption_id)
+    if (this%dissociation%is_defined) then
+      do ads=1,this%n_ads_total
+      do channel = 1, this%dissociation%rate_info(ads)%n_channels
+        this%acc_rate(dissociation_id) = this%acc_rate(dissociation_id) &
+                                       + this%dissociation%rate_info(ads)%list(channel)%rate
+      end do
+      end do
+    end if
+
+    ! accumulate rate for association (= rate for association + dissociation + desorption + hopping)
+    this%acc_rate(association_id) = this%acc_rate(dissociation_id)
+    if (this%association%is_defined) then
+      do ads=1,this%n_ads_total
+      do channel = 1, this%association%rate_info(ads)%n_channels
+        this%acc_rate(association_id) = this%acc_rate(association_id) &
+                                      + this%association%rate_info(ads)%list(channel)%rate
+      end do
+      end do
+    end if
+
+    ! accumulate rate for bimolecular reaction (= rate for bimolecular + association + dissociation + desorption + hopping)
+    this%acc_rate(bimolecular_id) = this%acc_rate(association_id)
+    if (this%bimolecular%is_defined) then
+      do ads=1,this%n_ads_total
+      do channel = 1, this%bimolecular%rate_info(ads)%n_channels
+        this%acc_rate(bimolecular_id) = this%acc_rate(bimolecular_id) &
+                                      + this%bimolecular%rate_info(ads)%list(channel)%rate
+      end do
+      end do
+    end if
+
+!    ! Debug printing of accumulated rates
+!    print*
+!    print*,'accumulate_rates debugging output:'
+!    print'(3A,1pe12.2)','Total rate for ',reaction_names(1), ' is ', this%acc_rate(1)
+!    do i=2, n_reaction_types
+!      print'(3A,1pe12.2)','Total rate for ',reaction_names(i), ' is ', this%acc_rate(i) - this%acc_rate(i-1)
+!    end do
+
+  end subroutine accumulate_rates
+
+!-----------------------------------------------------------------------------
   subroutine construct(this, lat, e_pars)
 !-----------------------------------------------------------------------------
     class(reaction_type),     intent(inout) :: this
@@ -83,7 +156,16 @@ contains
     class(energy_parameters), intent(in)    :: e_pars
 
     integer       :: ads
-
+    ! Debugging variables
+    integer :: chan, i, m
+    integer :: r_id, r_ast, r_lst
+    integer :: p1_id, p1_ast, p1_lst
+    integer :: p2_id, p2_ast, p2_lst
+    integer :: r1_id, r1_ast, r1_lst
+    integer :: r2_id, r2_ast, r2_lst
+    real(dp) :: rate
+    character(len=max_string_length) :: lst_name, lst_p1_name, lst_p2_name, lst_r1_name, lst_r2_name
+    character(len=max_string_length) :: ast_r_name, ast_r1_name, ast_r2_name, ast_p1_name, ast_p2_name
 
     ! Hopping
     if (this%hopping%is_defined) then
@@ -126,8 +208,11 @@ contains
 
     end if
 
-!! Debugging printout dissociation
+    call this%accumulate_rates(lat)
+
+! Debugging printout dissociation
 !print*
+!print*, 'construct debugging printout: '
 !call lat%print_ocs
 !print *
 !print '(a)' ,' Dissociation channels from reaction class'
@@ -210,10 +295,8 @@ contains
 !  end do
 !  if ( this%dissociation%rate_info(ads)%n_channels>0 ) print*
 !end do
-! Debugging printout bimolecular
+!! Debugging printout bimolecular
 !print*
-!call lat%print_ocs
-!print *
 !print '(a)' ,' Bimolecular channels from reaction class'
 !print '(a)'    ,' -------------------------------------------------------------------------------------------------------'
 !print '(a)'    ,'  ads# proc#       m   rate       lst_r1   ast_r1    lst_r2   ast_r2   lst_p1   ast_p1   lst_p2   ast_p2'
@@ -257,7 +340,7 @@ contains
 !        ads, i, m, rate, lst_r1_name, ast_r1_name, lst_r2_name, ast_r2_name, lst_p1_name, ast_p1_name, lst_p2_name, ast_p2_name
 !
 !  end do
-!!  if ( this%association%rate_info(ads)%n_channels>0 ) print*
+!  if ( this%association%rate_info(ads)%n_channels>0 ) print*
 !end do
 
   end subroutine construct
@@ -318,92 +401,32 @@ contains
     integer :: id_r, id_r1, id_r2, id_p1, id_p2
     integer :: ast_p1, ast_p2
     integer :: row, col, row_new, col_new, lst_new, ast_new
-    real(dp), dimension(n_reaction_types) :: acc_rate
     integer, dimension(2*lat%n_nn(1)) :: change_list
 
     real(dp) :: u, temp_dp
 
-    n_nn  = lat%n_nn(1)
+    n_nn = lat%n_nn(1)
     n_nn2 = n_nn/2
 
-    ! -------- calculate total rate
-
-    ! initialize the accumulated rate for hopping
-    acc_rate(hopping_id) = 0.0_dp
-    ! rate for hopping reactions
-    if (this%hopping%is_defined) then
-      do ads=1,this%n_ads_total
-      do m=1,n_nn
-        acc_rate(hopping_id) = acc_rate(hopping_id) + sum(this%hopping%rates(ads,m)%list)
-      end do
-      end do
-    end if
-    ! accumulate rate for desorption (= rate for desorption + hopping)
-    acc_rate(desorption_id) = acc_rate(hopping_id)
-    if (this%desorption%is_defined) then
-      do ads=1,this%n_ads_total
-        acc_rate(desorption_id) = acc_rate(desorption_id) + this%desorption%rates(ads)
-      end do
-    end if
-    ! accumulate rate for dissociation (= rate for dissociation + desorption + hopping)
-    acc_rate(dissociation_id) = acc_rate(desorption_id)
-    if (this%dissociation%is_defined) then
-      do ads=1,this%n_ads_total
-      do channel = 1, this%dissociation%rate_info(ads)%n_channels
-        acc_rate(dissociation_id) = acc_rate(dissociation_id) &
-                                  + this%dissociation%rate_info(ads)%list(channel)%rate
-      end do
-      end do
-    end if
-    ! accumulate rate for association (= rate for association + dissociation + desorption + hopping)
-    acc_rate(association_id) = acc_rate(dissociation_id)
-    if (this%association%is_defined) then
-      do ads=1,this%n_ads_total
-      do channel = 1, this%association%rate_info(ads)%n_channels
-        acc_rate(association_id) = acc_rate(association_id) &
-                                  + this%association%rate_info(ads)%list(channel)%rate
-      end do
-      end do
-    end if
-    ! accumulate rate for bimolecular reaction (= rate for bimolecular + association + dissociation + desorption + hopping)
-    acc_rate(bimolecular_id) = acc_rate(association_id)
-    if (this%bimolecular%is_defined) then
-      do ads=1,this%n_ads_total
-      do channel = 1, this%bimolecular%rate_info(ads)%n_channels
-        acc_rate(bimolecular_id) = acc_rate(bimolecular_id) &
-                                  + this%bimolecular%rate_info(ads)%list(channel)%rate
-      end do
-      end do
-    end if
-
-!    ! Debug printing of total rates
-!    print*
-!    print'(3A,1pe12.2)','Total rate for ',reaction_names(1), ' is ', acc_rate(1)
-!    do i=2, n_reaction_types
-!      print'(3A,1pe12.2)','Total rate for ',reaction_names(i), ' is ', acc_rate(i)-acc_rate(i-1)
-!    end do
-
-    ! Save the total rate value
-    this%total_rate = acc_rate(n_reaction_types)
     ! do nothing if there is nothing to do
-    if (this%total_rate == 0.0_dp) return
+    if (this%acc_rate(n_reaction_types) == 0.0_dp) return
 
     ! ------- Select the process
 
     ! random rate value to select a process
-    u = rand*this%total_rate
+    u = rand*this%acc_rate(n_reaction_types)
     ! determine the type of reaction
     do reaction_id=1,n_reaction_types
-      if (u < acc_rate(reaction_id)) exit
+      if (u < this%acc_rate(reaction_id)) exit
     end do
 
 ! Debug printing
 !if (debug(1)) then
 !  print*
+!  print*,'do reaction debugging printout:'
 !  print *, 'Before ', trim(reaction_names(reaction_id)),':'
 !  call lat%print_ocs
 !  call lat%print_ads
-!  print*, 'Accumulated rates are ', acc_rate
 !end if
 
     select case (reaction_id)
@@ -479,7 +502,7 @@ contains
       case(desorption_id)
         ! determine desorption channel (adsorbate)
         !                              (      ads)
-        temp_dp = acc_rate(hopping_id)
+        temp_dp = this%acc_rate(hopping_id)
         do ads=1,this%n_ads_total
           temp_dp = temp_dp + this%desorption%rates(ads)
           if (u < temp_dp) exit
@@ -538,7 +561,7 @@ contains
 
       case(dissociation_id)
         ! determine dissociation channel (ads, channel)
-        temp_dp = acc_rate(desorption_id)
+        temp_dp = this%acc_rate(desorption_id)
         extloop2: do ads=1,this%n_ads_total
         do channel=1,this%dissociation%rate_info(ads)%n_channels
           temp_dp = temp_dp + this%dissociation%rate_info(ads)%list(channel)%rate
@@ -617,7 +640,7 @@ contains
 
       case(association_id)
         ! determine association channel (ads, channel)
-        temp_dp = acc_rate(dissociation_id)
+        temp_dp = this%acc_rate(dissociation_id)
         extloop3: do ads=1,this%n_ads_total
         do channel=1,this%association%rate_info(ads)%n_channels
           temp_dp = temp_dp + this%association%rate_info(ads)%list(channel)%rate
@@ -704,7 +727,7 @@ contains
 
       case(bimolecular_id)
         ! determine bimolecular reaction channel (ads, channel)
-        temp_dp = acc_rate(association_id)
+        temp_dp = this%acc_rate(association_id)
         extloop4: do ads=1,this%n_ads_total
         do channel=1,this%bimolecular%rate_info(ads)%n_channels
           temp_dp = temp_dp + this%bimolecular%rate_info(ads)%list(channel)%rate
@@ -782,6 +805,8 @@ contains
 
     end select
 
+    ! Update the accumulated rates
+    call this%accumulate_rates(lat)
 ! Debug printing
 !if (debug(1)) then
 !  print*

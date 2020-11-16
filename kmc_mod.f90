@@ -44,7 +44,7 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
 
   integer, dimension(c_pars%n_species,c_pars%n_species,c_pars%rdf_n_bins) :: rdf_hist
 
-  integer :: j, k  ! only for debug printout
+  integer :: j, k, n_chan  ! only for debug printout
 
   ! initialize vector of conditions for debug trap
   debug =  .false.
@@ -210,8 +210,9 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
     time_loop: do while ( time < end_of_time )
 
       ! propagate the time
-      delta_t = -log(ran1())/r%total_rate   ! when does a reaction should occur?
+      delta_t = -log(ran1())/r%acc_rate(n_reaction_types)   ! when does a reaction should occur?
       time = time + delta_t
+
       ! set time to the final value at the end of trajectory
       if (time > end_of_time) time = end_of_time
 
@@ -339,7 +340,7 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
       call r%do_reaction(ran1(), lat, e_pars)
 
       ! End the trajectory if there's no processes left
-      if (r%total_rate == 0.0_dp) then
+      if (r%acc_rate(n_reaction_types) == 0.0_dp) then
         print*
         print *, 'total rate is zero: exiting kMC loop'
         print*
