@@ -16,6 +16,9 @@ type( energy_parameters) :: e_pars
 
 character(len=max_string_length) file_name_base
 
+! Print the banner
+print'(2A)', "kmc_tian. Release ",version
+
 ! Take a file name base
 select case (command_argument_count())
     case(1)

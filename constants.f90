@@ -17,6 +17,10 @@ module constants
   real(dp), parameter :: kB             = 8.61733238496e-5_dp       ! eV / K
   real(dp), parameter :: hbar           = 0.6582119514467406e-15_dp ! eV * s
 
+  ! Version number taken from a preprocessor variable
+
+  character(len=40), parameter :: version = __GIT_VERSION__
+
   !-------- Site type info ---------!
 
   ! Number of site types

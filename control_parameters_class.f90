@@ -40,6 +40,7 @@ module control_parameters_class
     integer  :: n_trajs                ! number of kMC trajectories
     integer, allocatable  :: n_bins(:) ! number of time intervals in kmc simulations
     real(dp) :: log_scale_t1           ! initial time for log binning
+    real(dp) :: power_scale_t1         ! initial time for log binning
     real(dp), allocatable :: t_end(:)  ! kmc simulation times
     character(len=max_string_length) ::&
                    rate_file_name   ! name of the file with rate parameters
@@ -91,6 +92,7 @@ contains
     control_parameters_init%n_trajs          = -1
     control_parameters_init%rate_file_name   = 'none'
     control_parameters_init%log_scale_t1     = -1.0_dp
+    control_parameters_init%power_scale_t1   = -1.0_dp
 
     control_parameters_init%file_name_base = file_name_base
     !  read control parameters from the input file
@@ -209,6 +211,10 @@ contains
           case('kmc_log_bin')
             if (nwords /= 2) stop err // "kmc_log_bin must have 1 parameter."
             read(words(2),*) control_parameters_init%log_scale_t1
+
+          case('kmc_power_bin')
+            if (nwords /= 2) stop err // "kmc_power_bin must have 1 parameter."
+            read(words(2),*) control_parameters_init%power_scale_t1
 
           case('kmc_rates')
             if (nwords/=2) stop err // "kmc_rates must have 1 parameter."

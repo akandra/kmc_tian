@@ -39,8 +39,8 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
   real(dp) :: time, end_of_time, time_bin, time_shift
   real(dp) :: delta_t
   real(dp), dimension(size(c_pars%t_end)) :: time_limits, step_bin
-  logical :: bin_log_scale
-  real(dp) :: log_t1
+  logical :: bin_log_scale, bin_power_scale
+  real(dp) :: log_t1, bin_power_law
 
   integer, dimension(c_pars%n_species,c_pars%n_species,c_pars%rdf_n_bins) :: rdf_hist
 
@@ -69,11 +69,15 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
 !
 !stop 111
 
-  bin_log_scale = c_pars%log_scale_t1 > 0.0_dp
+  bin_log_scale   = c_pars%log_scale_t1 > 0.0_dp
+  bin_power_scale = c_pars%power_scale_t1  > 0.0_dp
   ! do linear time binning for distributions
   if (bin_log_scale) then
     log_t1 = log10(c_pars%log_scale_t1)
     step_bin(1) = ( log10(c_pars%t_end(1)) - log_t1 )/c_pars%n_bins(1)
+  elseif (bin_power_scale) then
+    bin_power_law = ( log(c_pars%t_end(1)) - log(c_pars%power_scale_t1) )/ log( 1.0_dp*c_pars%n_bins(1) )
+    step_bin(1) = c_pars%power_scale_t1**(1.0/bin_power_law)
   else
     step_bin = c_pars%t_end/c_pars%n_bins
   end if
@@ -232,6 +236,8 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
             else
               ibin_new = int( ( log10(time) - log_t1 )/step_bin(time_segment) )
             end if
+          elseif (bin_power_scale) then
+            ibin_new = int( time**(1./bin_power_law)/step_bin(time_segment) )
           else
             ibin_new = bin_shift + int( (time - time_shift)/step_bin(time_segment) )
           end if
@@ -279,6 +285,8 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
           ! write into trajectory files
           if (bin_log_scale) then
             time_bin = 10**( log_t1 + ibin_current*step_bin(time_segment) )
+          elseif (bin_power_scale) then
+            time_bin = ( ibin_current*step_bin(time_segment) )**bin_power_law
           else
             time_bin = time_shift + (ibin_current - bin_shift)*step_bin(time_segment)
           end if

@@ -23,7 +23,7 @@ subroutine metropolis(lat, c_pars, e_pars)
   integer :: i, istep, ihop, species, species1, species2
   integer :: new_row, new_col, new_ads_site, old_row, old_col, old_ads_site
   real(dp) :: energy_old, beta, delta_E
-  character(len=max_string_length) :: n_ads_fmt, rdf_fmt
+  character(len=max_string_length) :: n_ads_fmt, rdf_fmt, version_header
   integer, dimension(lat%n_rows,lat%n_cols) :: cluster_label
   integer, dimension(maxval(lat%n_ads)) :: cluster_sizes
   integer :: largest_label, hist_counter, rdf_counter
@@ -49,10 +49,12 @@ subroutine metropolis(lat, c_pars, e_pars)
   n_ads_fmt = '('//trim(adjustl(n_ads_fmt))//'i8)'
   write(rdf_fmt,'(i10)') c_pars%rdf_n_bins
   rdf_fmt = '('//trim(adjustl(rdf_fmt))//'i8)'
+  version_header = '! kmc_tian Release ' // version
 
   ! write initial state of the lattice to a file
   call open_for_write(outcfg_unit,trim(c_pars%file_name_base)//'.confs')
 
+  write(outcfg_unit,'(A)') version_header
   write(outcfg_unit,'(A10,A10,A15)') &
                 "# rows","# cols","step_period"
   write(outcfg_unit,'(3i10)') lat%n_rows, lat%n_cols, c_pars%step_period
