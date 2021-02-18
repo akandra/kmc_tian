@@ -12,7 +12,7 @@ FPPFLAGS = -fpp -D__GIT_VERSION__=\"$(GIT_VERSION)\"
 FC = ifort
 
 # compiler flags
-CFLAGS = 
+CFLAGS =
 
 # files
 SOURCE = open_file.f90 constants.f90 \
@@ -42,35 +42,38 @@ REXEC  = $(RDIR)/$(EXEC)
 ROBJS  = $(addprefix $(RDIR)/, $(OBJS))
 RFLAGS = -O2 -module $(RDIR)
 
-.PHONY: all debug release prepare remake clean
-
-# Default rules
-all: prepare release
+.PHONY: all debug release prepare_debug prepare_release remaked remaker clean_debug clean_release
 
 # Debug rules
-debug: $(DEXEC)
+Debug: prepare_debug $(DEXEC)
 
-$(DEXEC): $(DOBJS) 
+$(DEXEC): $(DOBJS)
 	$(FC) $(CFLAGS) $(DFLAGS) -o $(DEXEC) $^
 
 $(DDIR)/%.o: %.f90
 	$(FC) -c $(CFLAGS) $(DFLAGS) $(FPPFLAGS) -o $@ $^
-	
-# Release rules
-release: $(REXEC)
 
-$(REXEC): $(ROBJS) 
+# Release rules
+release: prepare_release $(REXEC)
+
+$(REXEC): $(ROBJS)
 	$(FC) $(CFLAGS) $(RFLAGS) -o $(REXEC) $^
 
 $(RDIR)/%.o: %.f90
 	$(FC) -c $(CFLAGS) $(RFLAGS) $(FPPFLAGS) -o $@ $^
-	
+
 # additional rules
 
-prepare:
-	mkdir -p $(DDIR) $(RDIR)
-	
-remake: clean all
-	
-clean: 
-	rm -f $(DDIR)/* $(RDIR)/*
+prepare_debug:
+	mkdir -p $(DDIR)
+prepare_release:
+	mkdir -p $(RDIR)
+
+remaked: clean_debug debug
+remaker: clean_release release
+
+clean: clean_debug clean_release
+clean_debug:
+	@rm -rf $(DDIR)
+clean_release:
+	@rm -rf $(RDIR)
