@@ -38,6 +38,9 @@ select case (c_pars%algorithm)
   case ('mmc')
     call metropolis(lat, c_pars, e_pars) ! Warning: mmc is implemented for the hops only
 
+  case ('mmc-gc')
+    call metropolis(lat, c_pars, e_pars) ! Warning: mmc is implemented for the hops only
+
   case ('bkl')
     call Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
 

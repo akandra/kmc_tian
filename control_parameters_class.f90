@@ -11,7 +11,7 @@ module control_parameters_class
 
   type, public :: control_parameters
 
-    character(len=3) :: algorithm   ! MC algorithm to use (bkl or mmc)
+    character(len=10) :: algorithm  ! MC algorithm to use (bkl, mmc, mmc-gc)
     integer :: n_rows               ! number of rows
     integer :: n_cols               ! number of columns
     integer :: step_period          ! = step_density^-1, 0 means no steps
