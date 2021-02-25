@@ -34,6 +34,11 @@ module control_parameters_class
     integer :: n_mmc_steps          ! number of mmc steps
     integer :: hist_period          ! period for histogram  calculation
 
+    ! MMC-GC specific parameters
+
+    real(dp), allocatable :: chem_pots(:) ! chemical potentials for the ideal gas
+    integer :: gc_factor                  ! number of gc steps per a canonical mmc step
+
     ! kMC-specific parameters
 
     integer  :: start_traj             ! starting kMC trajectory number
@@ -65,10 +70,8 @@ contains
     character(len=max_string_length) :: buffer
     character(len=max_string_length) :: words(100)
 
-    real(dp),allocatable :: coverage(:)
+    real(dp),allocatable :: coverages(:), gc_coverages(:)
     integer :: default_int = huge(0)
-
-
 
 
     control_parameters_init%algorithm        = ''
@@ -85,6 +88,7 @@ contains
     control_parameters_init%rdf_n_bins       = -1
     control_parameters_init%rdf_period       = -1
     ! MMC-specific parameters
+    control_parameters_init%gc_factor        =  0
     control_parameters_init%n_mmc_steps      = -1
     control_parameters_init%hist_period      = -1
     ! kMC-specific parameters
@@ -104,7 +108,7 @@ contains
       read(inp_unit, '(A)', iostat=ios) buffer
         ! ios < 0: end of record condition encountered or endfile condition detected
         ! ios > 0: an error is detected
-        ! ios = 0  otherwise
+        ! ios = 0  otherwise!
 
       if (ios == 0) then
         ! Split an input string
@@ -143,7 +147,6 @@ contains
           case('adsorbates')
 
             if (nwords==1) stop err // "adsorbates must have at least 1 parameter."
-            control_parameters_init%n_species = nwords - 1
             allocate(control_parameters_init%ads_names(nwords - 1))
             do i=1,nwords-1
               read(words(i+1),*) control_parameters_init%ads_names(i)
@@ -152,10 +155,9 @@ contains
           case('coverages')
 
             if (nwords==1) stop err // "coverages must have at least 1 parameter."
-            control_parameters_init%n_species = nwords - 1
-            allocate(coverage(nwords - 1))
+            allocate(coverages(nwords - 1))
             do i=1,nwords-1
-              read(words(i+1),*) coverage(i)
+              read(words(i+1),*) coverages(i)
             end do
 
           case('temperature')
@@ -176,6 +178,17 @@ contains
             read(words(2),*) control_parameters_init%rdf_period
             read(words(3),*) control_parameters_init%rdf_bin_size
             read(words(4),*) control_parameters_init%rdf_n_bins
+
+          case('gc_factor')
+            if (nwords/=2) stop err // "gc_factor must have 1 parameter."
+            read(words(2),*) control_parameters_init%gc_factor
+
+          case('gc_coverages')
+            if (nwords==1) stop err // "gc_coverages must have at least 1 parameter."
+            allocate(gc_coverages(nwords - 1))
+            do i=1,nwords-1
+              read(words(i+1),*) gc_coverages(i)
+            end do
 
           case('mmc_save_period')
             if (nwords/=2) stop err // "save_period must have 1 parameter."
@@ -234,8 +247,10 @@ contains
 
     ! Check the input consistency
 
-    if (size(coverage) /= size(control_parameters_init%ads_names))&
+    if (size(coverages) /= size(control_parameters_init%ads_names))&
       stop err // "adsorbates and coverages are inconsistent"
+    ! set the number of adsorbates
+    control_parameters_init%n_species = size(coverages)
 
     if (control_parameters_init%step_period > 0 &
         .and. mod(control_parameters_init%n_cols,&
@@ -244,12 +259,13 @@ contains
 
     allocate(control_parameters_init%n_ads(control_parameters_init%n_species))
     ! Calculate number of adsorbate particles
-    control_parameters_init%n_ads = nint(coverage*control_parameters_init%n_rows&
+    control_parameters_init%n_ads = nint(coverages*control_parameters_init%n_rows&
                                                  *control_parameters_init%n_cols)
 
     select case (control_parameters_init%algorithm)
 
     case('mmc')
+
       ! Set mmc_save_period to the proper value
       if (control_parameters_init%save_period == 0 )&
         control_parameters_init%save_period = control_parameters_init%n_mmc_steps + 1
@@ -257,6 +273,19 @@ contains
         stop err // "mmc_save_period is undefined."
       if (control_parameters_init%save_period < 0 )&
         stop err // "mmc_save_period is negative."
+
+      if (gc_factor > 0) then
+        ! TODO: implement gc for the mixture of species
+        if (control_parameters_init%n_species > 1)&
+            stop err // "grand canonical mmc is not implemented for more than 1 species. Consult the experts"
+        ! check gc_coverages consistency
+        if (size(coverages) /= size(gc_coverages))&
+            stop err // "gc_coverages and coverages are inconsistent"
+        allocate(control_parameters_init%chem_pots(control_parameters_init%n_species))
+        ! set chemical potential
+        control_parameters_init%chem_pots = kB*control_parameters_init%temperature*&
+            ( log(gc_coverages/(1 - gc_coverages) ) + 1.0_dp/(1 - gc_coverages) )
+      end if
 
     case('bkl')
       ! Check kmc_nbins and kmc_time
