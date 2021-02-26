@@ -29,7 +29,7 @@ subroutine metropolis(lat, c_pars, e_pars)
   integer :: largest_label, hist_counter, rdf_counter
   integer, dimension(c_pars%n_species,maxval(lat%n_ads)) :: hist
   integer, dimension(c_pars%n_species,c_pars%n_species,c_pars%rdf_n_bins) :: rdf_hist
-  integer :: n_sites, row, col
+  integer :: n_sites, row, col, new_n_ads, n_ads_sites, delta
 !  real(dp), dimension(c_pars%rdf_n_bins) :: dr2
 !  real(dp), dimension(c_pars%n_species) :: coverage
 !  real(dp) :: unit_cell_area
@@ -119,7 +119,9 @@ subroutine metropolis(lat, c_pars, e_pars)
 
         delta_E = energy(i, lat, e_pars) - energy_old
 
-        if ( delta_E > 0.0_dp ) then  ! to prevent overflow
+        ! Accept if delta_E is non-positive
+        ! Calculate probability if delta_E is positive
+        if ( delta_E > 0.0_dp ) then
           if ( exp(- beta*delta_E) < ran1() ) then
             ! reject the hop
             lat%occupations(new_row,new_col) = 0
@@ -136,10 +138,8 @@ subroutine metropolis(lat, c_pars, e_pars)
 
     ! Loop over  grand-canonical steps
     ! WARNING: implemented for 1 species only
+    species = 1
     do i=1, c_pars%gc_factor
-
-!WE ARE HERE! DAN WANTS US TO REMEMBER WHAT WE ARE UP TO REMEMBER
-      energy_old = energy(?, lat, e_pars)
 
       ! select random site
       temp = ceiling(ran1()*n_sites)
@@ -149,58 +149,43 @@ subroutine metropolis(lat, c_pars, e_pars)
       if (lat%occupations(row,col) == 0) then
 
         ! Add an adsorbate
-        ! increase the number of adsorbates
-        lat%n_ads(1) = lat%n_ads(1)  + 1
-        ! update occupations
-        lat%occupations(row_p2,col_p2) = this%n_ads_total
-        ! update adsorbate list
-        lat%ads_list(this%n_ads_total)%id  =  id_p2
-        lat%ads_list(this%n_ads_total)%row = row_p2
-        lat%ads_list(this%n_ads_total)%col = col_p2
-        lat%ads_list(this%n_ads_total)%ast = ast_p2
-        lat%n_ads(id_p2) = lat%n_ads(id_p2) + 1
 
+        ! increase the number of adsorbates
+        lat%n_ads(species) = lat%n_ads(species)  + 1
+        ! update occupations
+        new_n_ads = lat%n_ads_tot()
+        lat%occupations(row,col) = new_n_ads
+        ! update adsorbate list
+        lat%ads_list(new_n_ads)%id  = species
+        lat%ads_list(new_n_ads)%row = row
+        lat%ads_list(new_n_ads)%col = col
+        n_ads_sites = size( lat%avail_ads_sites( lat%lst(row,col), species )%list )
+        if ( n_ads_sites == 1 ) then
+          lat%ads_list(new_n_ads)%ast = lat%avail_ads_sites( lat%lst(row,col), species )%list(1)
+        else
+          lat%ads_list(new_n_ads)%ast = lat%avail_ads_sites( lat%lst(row,col), species )%list( irand(n_ads_sites) )
+        end if
+
+        ! energy change due to the added adsorbate minus chemical potential
+        delta = energy(new_n_ads, lat, e_pars) - c_pars%chem_pots(species)
+
+        ! Accept if delta_E is non-positive
+        ! Calculate probability if delta_E is positive
+        if ( delta > 0.0_dp ) then
+WE ARE HERE - CHECK THE FORMULA BELOW TO BE SURE THE DIVISION IS NOT INTEGER
+          if ( n_sites/new_n_ads*exp(- beta*delta) < ran1() ) then
+            ! reject the hop
+            lat%occupations(row,col) = 0
+            lat%ads_list(new_n_ads)%row = 0
+            lat%ads_list(new_n_ads)%col = 0
+            lat%ads_list(new_n_ads)%ast = 0
+            lat%n_ads(species) = lat%n_ads(species)  - 1
+          end if
+        end if
 
       else
       end if
 
-
-      ! We consider hops to the nearest-neighbor cells only
-      ! And we doubt that we ever need something else
-      ihop = floor(lat%n_nn(1)*ran1()) + 1
-
-      call lat%hop(i,ihop,new_row,new_col,new_ads_site)
-
-!      print*, 'ads. no. = ',i,'row = ', new_row,'col = ', new_col,&
-!              'ads. site = ', ads_site_names(new_ads_site)
-!      pause
-
-      if (lat%occupations(new_row,new_col) == 0) then
-
-        old_row = lat%ads_list(i)%row
-        old_col = lat%ads_list(i)%col
-        old_ads_site = lat%ads_list(i)%ast
-
-        lat%occupations(new_row,new_col) = i
-        lat%occupations(old_row,old_col) = 0
-        lat%ads_list(i)%row = new_row
-        lat%ads_list(i)%col = new_col
-        lat%ads_list(i)%ast = new_ads_site
-
-        delta_E = energy(i, lat, e_pars) - energy_old
-
-        if ( delta_E > 0.0_dp ) then  ! to prevent overflow
-          if ( exp(- beta*delta_E) < ran1() ) then
-            ! reject the hop
-            lat%occupations(new_row,new_col) = 0
-            lat%occupations(old_row,old_col) = i
-            lat%ads_list(i)%row = old_row
-            lat%ads_list(i)%col = old_col
-            lat%ads_list(i)%ast = old_ads_site
-          end if
-        end if
-
-      end if
 
     enddo
 
