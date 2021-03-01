@@ -29,7 +29,8 @@ subroutine metropolis(lat, c_pars, e_pars)
   integer :: largest_label, hist_counter, rdf_counter
   integer, dimension(c_pars%n_species,maxval(lat%n_ads)) :: hist
   integer, dimension(c_pars%n_species,c_pars%n_species,c_pars%rdf_n_bins) :: rdf_hist
-  integer :: n_sites, row, col, new_n_ads, n_ads_sites, delta
+  integer :: n_sites, row, col, new_n_ads, n_ads_sites, i_ads
+  real(dp) :: delta
 !  real(dp), dimension(c_pars%rdf_n_bins) :: dr2
 !  real(dp), dimension(c_pars%n_species) :: coverage
 !  real(dp) :: unit_cell_area
@@ -169,12 +170,11 @@ subroutine metropolis(lat, c_pars, e_pars)
         ! energy change due to the added adsorbate minus chemical potential
         delta = energy(new_n_ads, lat, e_pars) - c_pars%chem_pots(species)
 
-        ! Accept if delta_E is non-positive
-        ! Calculate probability if delta_E is positive
+        ! Accept the addition of adsorbate if delta is non-positive, i.e., do nothing
+        ! If delta is positive calculate probability to reject the addition
         if ( delta > 0.0_dp ) then
-WE ARE HERE - CHECK THE FORMULA BELOW TO BE SURE THE DIVISION IS NOT INTEGER
-          if ( n_sites/new_n_ads*exp(- beta*delta) < ran1() ) then
-            ! reject the hop
+          if ( 1.0_dp*n_sites/new_n_ads*exp(- beta*delta) < ran1() ) then
+            ! reject the addition of adsorbate
             lat%occupations(row,col) = 0
             lat%ads_list(new_n_ads)%row = 0
             lat%ads_list(new_n_ads)%col = 0
@@ -184,6 +184,47 @@ WE ARE HERE - CHECK THE FORMULA BELOW TO BE SURE THE DIVISION IS NOT INTEGER
         end if
 
       else
+
+        ! Remove an adsorbate
+
+        ! Determine the number of an adsorbate to be removed
+        i_ads = lat%occupations(row,col)
+        ! chemical potential minus the energy change due to the removal of the adsorbate
+        delta = c_pars%chem_pots(species) - energy(i_ads, lat, e_pars)
+
+        ! Accept the addition of adsorbate if delta is non-positive, i.e., do nothing
+        ! If delta is positive calculate probability to reject the addition
+        if ( delta > 0.0_dp ) then
+          if ( 1.0_dp*n_sites/new_n_ads*exp(- beta*delta) < ran1() ) then
+            ! reject the addition of adsorbate
+            lat%occupations(row,col) = 0
+            lat%ads_list(new_n_ads)%row = 0
+            lat%ads_list(new_n_ads)%col = 0
+            lat%ads_list(new_n_ads)%ast = 0
+            lat%n_ads(species) = lat%n_ads(species)  - 1
+          end if
+        end if
+
+        id_r = lat%ads_list(ads)%id
+        ! Delete an adsorbate from the lattice
+        lat%occupations(lat%ads_list(ads)%row, lat%ads_list(ads)%col) = 0
+        ! Update the number of adsorbates in the lat structure
+        lat%n_ads(id_r) = lat%n_ads(id_r) - 1
+        ! Rearrange adsorbates except when the last adsorbate desorbs
+        if (ads < this%n_ads_total) then
+          ! Put the last adsorbate in place of ads
+          lat%ads_list(ads) = lat%ads_list(this%n_ads_total)
+          ! Update the adsorbate number in the lattice
+          lat%occupations(lat%ads_list(ads)%row, lat%ads_list(ads)%col) = ads
+          ! Update the rates arrays
+          this%hopping%rates(ads,:)        = this%hopping%rates(this%n_ads_total,:)
+          this%desorption%rates(ads)       = this%desorption%rates(this%n_ads_total)
+          this%dissociation%rate_info(ads) = this%dissociation%rate_info(this%n_ads_total)
+          this%association%rate_info(ads)  = this%association%rate_info(this%n_ads_total)
+          this%bimolecular%rate_info(ads)  = this%bimolecular%rate_info(this%n_ads_total)
+        end if
+
+
       end if
 
 
