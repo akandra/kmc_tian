@@ -10,7 +10,7 @@ module mmc
   implicit none
 
   private
-  public::  metropolis, gc_metropolis
+  public::  metropolis
 
 contains
 
@@ -29,8 +29,9 @@ subroutine metropolis(lat, c_pars, e_pars)
   integer :: largest_label, hist_counter, rdf_counter
   integer, dimension(c_pars%n_species,maxval(lat%n_ads)) :: hist
   integer, dimension(c_pars%n_species,c_pars%n_species,c_pars%rdf_n_bins) :: rdf_hist
-  integer :: n_sites, row, col, new_n_ads, n_ads_sites, i_ads
-  real(dp) :: delta
+  integer :: n_sites, row, col, new_n_ads, n_ads_sites, i_ads, n_ads_tot_old
+  real(dp) :: delta, probability, temp
+  logical :: remove
 !  real(dp), dimension(c_pars%rdf_n_bins) :: dr2
 !  real(dp), dimension(c_pars%n_species) :: coverage
 !  real(dp) :: unit_cell_area
@@ -170,16 +171,22 @@ subroutine metropolis(lat, c_pars, e_pars)
         ! energy change due to the added adsorbate minus chemical potential
         delta = energy(new_n_ads, lat, e_pars) - c_pars%chem_pots(species)
 
-        ! Accept the addition of adsorbate if delta is non-positive, i.e., do nothing
-        ! If delta is positive calculate probability to reject the addition
+        ! If delta is non-positive, accept the addition of adsorbate , i.e., do nothing
+        ! this check also prevents overflow in exp
         if ( delta > 0.0_dp ) then
-          if ( 1.0_dp*n_sites/new_n_ads*exp(- beta*delta) < ran1() ) then
-            ! reject the addition of adsorbate
-            lat%occupations(row,col) = 0
-            lat%ads_list(new_n_ads)%row = 0
-            lat%ads_list(new_n_ads)%col = 0
-            lat%ads_list(new_n_ads)%ast = 0
-            lat%n_ads(species) = lat%n_ads(species)  - 1
+          probability = 1.0_dp*n_sites/lat%n_ads(species)*exp(- beta*delta)
+          ! If probability is greater than or equal to 1, accept the addition, i.e., do nothing
+          ! we do this check to avoid picking the random number
+          if ( probability < 1.0_dp ) then
+            ! Check the condition to reject the addition
+            if ( probability < ran1() ) then
+              ! reject the addition of adsorbate
+              lat%occupations(row,col) = 0
+              lat%ads_list(new_n_ads)%row = 0
+              lat%ads_list(new_n_ads)%col = 0
+              lat%ads_list(new_n_ads)%ast = 0
+              lat%n_ads(species) = lat%n_ads(species)  - 1
+            end if
           end if
         end if
 
@@ -190,43 +197,38 @@ subroutine metropolis(lat, c_pars, e_pars)
         ! Determine the number of an adsorbate to be removed
         i_ads = lat%occupations(row,col)
         ! chemical potential minus the energy change due to the removal of the adsorbate
-        delta = c_pars%chem_pots(species) - energy(i_ads, lat, e_pars)
+        delta = - beta* ( c_pars%chem_pots(species) - energy(i_ads, lat, e_pars) )
 
-        ! Accept the addition of adsorbate if delta is non-positive, i.e., do nothing
-        ! If delta is positive calculate probability to reject the addition
-        if ( delta > 0.0_dp ) then
-          if ( 1.0_dp*n_sites/new_n_ads*exp(- beta*delta) < ran1() ) then
-            ! reject the addition of adsorbate
-            lat%occupations(row,col) = 0
-            lat%ads_list(new_n_ads)%row = 0
-            lat%ads_list(new_n_ads)%col = 0
-            lat%ads_list(new_n_ads)%ast = 0
-            lat%n_ads(species) = lat%n_ads(species)  - 1
+        remove = .false.
+        ! Prevents overflow in exp
+        if ( delta > exp_arg_too_big ) then
+          remove = .true.
+        else
+          probability = 1.0_dp*lat%n_ads(species)/n_sites*exp(delta)
+          if ( probability >= 1.0_dp ) then
+            remove = .true.
+          else if ( probability > ran1() ) then
+            remove = .true.
           end if
         end if
 
-        id_r = lat%ads_list(ads)%id
-        ! Delete an adsorbate from the lattice
-        lat%occupations(lat%ads_list(ads)%row, lat%ads_list(ads)%col) = 0
-        ! Update the number of adsorbates in the lat structure
-        lat%n_ads(id_r) = lat%n_ads(id_r) - 1
-        ! Rearrange adsorbates except when the last adsorbate desorbs
-        if (ads < this%n_ads_total) then
-          ! Put the last adsorbate in place of ads
-          lat%ads_list(ads) = lat%ads_list(this%n_ads_total)
-          ! Update the adsorbate number in the lattice
-          lat%occupations(lat%ads_list(ads)%row, lat%ads_list(ads)%col) = ads
-          ! Update the rates arrays
-          this%hopping%rates(ads,:)        = this%hopping%rates(this%n_ads_total,:)
-          this%desorption%rates(ads)       = this%desorption%rates(this%n_ads_total)
-          this%dissociation%rate_info(ads) = this%dissociation%rate_info(this%n_ads_total)
-          this%association%rate_info(ads)  = this%association%rate_info(this%n_ads_total)
-          this%bimolecular%rate_info(ads)  = this%bimolecular%rate_info(this%n_ads_total)
+        if (remove) then
+          ! Save total number of adsorbates
+          n_ads_tot_old = lat%n_ads_tot()
+          ! Remove adsorbate from the lattice
+          lat%occupations(row,col) = 0
+          ! Update the number of adsorbates in the lat structure
+          lat%n_ads(species) = lat%n_ads(species) - 1
+          ! Rearrange adsorbates except when the last adsorbate removed
+          if ( i_ads < n_ads_tot_old ) then
+            ! Put the last adsorbate in place of removed adsorbate
+            lat%ads_list(i_ads) = lat%ads_list(n_ads_tot_old)
+            ! Update the adsorbate number in the lattice
+            lat%occupations(lat%ads_list(i_ads)%row, lat%ads_list(i_ads)%col) = i_ads
+          end if
         end if
 
-
       end if
-
 
     enddo
 

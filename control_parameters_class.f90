@@ -274,7 +274,7 @@ contains
       if (control_parameters_init%save_period < 0 )&
         stop err // "mmc_save_period is negative."
 
-      if (gc_factor > 0) then
+      if (control_parameters_init%gc_factor > 0) then
         ! TODO: implement gc for the mixture of species
         if (control_parameters_init%n_species > 1)&
             stop err // "grand canonical mmc is not implemented for more than 1 species. Consult the experts"

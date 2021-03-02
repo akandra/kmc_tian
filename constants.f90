@@ -100,6 +100,7 @@ module constants
   integer, parameter :: randseed(13) = [7,5,3,11,9,1,17,2,9,6,4,5,8]
   integer, parameter :: max_string_length    = 1000
   real(dp), parameter :: tolerance           = 1.0e-9_dp
+  real(dp), parameter :: exp_arg_too_big     = 100.0_dp
 
   ! Conversion constants to program units
   !
