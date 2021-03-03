@@ -29,8 +29,8 @@ subroutine metropolis(lat, c_pars, e_pars)
   integer :: largest_label, hist_counter, rdf_counter
   integer, dimension(c_pars%n_species,maxval(lat%n_ads)) :: hist
   integer, dimension(c_pars%n_species,c_pars%n_species,c_pars%rdf_n_bins) :: rdf_hist
-  integer :: n_sites, row, col, new_n_ads, n_ads_sites, i_ads, n_ads_tot_old
-  real(dp) :: delta, probability, temp
+  integer :: n_sites, row, col, new_n_ads, n_ads_sites, i_ads, n_ads_tot_old, i_rand
+  real(dp) :: delta, probability
   logical :: remove
 !  real(dp), dimension(c_pars%rdf_n_bins) :: dr2
 !  real(dp), dimension(c_pars%n_species) :: coverage
@@ -144,10 +144,9 @@ subroutine metropolis(lat, c_pars, e_pars)
     do i=1, c_pars%gc_factor
 
       ! select random site
-      temp = ceiling(ran1()*n_sites)
-      row = temp/lat%n_cols + 1
-      col = temp - (row - 1)*lat%n_cols
-
+      i_rand = irand(n_sites)
+      row = (i_rand-1)/lat%n_cols + 1
+      col = i_rand - (row - 1)*lat%n_cols
       if (lat%occupations(row,col) == 0) then
 
         ! Add an adsorbate
@@ -232,6 +231,7 @@ subroutine metropolis(lat, c_pars, e_pars)
 
     enddo
 
+print*,lat%n_ads(1)
 
     ! Calculate the cluster size histogramm
     if (c_pars%hist_period > 0 .and. mod(istep, c_pars%hist_period) == 0) then
