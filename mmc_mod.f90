@@ -86,6 +86,10 @@ subroutine metropolis(lat, c_pars, e_pars)
   rdf_counter = 0
   rdf_hist = 0
 
+  ! open file for saving nads
+  call open_for_write(99,trim(c_pars%file_name_base)//'.nads')
+
+
   write(*,'(20X,A)') "M.M.C. Code's progress report:"
   call progress_bar(0)
 
@@ -231,7 +235,8 @@ subroutine metropolis(lat, c_pars, e_pars)
 
     enddo
 
-print*,lat%n_ads(1)
+    ! write out number of adsorbates
+    write(99,'(100i10)') lat%n_ads(1)
 
     ! Calculate the cluster size histogramm
     if (c_pars%hist_period > 0 .and. mod(istep, c_pars%hist_period) == 0) then
@@ -306,6 +311,7 @@ print*,lat%n_ads(1)
     call lat%print_ads(outcfg_unit)
   end if
 
+  close(99)
   close(outcfg_unit)
   close(outeng_unit)
   if (c_pars%hist_period > 0) close(outhst_unit)
