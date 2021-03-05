@@ -283,8 +283,9 @@ contains
             stop err // "gc_coverages and coverages are inconsistent"
         allocate(control_parameters_init%chem_pots(control_parameters_init%n_species))
         ! set chemical potential
-        control_parameters_init%chem_pots = kB*control_parameters_init%temperature*&
-            ( log(gc_coverages/(1 - gc_coverages) ) + 1.0_dp/(1 - gc_coverages) )
+        ! we are trying various options here
+        control_parameters_init%chem_pots = kB*control_parameters_init%temperature*gc_coverages
+            !( log(gc_coverages/(1 - gc_coverages) )  + 1.0_dp/(1 - gc_coverages) )
       end if
 
     case('bkl')
