@@ -200,17 +200,15 @@ subroutine metropolis(lat, c_pars, e_pars)
         ! Determine the number of an adsorbate to be removed
         i_ads = lat%occupations(row,col)
         ! chemical potential minus the energy change due to the removal of the adsorbate
-        delta = - beta* ( c_pars%chem_pots(species) - energy(i_ads, lat, e_pars) )
+        delta = c_pars%chem_pots(species) - energy(i_ads, lat, e_pars)
 
-        remove = .false.
         ! Prevents overflow in exp
-        if ( delta > exp_arg_too_big ) then
+        remove = .false.
+        if ( delta <= 0 ) then
           remove = .true.
         else
-          probability = 1.0_dp*lat%n_ads(species)/n_sites*exp(delta)
-          if ( probability >= 1.0_dp ) then
-            remove = .true.
-          else if ( probability > ran1() ) then
+          probability = exp(-beta*delta)
+          if ( probability > ran1() ) then
             remove = .true.
           end if
         end if
