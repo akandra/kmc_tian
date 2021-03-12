@@ -146,7 +146,7 @@ subroutine metropolis(lat, c_pars, e_pars)
     ! Loop over  grand-canonical steps
     ! WARNING: implemented for 1 species only
     species = 1
-    do i=1, c_pars%gc_factor
+    if (c_pars%gc_period > 0 .and. mod(istep, c_pars%gc_period) == 0) then
 
       ! select a random site
       i_rand = irand(n_sites)
@@ -233,7 +233,7 @@ subroutine metropolis(lat, c_pars, e_pars)
 
       end if
 
-    end do ! gc_factor loop
+    end if ! gc_period
 
     ! write out number of adsorbates
     write(99,'(100i10)') lat%n_ads(1)

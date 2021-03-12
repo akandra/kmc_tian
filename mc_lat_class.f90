@@ -233,6 +233,7 @@ contains
     integer, allocatable :: n_ads_in(:)
     integer :: ios, iconf, i, j, idummy, conf
     integer :: counter, s_counter, current_species, ads_site
+    integer :: i_rand, species
 
     ! Clean up lattice structure
     this%occupations = 0
@@ -261,6 +262,67 @@ contains
         if (counter == this%n_ads_tot()) exit loop1
       end do
       end do loop1
+
+      ! create random population
+      counter = 0
+      do species=1,size(this%n_ads)
+
+        i = 0
+        while (i < this%n_ads(species) ) do
+
+          ! select a random site
+          i_rand = irand(this%n_cols*this%n_rows)
+          row = (i_rand-1)/this%n_cols + 1
+          col = i_rand - (row - 1)*this%n_cols
+
+          if (this%occupations(row,col) == 0) then
+            i = i + 1
+            counter = counter + 1
+            this%occupations(row,col) == counter
+            ! Warning: arbitrary choice for the ads. site (the 1st available)!
+            ads_site = this%avail_ads_sites(species,this%lst(row,col))%list(1)
+            this%ads_list(counter) = adsorbate(row,col,ads_site,species)
+          end if
+
+        end do
+      end do
+
+
+      loop1: do j=1,this%n_cols
+      do i=1,this%n_rows
+        counter   = counter   + 1
+        s_counter = s_counter + 1
+        if (s_counter>this%n_ads(current_species)) then
+          s_counter = 1
+          current_species = current_species + 1
+        end if
+        this%occupations(i,j) = counter
+        ! Warning: arbitrary choice for the ads. site (the 1st available)!
+        ads_site = this%avail_ads_sites(current_species,this%lst(i,j))%list(1)
+        this%ads_list(counter) = adsorbate(i,j,ads_site,current_species)
+        if (counter == this%n_ads_tot()) exit loop1
+      end do
+      end do loop1
+
+      ! create artificial population
+!      counter = 0
+!      s_counter = 0
+!      current_species = 1
+!      loop1: do j=1,this%n_cols
+!      do i=1,this%n_rows
+!        counter   = counter   + 1
+!        s_counter = s_counter + 1
+!        if (s_counter>this%n_ads(current_species)) then
+!          s_counter = 1
+!          current_species = current_species + 1
+!        end if
+!        this%occupations(i,j) = counter
+!        ! Warning: arbitrary choice for the ads. site (the 1st available)!
+!        ads_site = this%avail_ads_sites(current_species,this%lst(i,j))%list(1)
+!        this%ads_list(counter) = adsorbate(i,j,ads_site,current_species)
+!        if (counter == this%n_ads_tot()) exit loop1
+!      end do
+!      end do loop1
 
     else
       ! Read in a conf from conf-file
