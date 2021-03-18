@@ -33,6 +33,7 @@ module control_parameters_class
 
     integer :: n_mmc_steps          ! number of mmc steps
     integer :: hist_period          ! period for histogram  calculation
+    integer :: conf_save            ! key to save confs ( 0 means not)
 
     ! MMC-GC specific parameters
 
@@ -91,6 +92,7 @@ contains
     control_parameters_init%gc_period        =  0
     control_parameters_init%n_mmc_steps      = -1
     control_parameters_init%hist_period      = -1
+    control_parameters_init%conf_save        =  0
     ! kMC-specific parameters
     control_parameters_init%start_traj       =  1
     control_parameters_init%n_trajs          = -1
@@ -201,6 +203,10 @@ contains
           case('mmc_hist_period')
             if (nwords/=2) stop err // "mmc_hist_period must have 1 parameter."
             read(words(2),*) control_parameters_init%hist_period
+
+          case('mmc_conf_save')
+            if (nwords/=2) stop err // "mmc_conf_save must have 1 parameter."
+            read(words(2),*) control_parameters_init%conf_save
 
           case('kmc_ntrajs')
             if ( nwords/=2 .and. nwords/=3 ) stop err // "kmc_ntrajs_period must have 1 parameter."

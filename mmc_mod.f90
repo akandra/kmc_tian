@@ -71,8 +71,8 @@ subroutine metropolis(lat, c_pars, e_pars)
 
   ! write initial total energy of the system
   call open_for_write(outeng_unit,trim(c_pars%file_name_base)//'.en')
-  write(outeng_unit,'(2A12)') 'mmc_step', ' energy(eV)'
-  write(outeng_unit,'(i12,1pe12.3)') 0, total_energy(lat,e_pars)
+  write(outeng_unit,'(2A12)') 'mmc_step', ' energy(eV)', 'n_ads'
+  write(outeng_unit,'(i12,1pe12.3)') 0, total_energy(lat,e_pars), lat%n_ads
 
   ! open file for saving cluster size histogram
   if (c_pars%hist_period > 0) call open_for_write(outhst_unit,trim(c_pars%file_name_base)//'.hist')
@@ -85,10 +85,6 @@ subroutine metropolis(lat, c_pars, e_pars)
   ! rdf histogram and counters
   rdf_counter = 0
   rdf_hist = 0
-
-  ! open file for saving nads
-  call open_for_write(99,trim(c_pars%file_name_base)//'.nads')
-
 
   write(*,'(20X,A)') "M.M.C. Code's progress report:"
   call progress_bar(0)
@@ -235,9 +231,6 @@ subroutine metropolis(lat, c_pars, e_pars)
 
     end if ! gc_period
 
-    ! write out number of adsorbates
-    write(99,'(100i10)') lat%n_ads(1)
-
     ! Calculate the cluster size histogramm
     if (c_pars%hist_period > 0 .and. mod(istep, c_pars%hist_period) == 0) then
       hist_counter = hist_counter + 1
@@ -268,13 +261,15 @@ subroutine metropolis(lat, c_pars, e_pars)
     if (mod(istep, c_pars%save_period) == 0) then
       call progress_bar(100*istep/c_pars%n_mmc_steps)
 
-      ! Save configuration
-      write(outcfg_unit,'(A10,i0)') "mmc_step ",istep
-      write(outcfg_unit,'(100i10)') lat%n_ads
-      call lat%print_ads(outcfg_unit)
-
       ! Save energy
-      write(outeng_unit,*) istep, total_energy(lat,e_pars)
+      write(outeng_unit,*) istep, total_energy(lat,e_pars), lat%n_ads
+
+      ! Save configuration
+      if (c_pars%conf_save > 0 ) then
+        write(outcfg_unit,'(A10,i0)') "mmc_step ",istep
+        write(outcfg_unit,'(100i10)') lat%n_ads
+        call lat%print_ads(outcfg_unit)
+      end if
 
       ! Save cluster size histogram
       if (c_pars%hist_period > 0) then
@@ -311,7 +306,6 @@ subroutine metropolis(lat, c_pars, e_pars)
     call lat%print_ads(outcfg_unit)
   end if
 
-  close(99)
   close(outcfg_unit)
   close(outeng_unit)
   if (c_pars%hist_period > 0) close(outhst_unit)
