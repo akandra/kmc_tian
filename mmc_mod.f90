@@ -71,8 +71,8 @@ subroutine metropolis(lat, c_pars, e_pars)
 
   ! write initial total energy of the system
   call open_for_write(outeng_unit,trim(c_pars%file_name_base)//'.en')
-  write(outeng_unit,'(2A12)') 'mmc_step', ' energy(eV)', 'n_ads'
-  write(outeng_unit,'(i12,1pe12.3)') 0, total_energy(lat,e_pars), lat%n_ads
+  write(outeng_unit,'(3A12)') 'mmc_step', ' energy(eV)', 'n_ads'
+  write(outeng_unit,*) 0, total_energy(lat,e_pars), lat%n_ads
 
   ! open file for saving cluster size histogram
   if (c_pars%hist_period > 0) call open_for_write(outhst_unit,trim(c_pars%file_name_base)//'.hist')
