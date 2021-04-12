@@ -19,7 +19,7 @@ module constants
 
   ! Version number taken from a preprocessor variable
 
-  character(len=40), parameter :: version = __GIT_VERSION__
+  character(len=40), parameter :: version =  __GIT_VERSION__
 
   !-------- Site type info ---------!
 

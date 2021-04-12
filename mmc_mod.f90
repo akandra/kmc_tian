@@ -25,9 +25,9 @@ subroutine metropolis(lat, c_pars, e_pars)
   real(dp) :: energy_old, beta, delta_E
   character(len=max_string_length) :: n_ads_fmt, rdf_fmt, version_header
   integer, dimension(lat%n_rows,lat%n_cols) :: cluster_label
-  integer, dimension(maxval(lat%n_ads)) :: cluster_sizes
+  integer, dimension(lat%n_rows*lat%n_cols) :: cluster_sizes
   integer :: largest_label, hist_counter, rdf_counter
-  integer, dimension(c_pars%n_species,maxval(lat%n_ads)) :: hist
+  integer, dimension(c_pars%n_species,lat%n_rows*lat%n_cols) :: hist
   integer, dimension(c_pars%n_species,c_pars%n_species,c_pars%rdf_n_bins) :: rdf_hist
   integer :: n_sites, row, col, new_n_ads, n_ads_sites, i_ads, n_ads_tot_old, i_rand
   real(dp) :: delta, probability, beta_delta
