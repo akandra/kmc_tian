@@ -18,8 +18,10 @@ module constants
   real(dp), parameter :: hbar           = 0.6582119514467406e-15_dp ! eV * s
 
   ! Version number taken from a preprocessor variable
-
-  character(len=40), parameter :: version =  __GIT_VERSION__
+  ! Linux
+!  character(len=40), parameter :: version =  __GIT_VERSION__
+  ! Windows
+  character(len=40), parameter :: version =  ""
 
   !-------- Site type info ---------!
 

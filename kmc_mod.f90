@@ -25,7 +25,7 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
 
   type(reaction_type) :: r
 
-  character(len=max_string_length) :: buffer, n_ads_fmt, rdf_fmt
+  character(len=max_string_length) :: buffer, n_ads_fmt, rdf_fmt, version_header
   integer :: itraj, ibin, ibin_new, ibin_current, bin_shift
   integer :: time_segment, time_segment_old, time_segment_new
   integer :: i, species, species1, species2
@@ -48,6 +48,8 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
 
   ! initialize vector of conditions for debug trap
   debug =  .false.
+
+  version_header = '! kmc_tian Release ' // version
 
   ! Create a rate structure
   r = reaction_init(c_pars, lat, e_pars)
@@ -139,6 +141,7 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
     write(buffer,'(i6.6)') itraj
     ! write initial state of the lattice into a file
     call open_for_write(outcfg_unit,trim(c_pars%file_name_base)//'_'//trim(buffer)//'.confs')
+    write(outcfg_unit,'(A)') version_header
     write(outcfg_unit,'(A10,A10,A15)') "# rows","# cols","step_period"
     write(outcfg_unit,'(3i10)') lat%n_rows, lat%n_cols, c_pars%step_period
     write(outcfg_unit,'(100A10)') adjustr(c_pars%ads_names)
@@ -357,18 +360,19 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
 
 ! WARNING - This is a hack, crude crude hack
       ! End the trajectory if there's no species called B anymore
-      if (lat%n_ads(2) == 0) then
+!      if (lat%n_ads(2) == 0) then
 !        print*
 !        print *, 'species ', c_pars%ads_names(2), ' extinct: exiting kMC loop'
 !        print *, 'if ', c_pars%ads_names(2), ' is not B, complain to UN'
 !        print*
-        exit
-      end if
+!        exit
+!      end if
 
       kmc_nsteps = kmc_nsteps + 1
 
     end do time_loop
 !-------------------------------------------------------------
+
 
     close(outcfg_unit)
     close(outeng_unit)
