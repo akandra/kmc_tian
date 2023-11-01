@@ -1,7 +1,7 @@
 module rates_bimolecular_class
 
   !---------------------------------------------------------------------------
-  !  Module for binary bimolecular reaction  r1 + r2 --> p1
+  !  Module for binary bimolecular reaction  r1 + r2 --> p1 + p2
   !---------------------------------------------------------------------------
   !  * controlled by the bimolecular keyword section of the .reaction file
   !  * p1 is assumed to be at the same lattice site as r1 with its adsorption

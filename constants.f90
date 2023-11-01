@@ -19,21 +19,23 @@ module constants
 
   ! Version number taken from a preprocessor variable
   ! Linux
-!  character(len=40), parameter :: version =  __GIT_VERSION__
+  character(len=40), parameter :: version =  __GIT_VERSION__
   ! Windows
-  character(len=40), parameter :: version =  ""
+  !character(len=40), parameter :: version =  ""
 
   !-------- Site type info ---------!
 
   ! Number of site types
-  integer, parameter :: n_max_lat_site_types = 3
+  integer, parameter :: n_max_lat_site_types = 5
   ! List of site types
   character(len=10), dimension(n_max_lat_site_types), parameter :: &
-            lat_site_names = [character(10)::'terrace','step','corner']
+            lat_site_names = [character(10)::'terrace','step','corner','terrace_s','terrace_c']
   ! Site type ids
-  integer, parameter :: terrace_site = 1
-  integer, parameter :: step_site    = 2
-  integer, parameter :: corner_site  = 3
+  integer, parameter :: terrace_site   = 1
+  integer, parameter :: step_site      = 2
+  integer, parameter :: corner_site    = 3
+  integer, parameter :: terrace_s_site = 4
+  integer, parameter :: terrace_c_site = 5
 
   !-------- Adsorption sites info ---------!
 

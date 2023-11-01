@@ -21,7 +21,7 @@ subroutine metropolis(lat, c_pars, e_pars)
   type(energy_parameters ), intent(in) :: e_pars
 
   integer :: i, istep, ihop, species, species1, species2
-  integer :: new_row, new_col, new_ads_site, old_row, old_col, old_ads_site
+  integer :: new_row, new_col, new_ads_site, old_row, old_col, old_ads_site, old_lst
   real(dp) :: energy_old, beta, delta_E
   character(len=max_string_length) :: n_ads_fmt, rdf_fmt, version_header
   integer, dimension(lat%n_rows,lat%n_cols) :: cluster_label
@@ -97,9 +97,14 @@ subroutine metropolis(lat, c_pars, e_pars)
 
       energy_old = energy(i, lat, e_pars)
 
+      old_row = lat%ads_list(i)%row
+      old_col = lat%ads_list(i)%col
+      old_ads_site = lat%ads_list(i)%ast
+      old_lst = lat%lst(old_row,old_col)
+
       ! We consider hops to the nearest-neighbor cells only
       ! And we doubt that we ever need something else
-      ihop = floor(lat%n_nn(1)*ran1()) + 1
+      ihop = floor(lat%n_nn(old_lst,1)*ran1()) + 1
 
       call lat%hop(i,ihop,new_row,new_col,new_ads_site)
 
@@ -108,10 +113,6 @@ subroutine metropolis(lat, c_pars, e_pars)
 !      pause
 
       if (lat%occupations(new_row,new_col) == 0) then
-
-        old_row = lat%ads_list(i)%row
-        old_col = lat%ads_list(i)%col
-        old_ads_site = lat%ads_list(i)%ast
 
         lat%occupations(new_row,new_col) = i
         lat%occupations(old_row,old_col) = 0
@@ -235,18 +236,18 @@ subroutine metropolis(lat, c_pars, e_pars)
     if (c_pars%hist_period > 0 .and. mod(istep, c_pars%hist_period) == 0) then
       hist_counter = hist_counter + 1
 
-      do species=1,c_pars%n_species
-        call lat%hoshen_kopelman(species, cluster_label, largest_label)
-        call lat%cluster_size(species, cluster_label, cluster_sizes)
-        do i=1,largest_label
-          if (cluster_sizes(i) > 0) &
-            hist(species,cluster_sizes(i)) = hist(species,cluster_sizes(i)) + 1
-        end do
+!      do species=1,c_pars%n_species
+!        call lat%hoshen_kopelman(species, cluster_label, largest_label)
+!        call lat%cluster_size(species, cluster_label, cluster_sizes)
+!        do i=1,largest_label
+!          if (cluster_sizes(i) > 0) &
+!            hist(species,cluster_sizes(i)) = hist(species,cluster_sizes(i)) + 1
+!        end do
 !        print*,'species =',species, 'largest_label = ',largest_label
 !        print*,'cluster_sizes = ',cluster_sizes
 !        print*,'hist:',hist(species,:)
 !        print*
-      end do
+!      end do
 
     end if
 

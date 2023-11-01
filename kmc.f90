@@ -3,9 +3,9 @@ program kmc_tian
 use mc_lat_class
 use control_parameters_class
 use energy_parameters_class
-use rates_hopping_class
+!use rates_hopping_class
 use mmc
-use kmc
+!use kmc
 use utilities
 
 implicit none
@@ -39,7 +39,7 @@ select case (c_pars%algorithm)
     call metropolis(lat, c_pars, e_pars) ! Warning: mmc is implemented for the hops only
 
   case ('bkl')
-    call Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
+!    call Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
 
   case default
     stop 'Error: mc algorithm not defined'

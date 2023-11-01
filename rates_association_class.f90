@@ -363,7 +363,7 @@ contains
                   r1p1_error = .true.
                 end if
 
-                ! check energy is defined for reactant's and for products' lat_site_type and ads_site
+                ! check if energy is defined for reactant's and for products' lat_site_type and ads_site
                 if( e_pars%ads_energy(r1_id, lst(1), ast(1)) == e_pars%undefined_energy .or. &
                     e_pars%ads_energy(r2_id, lst(2), ast(2)) == e_pars%undefined_energy .or. &
                     e_pars%ads_energy(p1_id, lst(3), ast(3)) == e_pars%undefined_energy ) then

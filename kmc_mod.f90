@@ -118,14 +118,14 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
 
       ! Calculate initial cluster size histogram
       hist = 0
-      do species=1,c_pars%n_species
-        call lat%hoshen_kopelman(species, cluster_label, largest_label)
-        call lat%cluster_size(species, cluster_label, cluster_sizes)
-        do i=1,largest_label
-          if (cluster_sizes(i) > 0) &
-            hist(species,cluster_sizes(i)) = hist(species,cluster_sizes(i)) + 1
-        end do
-      end do
+!      do species=1,c_pars%n_species
+!        call lat%hoshen_kopelman(species, cluster_label, largest_label)
+!        call lat%cluster_size(species, cluster_label, cluster_sizes)
+!        do i=1,largest_label
+!          if (cluster_sizes(i) > 0) &
+!            hist(species,cluster_sizes(i)) = hist(species,cluster_sizes(i)) + 1
+!        end do
+!      end do
 
       ! Calculate initial rdf
       if (c_pars%rdf_period > 0) then
@@ -268,14 +268,14 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
             ! Reset the histogram
             hist = 0
             ! Calculate histogram
-            do species=1,c_pars%n_species
-              call lat%hoshen_kopelman(species, cluster_label, largest_label)
-              call lat%cluster_size(species, cluster_label, cluster_sizes)
-              do i=1,largest_label
-                if (cluster_sizes(i) > 0) &
-                  hist(species,cluster_sizes(i)) = hist(species,cluster_sizes(i)) + 1
-              end do
-            end do
+!            do species=1,c_pars%n_species
+!              call lat%hoshen_kopelman(species, cluster_label, largest_label)
+!              call lat%cluster_size(species, cluster_label, cluster_sizes)
+!              do i=1,largest_label
+!                if (cluster_sizes(i) > 0) &
+!                  hist(species,cluster_sizes(i)) = hist(species,cluster_sizes(i)) + 1
+!              end do
+!            end do
 
             if (c_pars%rdf_period > 0) then
               ! Calculate rdf

@@ -38,8 +38,8 @@ module mc_lat_class
     ! lattice vectors
     real(dp), dimension(2) :: lat_vec_1, lat_vec_2
     ! shellwise number of neighbors
-    integer, dimension(n_shells) :: n_nn
-    integer, dimension(:,:,:), allocatable  :: shell_list
+    integer, dimension(n_max_lat_site_types,n_shells) :: n_nn
+    integer, dimension(:,:,:,:), allocatable  :: shell_list
     ! List of additional nn directions to scan after reaction
     integer, dimension(:,:), allocatable :: nn_new
     ! number of adsorbates per species
@@ -59,7 +59,7 @@ module mc_lat_class
       procedure :: neighbor   => mc_lat_neighbor_with_pbc
       procedure :: distance   => mc_lat_distance_with_pbc
       procedure :: n_ads_tot  => mc_lat_n_ads_total
-      procedure :: hoshen_kopelman
+!      procedure :: hoshen_kopelman
       procedure :: cluster_size => count_cluster_sizes
       procedure :: rdf_hist
       procedure :: conf_init  => mc_lat_conf_init
@@ -98,9 +98,17 @@ contains
     lat%lat_vec_2 = [ cos(pi/3.0_dp), -sin(pi/3.0_dp)]
 
     ! Shellwise number of neighbors for hex lattice
-    lat%n_nn = [6,6,6]
+    lat%n_nn(  terrace_site,:) = [6,6,6]
+    lat%n_nn(     step_site,:) = [5,5,5]
+    lat%n_nn(   corner_site,:) = [4,4,6]
+    lat%n_nn(terrace_s_site,:) = [6,7,4]
+    lat%n_nn(terrace_c_site,:) = [5,5,5]
 
-    ! NN list for the hexagonal structure
+    allocate(lat%shell_list(n_max_lat_site_types, n_shells, maxval(lat%n_nn), 2))
+
+    ! terrace
+
+    ! NN list for the hexagonal 111-structure (row,col)
     !  11    12    13***  14**  15***
     !
     !     21    22**   23*   24*   25**
@@ -111,28 +119,174 @@ contains
     !
     !              51*** 52**  53*** 54    55
 
-    allocate(lat%shell_list(n_shells,maxval(lat%n_nn),2))
     ! Nearest-neigbour (1st) shell (d = 1))
-    lat%shell_list(1,1,:) = (/ 0, 1/)
-    lat%shell_list(1,2,:) = (/ 1, 0/)
-    lat%shell_list(1,3,:) = (/ 1,-1/)
-    lat%shell_list(1,4,:) = (/ 0,-1/)
-    lat%shell_list(1,5,:) = (/-1, 0/)
-    lat%shell_list(1,6,:) = (/-1, 1/)
+    lat%shell_list(terrace_site,1,1,:) = (/ 0, 1/)
+    lat%shell_list(terrace_site,1,2,:) = (/ 1, 0/)
+    lat%shell_list(terrace_site,1,3,:) = (/ 1,-1/)
+    lat%shell_list(terrace_site,1,4,:) = (/ 0,-1/)
+    lat%shell_list(terrace_site,1,5,:) = (/-1, 0/)
+    lat%shell_list(terrace_site,1,6,:) = (/-1, 1/)
     ! Next-Nearest-neigbour (2nd) shell  (d = sqrt(3))
-    lat%shell_list(2,1,:) = (/ 1, 1/)
-    lat%shell_list(2,2,:) = (/ 2,-1/)
-    lat%shell_list(2,3,:) = (/ 1,-2/)
-    lat%shell_list(2,4,:) = (/-1,-1/)
-    lat%shell_list(2,5,:) = (/-2, 1/)
-    lat%shell_list(2,6,:) = (/-1, 2/)
+    lat%shell_list(terrace_site,2,1,:) = (/ 1, 1/)
+    lat%shell_list(terrace_site,2,2,:) = (/ 2,-1/)
+    lat%shell_list(terrace_site,2,3,:) = (/ 1,-2/)
+    lat%shell_list(terrace_site,2,4,:) = (/-1,-1/)
+    lat%shell_list(terrace_site,2,5,:) = (/-2, 1/)
+    lat%shell_list(terrace_site,2,6,:) = (/-1, 2/)
     ! Next-Next-Nearest-neigbour (3rd) shell  (d = 2)
-    lat%shell_list(3,1,:) = (/ 0, 2/)
-    lat%shell_list(3,2,:) = (/ 2, 0/)
-    lat%shell_list(3,3,:) = (/ 2,-2/)
-    lat%shell_list(3,4,:) = (/ 0,-2/)
-    lat%shell_list(3,5,:) = (/-2, 0/)
-    lat%shell_list(3,6,:) = (/-2, 2/)
+    lat%shell_list(terrace_site,3,1,:) = (/ 0, 2/)
+    lat%shell_list(terrace_site,3,2,:) = (/ 2, 0/)
+    lat%shell_list(terrace_site,3,3,:) = (/ 2,-2/)
+    lat%shell_list(terrace_site,3,4,:) = (/ 0,-2/)
+    lat%shell_list(terrace_site,3,5,:) = (/-2, 0/)
+    lat%shell_list(terrace_site,3,6,:) = (/-2, 2/)
+
+    ! step
+
+    ! NN list for the hexagonal structure (row,col)
+    ! col 3 is a step,      col 4 is a corner
+    ! col 2 is a terrace_s, col 5 is a terrace_c
+
+    !  t     ts    s      c     tc
+    !  11    12    13***  14**  15
+    !
+    !     21    22**   23*   24*   25***
+    !
+    !        31*** 32*   33    34**   35
+    !
+    !           41**  42*   43*   44   45
+    !
+    !              51*** 52**  53*** 54    55
+
+    ! Nearest-neigbour (1st) shell)
+    lat%shell_list(step_site,1,1,:) = (/-1, 1/) ! step -> corner    (d=2/3)
+    lat%shell_list(step_site,1,2,:) = (/ 1, 0/) ! step -> step      (d=1)
+    lat%shell_list(step_site,1,3,:) = (/-1, 0/) ! step -> step      (d=1)
+    lat%shell_list(step_site,1,4,:) = (/ 1,-1/) ! step -> terrace_s (d=1)
+    lat%shell_list(step_site,1,5,:) = (/ 0,-1/) ! step -> terrace_s (d=1)
+    ! Next-Nearest-neigbour (2nd) shell
+    lat%shell_list(step_site,2,1,:) = (/ 0, 1/) ! step -> corner (d=sqrt(13)/3)
+    lat%shell_list(step_site,2,2,:) = (/-2, 1/) ! step -> corner (d=sqrt(13)/3)
+    lat%shell_list(step_site,2,3,:) = (/ 2,-1/) ! step -> terrace_s (d=sqrt(3))
+    lat%shell_list(step_site,2,4,:) = (/-1,-1/) ! step -> terrace_s (d=sqrt(3))
+    lat%shell_list(step_site,2,5,:) = (/ 1,-2/) ! step -> terrace   (d=sqrt(3))
+    ! Next-Next-Nearest-neigbour (3rd) shell
+    lat%shell_list(step_site,3,1,:) = (/-1, 2/) ! step -> terrace_c (d=4/3)
+    lat%shell_list(step_site,3,2,:) = (/ 2, 0/) ! step -> step      (d=2)
+    lat%shell_list(step_site,3,3,:) = (/-2, 0/) ! step -> step      (d=2)
+    lat%shell_list(step_site,3,4,:) = (/ 2,-2/) ! step -> terrace   (d=2)
+    lat%shell_list(step_site,3,5,:) = (/ 0,-2/) ! step -> terrace   (d=2)
+
+    ! corner
+
+    ! NN list for the hexagonal 111-structure (row,col)
+    ! col 3 is a corner, col 4 is a terrace_c
+    ! col 2 is a step,   col 1 is a terrace_s
+
+    !  ts    s     c      tc    t
+    !  11    12    13***  14    15
+    !
+    !     21    22    23*   24**  25***
+    !
+    !        31    32**  33    34*   35***
+    !
+    !           41*** 42*   43*   44**  45
+    !
+    !              51*** 52**  53*** 54    55
+
+    ! Nearest-neigbour (1st) shell
+    lat%shell_list(corner_site,1,1,:) = (/ 1,-1/) ! corner -> step      (d=2/3)
+    lat%shell_list(corner_site,1,2,:) = (/ 0, 1/) ! corner -> terrace_c (d=2/3)
+    lat%shell_list(corner_site,1,3,:) = (/ 1, 0/) ! corner -> corner    (d=1)
+    lat%shell_list(corner_site,1,4,:) = (/-1, 0/) ! corner -> corner    (d=1)
+
+    ! Next-Nearest-neigbour (2nd) shell
+    lat%shell_list(corner_site,2,1,:) = (/-1, 1/) ! corner -> terrace_c (d=sqrt(3)-2/3)
+    lat%shell_list(corner_site,2,2,:) = (/ 1, 1/) ! corner -> terrace_c (d=sqrt(3)-2/3)
+    lat%shell_list(corner_site,2,3,:) = (/ 2,-1/) ! corner -> step      (d=sqrt(13)/3)
+    lat%shell_list(corner_site,2,4,:) = (/ 0,-1/) ! corner -> step      (d=sqrt(13)/3)
+
+    ! Next-Next-Nearest-neigbour (3rd) shell
+    lat%shell_list(corner_site,3,1,:) = (/ 0, 2/) ! corner -> terrace   (d=sqrt( (sqrt(3)-1/3)^2 + 1/4 ) )
+    lat%shell_list(corner_site,3,5,:) = (/-1, 2/) ! corner -> terrace   (d=sqrt( (sqrt(3)-1/3)^2 + 1/4 ) )
+    lat%shell_list(corner_site,3,2,:) = (/ 2, 0/) ! corner -> corner    (d=2)
+    lat%shell_list(corner_site,3,5,:) = (/-2, 0/) ! corner -> corner    (d=2)
+    lat%shell_list(corner_site,3,3,:) = (/ 2,-2/) ! corner -> terrace_s (d=sqrt( (5/3)^2 + 1/4 ) )
+    lat%shell_list(corner_site,3,4,:) = (/ 1,-2/) ! corner -> terrace_s (d=sqrt( (5/3)^2 + 1/4 ) )
+
+    ! terrace_s
+
+    ! NN list for the hexagonal structure (row,col)
+    ! col 3 is a terrace_s, col 4 is a step
+    ! col 2 is a terrace,   col 5 is a corner
+
+    !  t     t     ts     s     c
+    !  11    12    13***  14**  15**
+    !
+    !     21    22**   23*   24*   25**
+    !
+    !        31*** 32*   33    34*   35***
+    !
+    !           41**  42*   43*   44**  45
+    !
+    !              51*** 52**  53*** 54    55
+
+    ! Nearest-neigbour (1st) shell
+    lat%shell_list(terrace_s_site,1,1,:) = (/ 0, 1/) ! ts -> step (d=1)
+    lat%shell_list(terrace_s_site,1,2,:) = (/ 1, 0/) ! ts -> ts   (d=1)
+    lat%shell_list(terrace_s_site,1,3,:) = (/ 1,-1/) ! ts -> t    (d=1)
+    lat%shell_list(terrace_s_site,1,4,:) = (/ 0,-1/) ! ts -> t    (d=1)
+    lat%shell_list(terrace_s_site,1,5,:) = (/-1, 0/) ! ts -> ts   (d=1)
+    lat%shell_list(terrace_s_site,1,6,:) = (/-1, 1/) ! ts -> step (d=1)
+    ! Next-Nearest-neigbour (2nd) shell
+    lat%shell_list(terrace_s_site,2,1,:) = (/ 2,-1/) ! ts -> t (d=sqrt(3))
+    lat%shell_list(terrace_s_site,2,2,:) = (/ 1,-2/) ! ts -> t (d=sqrt(3))
+    lat%shell_list(terrace_s_site,2,3,:) = (/-1,-1/) ! ts -> t (d=sqrt(3))
+    lat%shell_list(terrace_s_site,2,4,:) = (/ 1, 1/) ! ts -> s (d=sqrt(3))
+    lat%shell_list(terrace_s_site,2,5,:) = (/-2, 1/) ! ts -> s (d=sqrt(3))
+    lat%shell_list(terrace_s_site,2,6,:) = (/-2, 2/) ! ts -> c (d=sqrt( (5/3)^2 + 1/4 ) )
+    lat%shell_list(terrace_s_site,2,7,:) = (/-1, 2/) ! ts -> c (d=sqrt( (5/3)^2 + 1/4 ) )
+    ! Next-Next-Nearest-neigbour (3rd) shell
+    lat%shell_list(terrace_s_site,3,2,:) = (/ 2, 0/) ! ts -> ts (d=2)
+    lat%shell_list(terrace_s_site,3,3,:) = (/ 2,-2/) ! ts -> t  (d=2)
+    lat%shell_list(terrace_s_site,3,4,:) = (/ 0,-2/) ! ts -> t  (d=2)
+    lat%shell_list(terrace_s_site,3,5,:) = (/-2, 0/) ! ts -> ts (d=2)
+
+    ! terrace_c
+
+    ! NN list for the hexagonal structure (row,col)
+    ! col 3 is a terrace_c, col 4 is a terrace
+    ! col 2 is a corner,    col 5 is a terrace
+
+    !  s     c     tc     t     t
+    !  11    12    13***  14**  15***
+    !
+    !     21   22**   23*   24*   25**
+    !
+    !        31    32*   33    34*   35***
+    !
+    !           41*** 42**  43*   44**  45
+    !
+    !              51    52    53*** 54    55
+
+    ! Nearest-neigbour (1st) shell
+    lat%shell_list(terrace_c_site,1,1,:) = (/ 0,-1/) ! tc -> c    (d=2/3)
+    lat%shell_list(terrace_c_site,1,2,:) = (/ 1, 0/) ! tc -> tc   (d=1)
+    lat%shell_list(terrace_c_site,1,3,:) = (/-1, 0/) ! tc -> tc   (d=1)
+    lat%shell_list(terrace_c_site,1,4,:) = (/ 0, 1/) ! tc -> t    (d=1)
+    lat%shell_list(terrace_c_site,1,5,:) = (/-1, 1/) ! tc -> t    (d=1)
+    ! Next-Nearest-neigbour (2nd) shell
+    lat%shell_list(terrace_c_site,2,1,:) = (/-1,-1/) ! tc -> c    (d = sqrt(3)-2/3)
+    lat%shell_list(terrace_c_site,2,2,:) = (/ 1,-1/) ! tc -> c    (d = sqrt(3)-2/3)
+    lat%shell_list(terrace_c_site,2,3,:) = (/ 1, 1/) ! tc -> t    (d = sqrt(3))
+    lat%shell_list(terrace_c_site,2,4,:) = (/-2, 1/) ! tc -> t    (d = sqrt(3))
+    lat%shell_list(terrace_c_site,2,5,:) = (/-1, 2/) ! tc -> t    (d = sqrt(3))
+    ! Next-Next-Nearest-neigbour (3rd) shell  (d = 2)
+    lat%shell_list(terrace_c_site,3,1,:) = (/ 0, 2/) ! tc -> t    (d=2)
+    lat%shell_list(terrace_c_site,3,2,:) = (/ 2, 0/) ! tc -> t    (d=2)
+    lat%shell_list(terrace_c_site,3,3,:) = (/-2, 0/) ! tc -> t    (d=2)
+    lat%shell_list(terrace_c_site,3,4,:) = (/-2, 2/) ! tc -> t    (d=2)
+    lat%shell_list(terrace_c_site,3,5,:) = (/ 1,-2/) ! s  -> c    (d=sqrt(13)/3)
 
     ! Check the distances to the neighbours
 !    print*, sqrt( &
@@ -144,10 +298,10 @@ contains
 !    stop
 
     ! List of additional nn directions for hex lattice to scan after a reaction
-    allocate(lat%nn_new( lat%n_nn(1), lat%n_nn(1)/2) )
-    do m=1,lat%n_nn(1)
-    do i=1,lat%n_nn(1)/2
-      lat%nn_new(m,i) = modulo( m + i - lat%n_nn(1)/2, lat%n_nn(1) ) + 1
+    allocate(lat%nn_new( lat%n_nn(terrace_site,1), lat%n_nn(terrace_site,1)/2) )
+    do m=1,lat%n_nn(terrace_site,1)
+    do i=1,lat%n_nn(terrace_site,1)/2
+      lat%nn_new(m,i) = modulo( m + i - lat%n_nn(terrace_site,1)/2, lat%n_nn(terrace_site,1) ) + 1
     end do
     end do
 
@@ -163,11 +317,13 @@ contains
     lat%ads_list     = adsorbate(0,0,0,0)
 
     lat%lst = terrace_site
-    ! Define where steps and corners are
+    ! Define where steps, corners, terrace_c's and terrace_s's are
     if ( c_pars%step_period > 0) then
       do j=1,lat%n_cols,c_pars%step_period
           lat%lst(:,j)   = step_site
           lat%lst(:,j+1) = corner_site
+          lat%lst(:,j+2) = terrace_c_site
+          lat%lst(:,j+c_pars%step_period-1) = terrace_s_site
       end do
       n_site_types = n_max_lat_site_types
     else
@@ -442,13 +598,13 @@ contains
     class(mc_lat), intent(in) :: this
     integer, intent(in)  :: i, ihop
     integer, intent(out) :: row, col, ads_site
-    integer :: list_size, id, site_type
+    integer :: row_old, col_old, list_size, id, site_type
 
+    row_old = this%ads_list(i)%row
+    col_old = this%ads_list(i)%col
 
-    row = modulo(this%ads_list(i)%row &
-               + this%shell_list(1,ihop,1) - 1, this%n_rows) + 1
-    col = modulo(this%ads_list(i)%col &
-               + this%shell_list(1,ihop,2) - 1, this%n_cols) + 1
+    row = modulo(row_old + this%shell_list(this%lst(row_old,col_old),1,ihop,1) - 1, this%n_rows) + 1
+    col = modulo(col_old + this%shell_list(this%lst(row_old,col_old),1,ihop,2) - 1, this%n_cols) + 1
 
     id = this%ads_list(i)%id
     site_type = this%lst(row,col)
@@ -472,13 +628,15 @@ contains
     integer, intent(in), optional :: shell
 
     integer :: ishell
+    integer :: row_old, col_old
+
+    row_old = this%ads_list(i)%row
+    col_old = this%ads_list(i)%col
 
     ishell = 1
     if (present(shell)) ishell = shell
-    row = modulo(this%ads_list(i)%row &
-               + this%shell_list(ishell,ihop,1) - 1, this%n_rows) + 1
-    col = modulo(this%ads_list(i)%col &
-               + this%shell_list(ishell,ihop,2) - 1, this%n_cols) + 1
+    row = modulo(row_old + this%shell_list(this%lst(row_old,col_old),ishell,ihop,1) - 1, this%n_rows) + 1
+    col = modulo(col_old + this%shell_list(this%lst(row_old,col_old),ishell,ihop,2) - 1, this%n_cols) + 1
 
   end subroutine
 
@@ -534,225 +692,225 @@ contains
 ! ---------------------------------------------------------------------
 ! Subroutine finding clusters with Hoshen-Kopelman algorithm
 ! ---------------------------------------------------------------------
-  subroutine hoshen_kopelman(this, species, cluster_label, largest_label)
-
-  implicit none
-
-  class (mc_lat), intent(in) :: this
-  integer, intent(in) :: species
-  integer, dimension(:,:), intent(out) :: cluster_label
-  integer, intent(out) :: largest_label
-
-  type nn_position
-    integer :: shell,m
-  end type nn_position
-
-  integer :: i, m, n, row, col, row_new,col_new, shell
-  integer :: itemp, ip, jp, i_ads, i_ads_nn, n_neighbors
-
-  integer, dimension(n_shells) :: nnn2
-  integer, dimension(this%n_ads(species)) :: labels
-  integer, dimension(n_shells, maxval(this%n_nn)/2) :: scanned_nn_occs, row_nn, col_nn
-  type(nn_position), dimension(sum(this%n_nn)/2) :: scanned_nn_list
-
-
-  nnn2 = this%n_nn/2
-  scanned_nn_occs = 0
-  cluster_label   = 0
-  do i=1,this%n_ads(species)
-      labels(i) = i
-  end do
-
-  largest_label = 0
-  do row=1,this%n_rows
-  do col=1,this%n_cols
-
-    i_ads = this%occupations(row,col)
-
-    if ( i_ads > 0 ) then
-      if ( this%ads_list(i_ads)%id == species ) then
-
-        do shell=1,n_shells
-        do m=1,nnn2(shell)
-
-          ! Take previously scanned neighbours
-          call this%neighbor(i_ads,nnn2(shell)+m,row_nn(shell,m),col_nn(shell,m), shell)
-          i_ads_nn = this%occupations(row_nn(shell,m), col_nn(shell,m))
-
-          scanned_nn_occs(shell,m) = 0
-          if ( i_ads_nn > 0 ) then
-            if ( this%ads_list(i_ads_nn)%id == species ) scanned_nn_occs(shell,m) = 1
-          end if
-
-        end do
-        end do
-
-        ! Switch off periodic boundary conditions
-        ! Warning: works only for hexagonal lattice, because of Corona virus
-
-        ! 1st shell
-        if (row==1) scanned_nn_occs(1,2:3) = 0
-        if (col==1) scanned_nn_occs(1,1) = 0
-        if (col==this%n_cols) scanned_nn_occs(1,3) = 0
-
-        ! 2nd shell
-        if (row==1) scanned_nn_occs(2,:) = 0
-        if (row==2) scanned_nn_occs(2,2) = 0
-        if (col==1) scanned_nn_occs(2,1) = 0
-        if (col==this%n_cols) scanned_nn_occs(2,2:3) = 0
-        if (col==this%n_cols-1) scanned_nn_occs(2,3) = 0
-
-        ! 3rd shell
-        if (row==1 .or. row==2) scanned_nn_occs(3,2:3) = 0
-        if (col==1 .or. col==2) scanned_nn_occs(3,1) = 0
-        if (col==this%n_cols .or. col==this%n_cols-1) scanned_nn_occs(3,3) = 0
-
-        ! create list of neighbors
-        n_neighbors = 0
-        scanned_nn_list = nn_position(0,0)
-        do shell=1,n_shells
-        do m=1,nnn2(shell)
-          if ( scanned_nn_occs(shell,m) == 1 ) then
-            n_neighbors = n_neighbors + 1
-            scanned_nn_list(n_neighbors)%shell = shell
-            scanned_nn_list(n_neighbors)%m     = m
-          end if
-        end do
-        end do
-
-       select case (n_neighbors)
-
-          case (0)
-!            print*
-!            print*,"Case 0"
-            largest_label = largest_label + 1
-            cluster_label(row,col) = largest_label
-
-          case (1)
-!            print*
-!            print*,"Case 1"
-            shell = scanned_nn_list(1)%shell
-            m     = scanned_nn_list(1)%m
-            cluster_label(row,col) = lfind( cluster_label(row_nn(shell,m),col_nn(shell,m)), labels)
-
-          case default
-            shell = scanned_nn_list(1)%shell
-            m     = scanned_nn_list(1)%m
-            itemp = cluster_label(row_nn(shell,m),col_nn(shell,m))
-            do i=2,n_neighbors
-              shell = scanned_nn_list(i)%shell
-              n     = scanned_nn_list(i)%m
-              call lunion(itemp,cluster_label(row_nn(shell,n),col_nn(shell,n)),labels)
-            end do
-            cluster_label(row,col) = lfind(itemp, labels)
-
-        end select
-
-      end if
-    end if
-
-  end do
-  end do
-
-!  print*
-!  call this%print_ocs
-!  print*
-!  print*,'cluster labels before applying PBC:'
-!  write(*,'(20i4)') transpose(cluster_label)
-!  print*,'cluster labels list:'
-!  do i=1,largest_label
-!      print('(i3,a5,i3)'), i, ' --> ' , labels(i)
+!  subroutine hoshen_kopelman(this, species, cluster_label, largest_label)
+!
+!  implicit none
+!
+!  class (mc_lat), intent(in) :: this
+!  integer, intent(in) :: species
+!  integer, dimension(:,:), intent(out) :: cluster_label
+!  integer, intent(out) :: largest_label
+!
+!  type nn_position
+!    integer :: shell,m
+!  end type nn_position
+!
+!  integer :: i, m, n, row, col, row_new,col_new, shell
+!  integer :: itemp, ip, jp, i_ads, i_ads_nn, n_neighbors
+!
+!  integer, dimension(n_shells) :: nnn2
+!  integer, dimension(this%n_ads(species)) :: labels
+!  integer, dimension(n_shells, maxval(this%n_nn)/2) :: scanned_nn_occs, row_nn, col_nn
+!  type(nn_position), dimension(sum(this%n_nn)/2) :: scanned_nn_list
+!
+!
+!  nnn2 = this%n_nn(terrace_site,:)/2
+!  scanned_nn_occs = 0
+!  cluster_label   = 0
+!  do i=1,this%n_ads(species)
+!      labels(i) = i
 !  end do
-
-  ! Apply PBC
-  do row=1,this%n_rows
-  do col=1,2
-    ip = cluster_label(row,col)
-    if (ip > 0) then
-      do shell=1,n_shells
-      do m=1,this%n_nn(shell)
-        call this%neighbor(this%occupations(row,col),m,row_new,col_new,shell)
-        jp = cluster_label(row_new,col_new)
-        if (jp > 0) call lunion(ip,jp,labels)
-      end do
-      end do
-    end if
-  end do
-  end do
-
-  do col=3,this%n_cols-2
-  do row=1,2
-    ip = cluster_label(row,col)
-    if (ip > 0) then
-      do shell=1, n_shells
-      do m=1,this%n_nn(shell)
-        call this%neighbor(this%occupations(row,col),m,row_new,col_new,shell)
-        jp = cluster_label(row_new,col_new)
-        if (jp > 0) call lunion(ip,jp,labels)
-      end do
-      end do
-    end if
-  end do
-  end do
-
-!  print*
-!  print*,'cluster labels list after PBC:'
-!  do i=1,largest_label
-!      print('(i3,a5,i3)'), i, ' --> ' , labels(i)
+!
+!  largest_label = 0
+!  do row=1,this%n_rows
+!  do col=1,this%n_cols
+!
+!    i_ads = this%occupations(row,col)
+!
+!    if ( i_ads > 0 ) then
+!      if ( this%ads_list(i_ads)%id == species ) then
+!
+!        do shell=1,n_shells
+!        do m=1,nnn2(shell)
+!
+!          ! Take previously scanned neighbours
+!          call this%neighbor(i_ads,nnn2(shell)+m,row_nn(shell,m),col_nn(shell,m), shell)
+!          i_ads_nn = this%occupations(row_nn(shell,m), col_nn(shell,m))
+!
+!          scanned_nn_occs(shell,m) = 0
+!          if ( i_ads_nn > 0 ) then
+!            if ( this%ads_list(i_ads_nn)%id == species ) scanned_nn_occs(shell,m) = 1
+!          end if
+!
+!        end do
+!        end do
+!
+!        ! Switch off periodic boundary conditions
+!        ! Warning: works only for hexagonal lattice, because of Corona virus
+!
+!        ! 1st shell
+!        if (row==1) scanned_nn_occs(1,2:3) = 0
+!        if (col==1) scanned_nn_occs(1,1) = 0
+!        if (col==this%n_cols) scanned_nn_occs(1,3) = 0
+!
+!        ! 2nd shell
+!        if (row==1) scanned_nn_occs(2,:) = 0
+!        if (row==2) scanned_nn_occs(2,2) = 0
+!        if (col==1) scanned_nn_occs(2,1) = 0
+!        if (col==this%n_cols) scanned_nn_occs(2,2:3) = 0
+!        if (col==this%n_cols-1) scanned_nn_occs(2,3) = 0
+!
+!        ! 3rd shell
+!        if (row==1 .or. row==2) scanned_nn_occs(3,2:3) = 0
+!        if (col==1 .or. col==2) scanned_nn_occs(3,1) = 0
+!        if (col==this%n_cols .or. col==this%n_cols-1) scanned_nn_occs(3,3) = 0
+!
+!        ! create list of neighbors
+!        n_neighbors = 0
+!        scanned_nn_list = nn_position(0,0)
+!        do shell=1,n_shells
+!        do m=1,nnn2(shell)
+!          if ( scanned_nn_occs(shell,m) == 1 ) then
+!            n_neighbors = n_neighbors + 1
+!            scanned_nn_list(n_neighbors)%shell = shell
+!            scanned_nn_list(n_neighbors)%m     = m
+!          end if
+!        end do
+!        end do
+!
+!       select case (n_neighbors)
+!
+!          case (0)
+!!            print*
+!!            print*,"Case 0"
+!            largest_label = largest_label + 1
+!            cluster_label(row,col) = largest_label
+!
+!          case (1)
+!!            print*
+!!            print*,"Case 1"
+!            shell = scanned_nn_list(1)%shell
+!            m     = scanned_nn_list(1)%m
+!            cluster_label(row,col) = lfind( cluster_label(row_nn(shell,m),col_nn(shell,m)), labels)
+!
+!          case default
+!            shell = scanned_nn_list(1)%shell
+!            m     = scanned_nn_list(1)%m
+!            itemp = cluster_label(row_nn(shell,m),col_nn(shell,m))
+!            do i=2,n_neighbors
+!              shell = scanned_nn_list(i)%shell
+!              n     = scanned_nn_list(i)%m
+!              call lunion(itemp,cluster_label(row_nn(shell,n),col_nn(shell,n)),labels)
+!            end do
+!            cluster_label(row,col) = lfind(itemp, labels)
+!
+!        end select
+!
+!      end if
+!    end if
+!
 !  end do
-
-  ! Going down to roots
-  do row=1,this%n_rows
-  do col=1,this%n_cols
-    if (cluster_label(row,col) > 0) &
-       cluster_label(row,col) = lfind(cluster_label(row,col), labels)
-  end do
-  end do
-
-!  print*
-!  print*,'cluster labels after PBC and rooting:'
-!  write(*,'(20i4)') transpose(cluster_label)
-!  pause
-
-  contains
-
-    integer function lfind(x, labels)
-
-      integer, intent(inout) :: x
-      integer, dimension(:), intent(inout) :: labels
-
-      integer :: y, z
-
-      y = x
-        do while (labels(y) /= y)
-            y = labels(y)
-        end do
-
-    !    do while (labels(x) /= x)
-    !        z = labels(x)
-    !        labels(x) = y
-    !        x = z
-    !    end do
-    !
-        lfind = y
-
-    end function
-
-    subroutine lunion(x, y, labels)
-
-      integer, intent(inout) :: x, y
-      integer, dimension(:), intent(inout) :: labels
-
-        if (x > y) then
-            labels( lfind(x, labels) ) = lfind(y, labels)
-        else if ( x < y) then
-            labels( lfind(y, labels) ) = lfind(x, labels)
-        endif
-
-    end subroutine
-
-  end subroutine
-
+!  end do
+!
+!!  print*
+!!  call this%print_ocs
+!!  print*
+!!  print*,'cluster labels before applying PBC:'
+!!  write(*,'(20i4)') transpose(cluster_label)
+!!  print*,'cluster labels list:'
+!!  do i=1,largest_label
+!!      print('(i3,a5,i3)'), i, ' --> ' , labels(i)
+!!  end do
+!
+!  ! Apply PBC
+!  do row=1,this%n_rows
+!  do col=1,2
+!    ip = cluster_label(row,col)
+!    if (ip > 0) then
+!      do shell=1,n_shells
+!      do m=1,this%n_nn(terrace_site,shell)
+!        call this%neighbor(this%occupations(row,col),m,row_new,col_new,shell)
+!        jp = cluster_label(row_new,col_new)
+!        if (jp > 0) call lunion(ip,jp,labels)
+!      end do
+!      end do
+!    end if
+!  end do
+!  end do
+!
+!  do col=3,this%n_cols-2
+!  do row=1,2
+!    ip = cluster_label(row,col)
+!    if (ip > 0) then
+!      do shell=1, n_shells
+!      do m=1,this%n_nn(terrace_site,shell)
+!        call this%neighbor(this%occupations(row,col),m,row_new,col_new,shell)
+!        jp = cluster_label(row_new,col_new)
+!        if (jp > 0) call lunion(ip,jp,labels)
+!      end do
+!      end do
+!    end if
+!  end do
+!  end do
+!
+!!  print*
+!!  print*,'cluster labels list after PBC:'
+!!  do i=1,largest_label
+!!      print('(i3,a5,i3)'), i, ' --> ' , labels(i)
+!!  end do
+!
+!  ! Going down to roots
+!  do row=1,this%n_rows
+!  do col=1,this%n_cols
+!    if (cluster_label(row,col) > 0) &
+!       cluster_label(row,col) = lfind(cluster_label(row,col), labels)
+!  end do
+!  end do
+!
+!!  print*
+!!  print*,'cluster labels after PBC and rooting:'
+!!  write(*,'(20i4)') transpose(cluster_label)
+!!  pause
+!
+!  contains
+!
+!    integer function lfind(x, labels)
+!
+!      integer, intent(inout) :: x
+!      integer, dimension(:), intent(inout) :: labels
+!
+!      integer :: y, z
+!
+!      y = x
+!        do while (labels(y) /= y)
+!            y = labels(y)
+!        end do
+!
+!    !    do while (labels(x) /= x)
+!    !        z = labels(x)
+!    !        labels(x) = y
+!    !        x = z
+!    !    end do
+!    !
+!        lfind = y
+!
+!    end function
+!
+!    subroutine lunion(x, y, labels)
+!
+!      integer, intent(inout) :: x, y
+!      integer, dimension(:), intent(inout) :: labels
+!
+!        if (x > y) then
+!            labels( lfind(x, labels) ) = lfind(y, labels)
+!        else if ( x < y) then
+!            labels( lfind(y, labels) ) = lfind(x, labels)
+!        endif
+!
+!    end subroutine
+!
+!  end subroutine
+!
 ! ---------------------------------------------------------------------
 ! Subroutine counting cluster sizes
 ! ---------------------------------------------------------------------
