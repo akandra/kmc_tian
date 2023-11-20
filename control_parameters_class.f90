@@ -28,12 +28,14 @@ module control_parameters_class
     integer  :: rdf_period            ! period for rdf_hist calculations
     real(dp) :: rdf_bin_size          ! size (in init cell) of the bin for rdf calculation
     integer  :: rdf_n_bins            ! number of bins for rdf_hist calculations
+    integer  :: show_progress         ! if to show progress bar
 
     ! MMC-specific parameters
 
     integer :: n_mmc_steps          ! number of mmc steps
     integer :: hist_period          ! period for histogram  calculation
     integer :: conf_save            ! key to save confs ( 0 means not)
+    integer :: running_avgs_save    ! key to save running averages ( 0 means not)
 
     ! MMC-GC specific parameters
 
@@ -88,11 +90,13 @@ contains
     control_parameters_init%rdf_bin_size     = -1.0_dp
     control_parameters_init%rdf_n_bins       = -1
     control_parameters_init%rdf_period       = -1
+    control_parameters_init%show_progress    = 0
     ! MMC-specific parameters
     control_parameters_init%gc_period        =  0
     control_parameters_init%n_mmc_steps      = -1
     control_parameters_init%hist_period      = -1
     control_parameters_init%conf_save        =  0
+    control_parameters_init%running_avgs_save=  0
     ! kMC-specific parameters
     control_parameters_init%start_traj       =  1
     control_parameters_init%n_trajs          = -1
@@ -181,6 +185,10 @@ contains
             read(words(3),*) control_parameters_init%rdf_bin_size
             read(words(4),*) control_parameters_init%rdf_n_bins
 
+          case('show_progress')
+            if (nwords/=2) stop err // "show_progress must have 1 parameter."
+            read(words(2),*) control_parameters_init%show_progress
+
           case('gc_period')
             if (nwords/=2) stop err // "gc_period must have 1 parameter."
             read(words(2),*) control_parameters_init%gc_period
@@ -207,6 +215,10 @@ contains
           case('mmc_conf_save')
             if (nwords/=2) stop err // "mmc_conf_save must have 1 parameter."
             read(words(2),*) control_parameters_init%conf_save
+
+          case('mmc_running_avgs_save')
+            if (nwords/=2) stop err // "mmc_running_avgs_save must have 1 parameter."
+            read(words(2),*) control_parameters_init%running_avgs_save
 
           case('kmc_ntrajs')
             if ( nwords/=2 .and. nwords/=3 ) stop err // "kmc_ntrajs_period must have 1 parameter."

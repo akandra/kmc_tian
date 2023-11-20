@@ -20,7 +20,7 @@ subroutine metropolis(lat, c_pars, e_pars)
   type(control_parameters), intent(in) :: c_pars
   type(energy_parameters ), intent(in) :: e_pars
 
-  integer :: i, istep, ihop, species, species1, species2
+  integer :: i, istep, ihop, species, species1, species2, j
   integer :: new_row, new_col, new_ads_site, old_row, old_col, old_ads_site, old_lst
   real(dp) :: energy_old, beta, delta_E
   character(len=max_string_length) :: n_ads_fmt, rdf_fmt, version_header
@@ -29,14 +29,23 @@ subroutine metropolis(lat, c_pars, e_pars)
   integer :: largest_label, hist_counter, rdf_counter
   integer, dimension(c_pars%n_species,lat%n_rows*lat%n_cols) :: hist
   integer, dimension(c_pars%n_species,c_pars%n_species,c_pars%rdf_n_bins) :: rdf_hist
-  integer :: n_sites, row, col, new_n_ads, n_ads_sites, i_ads, n_ads_tot_old, i_rand
-  real(dp) :: delta, probability, beta_delta
+  integer :: n_sites, row, col, new_n_ads, n_ads_sites, i_ads, n_ads_tot_old, i_rand, i_lst
+  real(dp) :: delta, probability, beta_delta, cov_factor
   logical :: remove
+  ! Running averages
+  ! lst-specific coverage in ML
+  integer,  dimension(c_pars%n_species,n_max_lat_site_types) :: lst_pops
+  ! replica-specific coverage in ML
+  integer,  dimension(c_pars%n_species,lat%n_cols/c_pars%step_period) :: replica_pops
+  ! vector of zigzag-related coverage in ML
+  integer :: ns(4), zigzag(2,2,2,2)
+
 !  real(dp), dimension(c_pars%rdf_n_bins) :: dr2
 !  real(dp), dimension(c_pars%n_species) :: coverage
 !  real(dp) :: unit_cell_area
 
   n_sites = lat%n_rows*lat%n_cols
+  cov_factor = 1.0_dp/(n_sites*c_pars%save_period)
 
   ! inverse thermodynamic temperature
   beta = 1.0_dp/(kB*c_pars%temperature)
@@ -59,7 +68,7 @@ subroutine metropolis(lat, c_pars, e_pars)
   ! write initial state of the lattice to a file
   call open_for_write(outcfg_unit,trim(c_pars%file_name_base)//'.confs')
 
-  write(outcfg_unit,'(A)') version_header
+  write(outcfg_unit,'(A)') trim(version_header)
   write(outcfg_unit,'(A10,A10,A15)') &
                 "# rows","# cols","step_period"
   write(outcfg_unit,'(3i10)') lat%n_rows, lat%n_cols, c_pars%step_period
@@ -74,6 +83,13 @@ subroutine metropolis(lat, c_pars, e_pars)
   write(outeng_unit,'(3A12)') 'mmc_step', ' energy(eV)', 'n_ads'
   write(outeng_unit,*) 0, total_energy(lat,e_pars), lat%n_ads
 
+  ! open file for saving running averages
+  if (c_pars%running_avgs_save > 0) call open_for_write(outrav_unit,trim(c_pars%file_name_base)//'.rav')
+  ! Initialize accumulators
+  lst_pops = 0
+  replica_pops = 0
+  zigzag = 0
+
   ! open file for saving cluster size histogram
   if (c_pars%hist_period > 0) call open_for_write(outhst_unit,trim(c_pars%file_name_base)//'.hist')
   ! Initialize cluster histogram and counters
@@ -86,8 +102,10 @@ subroutine metropolis(lat, c_pars, e_pars)
   rdf_counter = 0
   rdf_hist = 0
 
-  write(*,'(20X,A)') "M.M.C. Code's progress report:"
-  call progress_bar(0)
+  if (c_pars%show_progress > 0) then
+    write(*,'(20X,A)') "M.M.C. Code's progress report:"
+    call progress_bar(0)
+  end if
 
   !loop over mmc steps
   do istep=1, c_pars%n_mmc_steps
@@ -232,6 +250,42 @@ subroutine metropolis(lat, c_pars, e_pars)
 
     end if ! gc_period
 
+    ! Accumulate running averages
+    if (c_pars%running_avgs_save > 0) then
+
+      do i=1, lat%n_ads_tot()
+
+        row     = lat%ads_list(i)%row
+        col     = lat%ads_list(i)%col
+        species = lat%ads_list(i)%id
+        i_lst   = lat%lst(row,col)
+        lst_pops(species,i_lst) = lst_pops(species,i_lst) + 1
+        replica_pops(species, (col-1)/c_pars%step_period + 1) = replica_pops(species, (col-1)/c_pars%step_period + 1) + 1
+
+        ! counting zigzags
+        if (i_lst == corner_site) then ! an adsorbate at the corner
+
+          ns(1) = lat%occupations(                             row, modulo(col-1-1,c_pars%n_cols)+1 ) ! { 0,-1}
+          ns(2) = lat%occupations( modulo(row+2-1,c_pars%n_rows)+1, modulo(col-1-1,c_pars%n_cols)+1 ) ! { 2,-1}
+          ns(3) = lat%occupations( modulo(row+2-1,c_pars%n_rows)+1,                             col ) ! { 2, 0}
+          ns(4) = lat%occupations( modulo(row-2-1,c_pars%n_rows)+1,                             col ) ! {-2, 0}
+
+          do j=1,4
+            if (ns(j) > 0) then
+              ns(j) = 2
+            else
+              ns(j) = 1
+            end if
+          end do
+
+          zigzag(ns(1),ns(2),ns(3),ns(4)) = zigzag(ns(1),ns(2),ns(3),ns(4)) + 1
+
+        end if
+
+      end do
+
+    end if
+
     ! Calculate the cluster size histogramm
     if (c_pars%hist_period > 0 .and. mod(istep, c_pars%hist_period) == 0) then
       hist_counter = hist_counter + 1
@@ -260,7 +314,7 @@ subroutine metropolis(lat, c_pars, e_pars)
     end if
 
     if (mod(istep, c_pars%save_period) == 0) then
-      call progress_bar(100*istep/c_pars%n_mmc_steps)
+      if (c_pars%show_progress > 0) call progress_bar(100*istep/c_pars%n_mmc_steps)
 
       ! Save energy
       write(outeng_unit,*) istep, total_energy(lat,e_pars), lat%n_ads
@@ -270,6 +324,14 @@ subroutine metropolis(lat, c_pars, e_pars)
         write(outcfg_unit,'(A10,i0)') "mmc_step ",istep
         write(outcfg_unit,'(100i10)') lat%n_ads
         call lat%print_ads(outcfg_unit)
+      end if
+
+      ! Save running averages
+      if (c_pars%running_avgs_save > 0) then
+        write(outrav_unit,'(i0,1000f15.8)') istep, cov_factor*lst_pops, cov_factor*zigzag, cov_factor*replica_pops
+        lst_pops = 0
+        replica_pops = 0
+        zigzag = 0
       end if
 
       ! Save cluster size histogram
@@ -309,6 +371,7 @@ subroutine metropolis(lat, c_pars, e_pars)
 
   close(outcfg_unit)
   close(outeng_unit)
+  if (c_pars%running_avgs_save > 0) close(outrav_unit)
   if (c_pars%hist_period > 0) close(outhst_unit)
   if (c_pars%rdf_period  > 0) close(outrdf_unit)
 

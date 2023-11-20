@@ -90,14 +90,14 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
     time_limits(i) = time_limits(i-1) + c_pars%t_end(i)
   end do
 
-  write(*,'(20X,A)') "B.K.L. Code's progress report:"
+  if (c_pars%show_progress > 0) write(*,'(20X,A)') "B.K.L. Code's progress report:"
 
   ! Loop over trajectories
   do itraj=c_pars%start_traj, c_pars%start_traj - 1 + c_pars%n_trajs
 
     debug(1) = (itraj==3)
 
-    call progress_bar( 'current trajectory', 0 , &
+    if (c_pars%show_progress > 0) call progress_bar( 'current trajectory', 0 , &
                                  '   total', 100*(itraj-c_pars%start_traj+1)/c_pars%n_trajs )
     ibin = 0
     kmc_nsteps = 0
@@ -256,10 +256,10 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
         ! Do write when switched to the next bin taking into account jumps over more than 1 by repeating output values
         do ibin_current=ibin+1,ibin_new
 
-          call progress_bar(                  &
-            'current trajectory',           &
-            int(100*time/end_of_time), &
-            '   total',                     &
+          if (c_pars%show_progress > 0) call progress_bar(&
+            'current trajectory',&
+            int(100*time/end_of_time),&
+            '   total',&
             ! total =  % completed trajs + contribution form current trajctory
             100*(itraj-c_pars%start_traj)/c_pars%n_trajs + int(100.*time/(end_of_time*c_pars%n_trajs)))
 

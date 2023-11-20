@@ -462,6 +462,7 @@ contains
       ! Read info from the configuration file
       call open_for_read(inp_unit,trim(c_pars%cfg_file_name))
       read(inp_unit,'(A)') line
+      read(inp_unit,'(A)') line
       read(inp_unit,*) n_rows_in, n_cols_in, step_period_in
       ! Check consistency with control parameters
       if (n_rows_in      /= c_pars%n_rows .OR.&
