@@ -26,16 +26,27 @@ module constants
   !-------- Site type info ---------!
 
   ! Number of site types
-  integer, parameter :: n_max_lat_site_types = 5
+  integer, parameter :: n_max_lat_site_types = 13
   ! List of site types
   character(len=10), dimension(n_max_lat_site_types), parameter :: &
-            lat_site_names = [character(10)::'terrace','step','corner','terrace_s','terrace_c']
+            lat_site_names = [character(10):: 'terrace', 'step', 'corner', 'ts1', 'tc1', 'ts2', 'tc2',&
+                                                         'stepA','cornerA','ts1A','tc1A','ts2A','tc2A']
+
+
   ! Site type ids
-  integer, parameter :: terrace_site   = 1
-  integer, parameter :: step_site      = 2
-  integer, parameter :: corner_site    = 3
-  integer, parameter :: terrace_s_site = 4
-  integer, parameter :: terrace_c_site = 5
+  integer, parameter :: terrace_site = 1
+  integer, parameter :: step_site    = 2
+  integer, parameter :: corner_site  = 3
+  integer, parameter :: ts1_site     = 4
+  integer, parameter :: tc1_site     = 5
+  integer, parameter :: ts2_site     = 6
+  integer, parameter :: tc2_site     = 7
+  integer, parameter :: stepA_site   = 8
+  integer, parameter :: cornerA_site = 9
+  integer, parameter :: ts1A_site    = 10
+  integer, parameter :: tc1A_site    = 11
+  integer, parameter :: ts2A_site    = 12
+  integer, parameter :: tc2A_site    = 13
 
   !-------- Adsorption sites info ---------!
 

@@ -2,6 +2,7 @@ module mc_lat_class
 
   use constants
   use utilities
+  use open_file
   use control_parameters_class
   use energy_parameters_class
 
@@ -97,18 +98,22 @@ contains
     lat%lat_vec_1 = [ cos(0.0_dp),    -sin(0.0_dp)   ]
     lat%lat_vec_2 = [ cos(pi/3.0_dp), -sin(pi/3.0_dp)]
 
-    ! Shellwise number of neighbors for hex lattice
-    lat%n_nn(  terrace_site,:) = [6,6,6]
-    lat%n_nn(     step_site,:) = [5,5,5]
-    lat%n_nn(   corner_site,:) = [4,4,6]
-    lat%n_nn(terrace_s_site,:) = [6,7,4]
-    lat%n_nn(terrace_c_site,:) = [5,5,5]
+    ! Shell-wise number of neighbors for hex lattice with B-type steps
+    lat%n_nn(terrace_site,:) = [6,6,6]
+    lat%n_nn(   step_site,:) = [5,5,5]
+    lat%n_nn( corner_site,:) = [4,4,6]
+    lat%n_nn(    ts1_site,:) = [6,7,4]
+    lat%n_nn(    ts2_site,:) = [6,6,6]
+    lat%n_nn(    tc2_site,:) = [6,6,6]
+    lat%n_nn(    tc1_site,:) = [5,5,5]
 
     allocate(lat%shell_list(n_max_lat_site_types, n_shells, maxval(lat%n_nn), 2))
 
-    ! terrace
+    ! terrace, ts2, or tc2
 
     ! NN list for the hexagonal 111-structure (row,col)
+    !  tc1   tc2   ts2    ts1   s
+    !  c     tc1   tc2    ts2   ts1
     !  11    12    13***  14**  15***
     !
     !     21    22**   23*   24*   25**
@@ -141,13 +146,22 @@ contains
     lat%shell_list(terrace_site,3,5,:) = (/-2, 0/)
     lat%shell_list(terrace_site,3,6,:) = (/-2, 2/)
 
+    lat%shell_list(ts2_site,1:3,:,:) = lat%shell_list(terrace_site,1:3,:,:)
+    lat%shell_list(tc2_site,1:3,:,:) = lat%shell_list(terrace_site,1:3,:,:)
+
+    lat%shell_list(stepA_site,1:3,:,:)   = lat%shell_list(terrace_site,1:3,:,:)
+    lat%shell_list(cornerA_site,1:3,:,:) = lat%shell_list(terrace_site,1:3,:,:)
+    lat%shell_list(ts1A_site,1:3,:,:)    = lat%shell_list(terrace_site,1:3,:,:)
+    lat%shell_list(tc1A_site,1:3,:,:)    = lat%shell_list(terrace_site,1:3,:,:)
+    lat%shell_list(ts2A_site,1:3,:,:)    = lat%shell_list(terrace_site,1:3,:,:)
+    lat%shell_list(tc2A_site,1:3,:,:)    = lat%shell_list(terrace_site,1:3,:,:)
+
+
     ! step
 
     ! NN list for the hexagonal structure (row,col)
-    ! col 3 is a step,      col 4 is a corner
-    ! col 2 is a terrace_s, col 5 is a terrace_c
 
-    !  t     ts    s      c     tc
+    ! ts2   ts1    s      c     tc1
     !  11    12    13***  14**  15
     !
     !     21    22**   23*   24*   25***
@@ -159,31 +173,28 @@ contains
     !              51*** 52**  53*** 54    55
 
     ! Nearest-neigbour (1st) shell)
-    lat%shell_list(step_site,1,1,:) = (/-1, 1/) ! step -> corner    (d=2/3)
-    lat%shell_list(step_site,1,2,:) = (/ 1, 0/) ! step -> step      (d=1)
-    lat%shell_list(step_site,1,3,:) = (/-1, 0/) ! step -> step      (d=1)
-    lat%shell_list(step_site,1,4,:) = (/ 1,-1/) ! step -> terrace_s (d=1)
-    lat%shell_list(step_site,1,5,:) = (/ 0,-1/) ! step -> terrace_s (d=1)
+    lat%shell_list(step_site,1,1,:) = (/-1, 1/) ! step -> corner (d=2/3)
+    lat%shell_list(step_site,1,2,:) = (/ 1, 0/) ! step -> step   (d=1)
+    lat%shell_list(step_site,1,3,:) = (/-1, 0/) ! step -> step   (d=1)
+    lat%shell_list(step_site,1,4,:) = (/ 1,-1/) ! step -> ts1    (d=1)
+    lat%shell_list(step_site,1,5,:) = (/ 0,-1/) ! step -> ts1    (d=1)
     ! Next-Nearest-neigbour (2nd) shell
     lat%shell_list(step_site,2,1,:) = (/ 0, 1/) ! step -> corner (d=sqrt(13)/3)
     lat%shell_list(step_site,2,2,:) = (/-2, 1/) ! step -> corner (d=sqrt(13)/3)
-    lat%shell_list(step_site,2,3,:) = (/ 2,-1/) ! step -> terrace_s (d=sqrt(3))
-    lat%shell_list(step_site,2,4,:) = (/-1,-1/) ! step -> terrace_s (d=sqrt(3))
-    lat%shell_list(step_site,2,5,:) = (/ 1,-2/) ! step -> terrace   (d=sqrt(3))
+    lat%shell_list(step_site,2,3,:) = (/ 2,-1/) ! step -> ts1    (d=sqrt(3))
+    lat%shell_list(step_site,2,4,:) = (/-1,-1/) ! step -> ts1    (d=sqrt(3))
+    lat%shell_list(step_site,2,5,:) = (/ 1,-2/) ! step -> ts2    (d=sqrt(3))
     ! Next-Next-Nearest-neigbour (3rd) shell
-    lat%shell_list(step_site,3,1,:) = (/-1, 2/) ! step -> terrace_c (d=4/3)
-    lat%shell_list(step_site,3,2,:) = (/ 2, 0/) ! step -> step      (d=2)
-    lat%shell_list(step_site,3,3,:) = (/-2, 0/) ! step -> step      (d=2)
-    lat%shell_list(step_site,3,4,:) = (/ 2,-2/) ! step -> terrace   (d=2)
-    lat%shell_list(step_site,3,5,:) = (/ 0,-2/) ! step -> terrace   (d=2)
+    lat%shell_list(step_site,3,1,:) = (/-1, 2/) ! step -> tc1  (d=4/3)
+    lat%shell_list(step_site,3,2,:) = (/ 2, 0/) ! step -> step (d=2)
+    lat%shell_list(step_site,3,3,:) = (/-2, 0/) ! step -> step (d=2)
+    lat%shell_list(step_site,3,4,:) = (/ 2,-2/) ! step -> ts2  (d=2)
+    lat%shell_list(step_site,3,5,:) = (/ 0,-2/) ! step -> ts2  (d=2)
 
     ! corner
-
     ! NN list for the hexagonal 111-structure (row,col)
-    ! col 3 is a corner, col 4 is a terrace_c
-    ! col 2 is a step,   col 1 is a terrace_s
 
-    !  ts    s     c      tc    t
+    ! ts1    s     c      tc1   tc2
     !  11    12    13***  14    15
     !
     !     21    22    23*   24**  25***
@@ -195,32 +206,30 @@ contains
     !              51*** 52**  53*** 54    55
 
     ! Nearest-neigbour (1st) shell
-    lat%shell_list(corner_site,1,1,:) = (/ 1,-1/) ! corner -> step      (d=2/3)
-    lat%shell_list(corner_site,1,2,:) = (/ 0, 1/) ! corner -> terrace_c (d=2/3)
-    lat%shell_list(corner_site,1,3,:) = (/ 1, 0/) ! corner -> corner    (d=1)
-    lat%shell_list(corner_site,1,4,:) = (/-1, 0/) ! corner -> corner    (d=1)
+    lat%shell_list(corner_site,1,1,:) = (/ 1,-1/) ! corner -> step   (d=2/3)
+    lat%shell_list(corner_site,1,2,:) = (/ 0, 1/) ! corner -> tc1    (d=2/3)
+    lat%shell_list(corner_site,1,3,:) = (/ 1, 0/) ! corner -> corner (d=1)
+    lat%shell_list(corner_site,1,4,:) = (/-1, 0/) ! corner -> corner (d=1)
 
     ! Next-Nearest-neigbour (2nd) shell
-    lat%shell_list(corner_site,2,1,:) = (/-1, 1/) ! corner -> terrace_c (d=sqrt(3)-2/3)
-    lat%shell_list(corner_site,2,2,:) = (/ 1, 1/) ! corner -> terrace_c (d=sqrt(3)-2/3)
-    lat%shell_list(corner_site,2,3,:) = (/ 2,-1/) ! corner -> step      (d=sqrt(13)/3)
-    lat%shell_list(corner_site,2,4,:) = (/ 0,-1/) ! corner -> step      (d=sqrt(13)/3)
+    lat%shell_list(corner_site,2,1,:) = (/-1, 1/) ! corner -> tc1  (d=sqrt(3)-2/3)
+    lat%shell_list(corner_site,2,2,:) = (/ 1, 1/) ! corner -> tc1  (d=sqrt(3)-2/3)
+    lat%shell_list(corner_site,2,3,:) = (/ 2,-1/) ! corner -> step (d=sqrt(13)/3)
+    lat%shell_list(corner_site,2,4,:) = (/ 0,-1/) ! corner -> step (d=sqrt(13)/3)
 
     ! Next-Next-Nearest-neigbour (3rd) shell
-    lat%shell_list(corner_site,3,1,:) = (/ 0, 2/) ! corner -> terrace   (d=sqrt( (sqrt(3)-1/3)^2 + 1/4 ) )
-    lat%shell_list(corner_site,3,5,:) = (/-1, 2/) ! corner -> terrace   (d=sqrt( (sqrt(3)-1/3)^2 + 1/4 ) )
-    lat%shell_list(corner_site,3,2,:) = (/ 2, 0/) ! corner -> corner    (d=2)
-    lat%shell_list(corner_site,3,5,:) = (/-2, 0/) ! corner -> corner    (d=2)
-    lat%shell_list(corner_site,3,3,:) = (/ 2,-2/) ! corner -> terrace_s (d=sqrt( (5/3)^2 + 1/4 ) )
-    lat%shell_list(corner_site,3,4,:) = (/ 1,-2/) ! corner -> terrace_s (d=sqrt( (5/3)^2 + 1/4 ) )
+    lat%shell_list(corner_site,3,1,:) = (/ 0, 2/) ! corner -> tc2    (d=sqrt( (sqrt(3)-1/3)^2 + 1/4 ) )
+    lat%shell_list(corner_site,3,5,:) = (/-1, 2/) ! corner -> tc2    (d=sqrt( (sqrt(3)-1/3)^2 + 1/4 ) )
+    lat%shell_list(corner_site,3,2,:) = (/ 2, 0/) ! corner -> corner (d=2)
+    lat%shell_list(corner_site,3,5,:) = (/-2, 0/) ! corner -> corner (d=2)
+    lat%shell_list(corner_site,3,3,:) = (/ 2,-2/) ! corner -> ts1    (d=sqrt( (5/3)^2 + 1/4 ) )
+    lat%shell_list(corner_site,3,4,:) = (/ 1,-2/) ! corner -> ts1    (d=sqrt( (5/3)^2 + 1/4 ) )
 
-    ! terrace_s
+    ! ts1 (terrace adjacent to step)
 
     ! NN list for the hexagonal structure (row,col)
-    ! col 3 is a terrace_s, col 4 is a step
-    ! col 2 is a terrace,   col 5 is a corner
 
-    !  t     t     ts     s     c
+    !  tc2   ts2   ts1    s     c
     !  11    12    13***  14**  15**
     !
     !     21    22**   23*   24*   25**
@@ -232,33 +241,31 @@ contains
     !              51*** 52**  53*** 54    55
 
     ! Nearest-neigbour (1st) shell
-    lat%shell_list(terrace_s_site,1,1,:) = (/ 0, 1/) ! ts -> step (d=1)
-    lat%shell_list(terrace_s_site,1,2,:) = (/ 1, 0/) ! ts -> ts   (d=1)
-    lat%shell_list(terrace_s_site,1,3,:) = (/ 1,-1/) ! ts -> t    (d=1)
-    lat%shell_list(terrace_s_site,1,4,:) = (/ 0,-1/) ! ts -> t    (d=1)
-    lat%shell_list(terrace_s_site,1,5,:) = (/-1, 0/) ! ts -> ts   (d=1)
-    lat%shell_list(terrace_s_site,1,6,:) = (/-1, 1/) ! ts -> step (d=1)
+    lat%shell_list(ts1_site,1,1,:) = (/ 0, 1/) ! ts1 -> step (d=1)
+    lat%shell_list(ts1_site,1,2,:) = (/ 1, 0/) ! ts1 -> ts1  (d=1)
+    lat%shell_list(ts1_site,1,3,:) = (/ 1,-1/) ! ts1 -> ts2  (d=1)
+    lat%shell_list(ts1_site,1,4,:) = (/ 0,-1/) ! ts1 -> ts2  (d=1)
+    lat%shell_list(ts1_site,1,5,:) = (/-1, 0/) ! ts1 -> ts1  (d=1)
+    lat%shell_list(ts1_site,1,6,:) = (/-1, 1/) ! ts1 -> step (d=1)
     ! Next-Nearest-neigbour (2nd) shell
-    lat%shell_list(terrace_s_site,2,1,:) = (/ 2,-1/) ! ts -> t (d=sqrt(3))
-    lat%shell_list(terrace_s_site,2,2,:) = (/ 1,-2/) ! ts -> t (d=sqrt(3))
-    lat%shell_list(terrace_s_site,2,3,:) = (/-1,-1/) ! ts -> t (d=sqrt(3))
-    lat%shell_list(terrace_s_site,2,4,:) = (/ 1, 1/) ! ts -> s (d=sqrt(3))
-    lat%shell_list(terrace_s_site,2,5,:) = (/-2, 1/) ! ts -> s (d=sqrt(3))
-    lat%shell_list(terrace_s_site,2,6,:) = (/-2, 2/) ! ts -> c (d=sqrt( (5/3)^2 + 1/4 ) )
-    lat%shell_list(terrace_s_site,2,7,:) = (/-1, 2/) ! ts -> c (d=sqrt( (5/3)^2 + 1/4 ) )
+    lat%shell_list(ts1_site,2,1,:) = (/ 2,-1/) ! ts1 -> ts2 (d=sqrt(3))
+    lat%shell_list(ts1_site,2,2,:) = (/ 1,-2/) ! ts1 -> tc2 (d=sqrt(3))
+    lat%shell_list(ts1_site,2,3,:) = (/-1,-1/) ! ts1 -> ts2 (d=sqrt(3))
+    lat%shell_list(ts1_site,2,4,:) = (/ 1, 1/) ! ts1 -> s   (d=sqrt(3))
+    lat%shell_list(ts1_site,2,5,:) = (/-2, 1/) ! ts1 -> s   (d=sqrt(3))
+    lat%shell_list(ts1_site,2,6,:) = (/-2, 2/) ! ts1 -> c   (d=sqrt( (5/3)^2 + 1/4 ) )
+    lat%shell_list(ts1_site,2,7,:) = (/-1, 2/) ! ts1 -> c   (d=sqrt( (5/3)^2 + 1/4 ) )
     ! Next-Next-Nearest-neigbour (3rd) shell
-    lat%shell_list(terrace_s_site,3,2,:) = (/ 2, 0/) ! ts -> ts (d=2)
-    lat%shell_list(terrace_s_site,3,3,:) = (/ 2,-2/) ! ts -> t  (d=2)
-    lat%shell_list(terrace_s_site,3,4,:) = (/ 0,-2/) ! ts -> t  (d=2)
-    lat%shell_list(terrace_s_site,3,5,:) = (/-2, 0/) ! ts -> ts (d=2)
+    lat%shell_list(ts1_site,3,2,:) = (/ 2, 0/) ! ts1 -> ts1 (d=2)
+    lat%shell_list(ts1_site,3,3,:) = (/ 2,-2/) ! ts1 -> tc2 (d=2)
+    lat%shell_list(ts1_site,3,4,:) = (/ 0,-2/) ! ts1 -> tc2 (d=2)
+    lat%shell_list(ts1_site,3,5,:) = (/-2, 0/) ! ts1 -> ts1 (d=2)
 
-    ! terrace_c
+    ! tc1 (terrace adjacent to corner)
 
     ! NN list for the hexagonal structure (row,col)
-    ! col 3 is a terrace_c, col 4 is a terrace
-    ! col 2 is a corner,    col 5 is a terrace
 
-    !  s     c     tc     t     t
+    !  s     c     tc1    tc2   ts2
     !  11    12    13***  14**  15***
     !
     !     21   22**   23*   24*   25**
@@ -270,23 +277,23 @@ contains
     !              51    52    53*** 54    55
 
     ! Nearest-neigbour (1st) shell
-    lat%shell_list(terrace_c_site,1,1,:) = (/ 0,-1/) ! tc -> c    (d=2/3)
-    lat%shell_list(terrace_c_site,1,2,:) = (/ 1, 0/) ! tc -> tc   (d=1)
-    lat%shell_list(terrace_c_site,1,3,:) = (/-1, 0/) ! tc -> tc   (d=1)
-    lat%shell_list(terrace_c_site,1,4,:) = (/ 0, 1/) ! tc -> t    (d=1)
-    lat%shell_list(terrace_c_site,1,5,:) = (/-1, 1/) ! tc -> t    (d=1)
+    lat%shell_list(tc1_site,1,1,:) = (/ 0,-1/) ! tc1 -> c   (d=2/3)
+    lat%shell_list(tc1_site,1,2,:) = (/ 1, 0/) ! tc1 -> tc1 (d=1)
+    lat%shell_list(tc1_site,1,3,:) = (/-1, 0/) ! tc1 -> tc1 (d=1)
+    lat%shell_list(tc1_site,1,4,:) = (/ 0, 1/) ! tc1 -> tc2 (d=1)
+    lat%shell_list(tc1_site,1,5,:) = (/-1, 1/) ! tc1 -> tc2 (d=1)
     ! Next-Nearest-neigbour (2nd) shell
-    lat%shell_list(terrace_c_site,2,1,:) = (/-1,-1/) ! tc -> c    (d = sqrt(3)-2/3)
-    lat%shell_list(terrace_c_site,2,2,:) = (/ 1,-1/) ! tc -> c    (d = sqrt(3)-2/3)
-    lat%shell_list(terrace_c_site,2,3,:) = (/ 1, 1/) ! tc -> t    (d = sqrt(3))
-    lat%shell_list(terrace_c_site,2,4,:) = (/-2, 1/) ! tc -> t    (d = sqrt(3))
-    lat%shell_list(terrace_c_site,2,5,:) = (/-1, 2/) ! tc -> t    (d = sqrt(3))
+    lat%shell_list(tc1_site,2,1,:) = (/-1,-1/) ! tc1 -> c   (d = sqrt(3)-2/3)
+    lat%shell_list(tc1_site,2,2,:) = (/ 1,-1/) ! tc1 -> c   (d = sqrt(3)-2/3)
+    lat%shell_list(tc1_site,2,3,:) = (/ 1, 1/) ! tc1 -> tc2 (d = sqrt(3))
+    lat%shell_list(tc1_site,2,4,:) = (/-2, 1/) ! tc1 -> tc2 (d = sqrt(3))
+    lat%shell_list(tc1_site,2,5,:) = (/-1, 2/) ! tc1 -> ts2 (d = sqrt(3))
     ! Next-Next-Nearest-neigbour (3rd) shell  (d = 2)
-    lat%shell_list(terrace_c_site,3,1,:) = (/ 0, 2/) ! tc -> t    (d=2)
-    lat%shell_list(terrace_c_site,3,2,:) = (/ 2, 0/) ! tc -> t    (d=2)
-    lat%shell_list(terrace_c_site,3,3,:) = (/-2, 0/) ! tc -> t    (d=2)
-    lat%shell_list(terrace_c_site,3,4,:) = (/-2, 2/) ! tc -> t    (d=2)
-    lat%shell_list(terrace_c_site,3,5,:) = (/ 1,-2/) ! s  -> c    (d=sqrt(13)/3)
+    lat%shell_list(tc1_site,3,1,:) = (/ 0, 2/) ! tc1 -> ts2 (d=2)
+    lat%shell_list(tc1_site,3,2,:) = (/ 2, 0/) ! tc1 -> tc1 (d=2)
+    lat%shell_list(tc1_site,3,3,:) = (/-2, 0/) ! tc1 -> tc1 (d=2)
+    lat%shell_list(tc1_site,3,4,:) = (/-2, 2/) ! tc1 -> ts2 (d=2)
+    lat%shell_list(tc1_site,3,5,:) = (/ 1,-2/) ! tc1 -> s   (d=sqrt(13)/3)
 
     ! Check the distances to the neighbours
 !    print*, sqrt( &
@@ -298,6 +305,7 @@ contains
 !    stop
 
     ! List of additional nn directions for hex lattice to scan after a reaction
+    ! WARNING: reconsider the construction of new nn list for kmc!
     allocate(lat%nn_new( lat%n_nn(terrace_site,1), lat%n_nn(terrace_site,1)/2) )
     do m=1,lat%n_nn(terrace_site,1)
     do i=1,lat%n_nn(terrace_site,1)/2
@@ -316,18 +324,24 @@ contains
     ! Initialize arrays
     lat%ads_list     = adsorbate(0,0,0,0)
 
+
+    ! Define where steps, corners, and other sites are
+    ! NEXT TIME: consider using the energy file to define lst
     lat%lst = terrace_site
-    ! Define where steps, corners, terrace_c's and terrace_s's are
-    if ( c_pars%step_period > 0) then
+    if ( c_pars%step_period > 5) then
       do j=1,lat%n_cols,c_pars%step_period
           lat%lst(:,j)   = step_site
           lat%lst(:,j+1) = corner_site
-          lat%lst(:,j+2) = terrace_c_site
-          lat%lst(:,j+c_pars%step_period-1) = terrace_s_site
+          lat%lst(:,j+2) = tc1_site
+          lat%lst(:,j+3) = tc2_site
+          lat%lst(:,j+c_pars%step_period-1) = ts1_site
+          lat%lst(:,j+c_pars%step_period-2) = ts2_site
       end do
       n_site_types = n_max_lat_site_types
-    else
+    elseif ( c_pars%step_period == 0) then
       n_site_types = 1
+    else
+      stop "mc_lat_init: step period between 1 and 5 not supported."
     end if
 
     allocate(lat%avail_ads_sites(c_pars%n_species,n_site_types))
@@ -387,7 +401,7 @@ contains
     integer :: n_species_in
     character(len=max_string_length) :: ads_names_in(100)
     integer, allocatable :: n_ads_in(:)
-    integer :: ios, iconf, i, j, idummy, conf
+    integer :: ios, iconf, i, idummy, conf
     integer :: counter, s_counter, current_species, ads_site
     integer :: i_rand, species, row, col
 

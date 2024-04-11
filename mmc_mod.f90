@@ -2,6 +2,7 @@ module mmc
 
   use constants
   use utilities
+  use open_file
   use mc_lat_class
   use control_parameters_class
   use energy_parameters_class

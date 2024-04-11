@@ -9,29 +9,27 @@ module open_file
     !			        Sascha Kandratsenka
     !			        Dan J. Auerbach
 
-    interface
-        subroutine open_for_read(lun, file_name)
-            integer, intent(in)     :: lun
-            character, intent(in)   :: file_name
-        end subroutine
-
-        subroutine open_for_write(lun, file_name)
-            integer, intent(in)     :: lun
-            character, intent(in)   :: file_name
-        end subroutine
-
-        subroutine open_for_append(lun, file_name)
-            integer, intent(in)     :: lun
-            character, intent(in)   :: file_name
-        end subroutine
-
- !       contains module procedure
-
-    endinterface
-
+!    interface
+!        subroutine open_for_read(lun, file_name)
+!            integer, intent(in)     :: lun
+!            character, intent(in)   :: file_name
+!        end subroutine
+!
+!        subroutine open_for_write(lun, file_name)
+!            integer, intent(in)     :: lun
+!            character, intent(in)   :: file_name
+!        end subroutine
+!
+!        subroutine open_for_append(lun, file_name)
+!            integer, intent(in)     :: lun
+!            character, intent(in)   :: file_name
+!        end subroutine
+!
+! !       contains module procedure
+!
+!    endinterface
+!
 contains
-
-end module
 
 subroutine open_for_read(lun,file_name)
     implicit none
@@ -91,3 +89,4 @@ subroutine open_for_append(lun,file_name)
 
 end subroutine open_for_append
 
+end module

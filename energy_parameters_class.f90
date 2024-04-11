@@ -112,7 +112,7 @@ contains
 !            print*, 'id       =', current_species_id
 !            print*, control_pars%ads_names
 
-          case ('terrace','step','corner','terrace_s','terrace_c')
+          case ('terrace','step','corner','ts1','tc1','ts2','tc2')
             if (parse_state /= parse_state_adsorption) &
               call error_message(file_name, line_number, buffer, "invalid site type statement")
 
