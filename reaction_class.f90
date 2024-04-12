@@ -84,7 +84,7 @@ contains
 
     integer :: n_nn, i, m, ads, channel
 
-    n_nn  = lat%n_nn(1)
+    n_nn  = lat%n_nn(terrace_site,1) ! this is wrong
 
     ! initialize the accumulated rate for hopping
     this%acc_rate(hopping_id) = 0.0_dp
@@ -375,7 +375,7 @@ contains
 
     integer :: m
 
-    do m=1,lat%n_nn(1)
+    do m=1,lat%n_nn(terrace_site,1) ! this is wrong
       this%hopping%rates(ads,m)%list = 0.0_dp
     end do
     this%desorption%rates(ads) = 0.0_dp
@@ -401,11 +401,11 @@ contains
     integer :: id_r, id_r1, id_r2, id_p1, id_p2
     integer :: ast_p1, ast_p2
     integer :: row, col, row_new, col_new, lst_new, ast_new
-    integer, dimension(2*lat%n_nn(1)) :: change_list
+    integer, dimension(2*lat%n_nn(terrace_site,1)) :: change_list
 
     real(dp) :: u, temp_dp
 
-    n_nn = lat%n_nn(1)
+    n_nn = lat%n_nn(terrace_site,1) !  this is wrong
     n_nn2 = n_nn/2
 
     ! do nothing if there is nothing to do

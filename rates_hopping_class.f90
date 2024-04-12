@@ -77,7 +77,7 @@ contains
 
     integer :: n_nn, n_nn2, max_avail_ads_sites
 
-    n_nn  = lat%n_nn(1)
+    n_nn  = lat%n_nn(terrace_site,1) ! this is wrong
     n_nn2 = n_nn/2
     ! maximal number of available ads. sites
     max_avail_ads_sites = 1
@@ -360,7 +360,7 @@ contains
     lat%occupations(row_old,col_old) = 0
 
     ! Loop over possible new positions of particle ads
-    do m=1,lat%n_nn(1)
+    do m=1,lat%n_nn(lst_old, 1)
 
       ! Get position and site type of neighbour m
       call lat%neighbor(ads, m, row_new, col_new)

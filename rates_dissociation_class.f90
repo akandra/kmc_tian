@@ -148,7 +148,7 @@ contains
     do i=1,lat%n_rows*lat%n_cols
       allocate( dissociation_init%rate_info(i)%list( max_avail_ads_sites * &
                                                      max_avail_ads_sites * &
-                                                     lat%n_nn(1)) )
+                                                     lat%n_nn(terrace_site,1)) )
       dissociation_init%rate_info(i)%list = rate_info_dissociation( 0, 0, 0.0_dp )
     end do
 
@@ -497,7 +497,7 @@ contains
 
     ! Loop over possible positions for product 2
     n_channels=0
-    do m=1,lat%n_nn(1)
+    do m=1,lat%n_nn(lst,1)
 
       ! Get position and site type of neighbour m
       call lat%neighbor(ads, m, row_2, col_2)

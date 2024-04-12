@@ -22,9 +22,13 @@ SOURCE = open_file.f90 constants.f90 \
 	mc_lat_class.f90 \
 	energy_mod.f90 \
 	mmc_mod.f90  \
+	rates_hopping_class.f90 rates_desorption_class.f90 rates_dissociation_class.f90 \
+	rates_association_class.f90  rates_bimolecular_class.f90 \
+	reaction_class.f90  \
+	kmc_mod.f90 \
 	kmc.f90
 OBJS = $(subst .f90,.o,$(SOURCE))
-EXEC = mmc_tian
+EXEC = kmc_tian
 
 # debug build
 DDIR   = debug
@@ -41,7 +45,7 @@ RFLAGS = -O2 -module $(RDIR)
 .PHONY: all debug release prepare_debug prepare_release remaked remaker clean_debug clean_release
 
 # Debug rules
-debug: prepare_debug $(DEXEC)
+Debug: prepare_debug $(DEXEC)
 
 $(DEXEC): $(DOBJS)
 	$(FC) $(CFLAGS) $(DFLAGS) -o $(DEXEC) $^

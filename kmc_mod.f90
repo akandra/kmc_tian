@@ -6,6 +6,7 @@ module kmc
   use control_parameters_class
   use energy_parameters_class
   use energy_mod
+  use open_file
   use rates_hopping_class
   use rates_desorption_class
   use reaction_class

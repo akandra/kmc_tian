@@ -32,6 +32,7 @@ module mc_lat_class
     integer :: n_rows       ! number of rows    in 2D lattice
     integer :: n_cols       ! number of columns in 2D lattice
     integer :: n_max_ads_sites ! number of adsorbtion sites in the unit cell
+    integer :: n_max_nn     ! maximum number of nearest neighbors (1 shell)
 
     integer, dimension(:,:), allocatable  :: occupations  !  n_rows x n_cols
     ! array of lattice site types
@@ -41,8 +42,9 @@ module mc_lat_class
     ! shellwise number of neighbors
     integer, dimension(n_max_lat_site_types,n_shells) :: n_nn
     integer, dimension(:,:,:,:), allocatable  :: shell_list
-    ! List of additional nn directions to scan after reaction
-    integer, dimension(:,:), allocatable :: nn_new
+    ! List and number of additional nn directions to scan after reaction
+    integer, dimension(:,:,:), allocatable :: nn_new
+    integer, dimension(:,:),   allocatable :: n_nn_new
     ! number of adsorbates per species
     integer, dimension(:), allocatable :: n_ads
     ! initial and current adsorbates lists
@@ -106,6 +108,7 @@ contains
     lat%n_nn(    ts2_site,:) = [6,6,6]
     lat%n_nn(    tc2_site,:) = [6,6,6]
     lat%n_nn(    tc1_site,:) = [5,5,5]
+    lat%n_max_nn = 6
 
     allocate(lat%shell_list(n_max_lat_site_types, n_shells, maxval(lat%n_nn), 2))
 
@@ -304,14 +307,142 @@ contains
 !        )
 !    stop
 
-    ! List of additional nn directions for hex lattice to scan after a reaction
-    ! WARNING: reconsider the construction of new nn list for kmc!
-    allocate(lat%nn_new( lat%n_nn(terrace_site,1), lat%n_nn(terrace_site,1)/2) )
+    ! Lists and numbers of additional nn directions for hex lattice to scan after a reaction
+    allocate(lat%nn_new(  n_max_lat_site_types, lat%n_max_nn, 4 ) )
+    allocate(lat%n_nn_new(n_max_lat_site_types, lat%n_max_nn)   )
+
     do m=1,lat%n_nn(terrace_site,1)
-    do i=1,lat%n_nn(terrace_site,1)/2
-      lat%nn_new(m,i) = modulo( m + i - lat%n_nn(terrace_site,1)/2, lat%n_nn(terrace_site,1) ) + 1
+      lat%n_nn_new(terrace_site,m) = 3
+      do i=1,lat%n_nn_new(terrace_site,m)
+        lat%nn_new(terrace_site, m,i) = modulo( m + i - lat%n_nn(terrace_site,1)/2, lat%n_nn(terrace_site,1) ) + 1
+      end do
     end do
+
+    lat%n_nn_new(ts2_site,:)     = lat%n_nn_new(terrace_site,:)
+    lat%n_nn_new(tc2_site,:)     = lat%n_nn_new(terrace_site,:)
+    lat%n_nn_new(stepA_site,:)   = lat%n_nn_new(terrace_site,:)
+    lat%n_nn_new(cornerA_site,:) = lat%n_nn_new(terrace_site,:)
+    lat%n_nn_new(ts1A_site,:)    = lat%n_nn_new(terrace_site,:)
+    lat%n_nn_new(ts2A_site,:)    = lat%n_nn_new(terrace_site,:)
+    lat%n_nn_new(tc1A_site,:)    = lat%n_nn_new(terrace_site,:)
+    lat%n_nn_new(tc2A_site,:)    = lat%n_nn_new(terrace_site,:)
+    lat%nn_new(ts2_site,    :,:) = lat%nn_new(terrace_site,:,:)
+    lat%nn_new(tc2_site,    :,:) = lat%nn_new(terrace_site,:,:)
+    lat%nn_new(stepA_site,  :,:) = lat%nn_new(terrace_site,:,:)
+    lat%nn_new(cornerA_site,:,:) = lat%nn_new(terrace_site,:,:)
+    lat%nn_new(ts1A_site,   :,:) = lat%nn_new(terrace_site,:,:)
+    lat%nn_new(ts2A_site,   :,:) = lat%nn_new(terrace_site,:,:)
+    lat%nn_new(tc1A_site,   :,:) = lat%nn_new(terrace_site,:,:)
+    lat%nn_new(tc2A_site,   :,:) = lat%nn_new(terrace_site,:,:)
+
+
+    do i=1, lat%n_nn(step_site,1)
+      lat%n_nn_new(step_site,i) = 3
     end do
+
+    lat%nn_new(step_site,1,1) = 2
+    lat%nn_new(step_site,1,2) = 3
+    lat%nn_new(step_site,1,3) = 4
+
+    lat%nn_new(step_site,2,1) = 1
+    lat%nn_new(step_site,2,2) = 2
+    lat%nn_new(step_site,2,3) = 4
+
+    lat%nn_new(step_site,3,1) = 1
+    lat%nn_new(step_site,3,2) = 3
+    lat%nn_new(step_site,3,3) = 5
+
+    lat%nn_new(step_site,4,1) = 2
+    lat%nn_new(step_site,4,2) = 3
+    lat%nn_new(step_site,4,3) = 4
+
+    lat%nn_new(step_site,5,1) = 3
+    lat%nn_new(step_site,5,2) = 4
+    lat%nn_new(step_site,5,3) = 5
+
+    lat%n_nn_new(corner_site,1) = 4
+
+    lat%nn_new(corner_site,1,1) = 2
+    lat%nn_new(corner_site,1,2) = 3
+    lat%nn_new(corner_site,1,3) = 4
+    lat%nn_new(corner_site,1,4) = 5
+
+    lat%n_nn_new(corner_site,2) = 4
+
+    lat%nn_new(corner_site,2,1) = 2
+    lat%nn_new(corner_site,2,2) = 3
+    lat%nn_new(corner_site,2,3) = 4
+    lat%nn_new(corner_site,2,4) = 5
+
+    lat%n_nn_new(corner_site,3) = 3
+
+    lat%nn_new(corner_site,3,1) = 1
+    lat%nn_new(corner_site,3,2) = 2
+    lat%nn_new(corner_site,3,3) = 3
+
+    lat%n_nn_new(corner_site,4) = 3
+
+    lat%nn_new(corner_site,4,1) = 1
+    lat%nn_new(corner_site,4,2) = 2
+    lat%nn_new(corner_site,4,3) = 4
+
+    lat%n_nn_new(ts1_site,1) = 2
+
+    lat%nn_new(ts1_site,1,1) = 1
+    lat%nn_new(ts1_site,1,2) = 2
+
+    lat%n_nn_new(ts1_site,2) = 3
+
+    lat%nn_new(ts1_site,2,1) = 1
+    lat%nn_new(ts1_site,2,2) = 2
+    lat%nn_new(ts1_site,2,3) = 3
+
+    lat%n_nn_new(ts1_site,3) = 3
+
+    lat%nn_new(ts1_site,3,1) = 2
+    lat%nn_new(ts1_site,3,2) = 3
+    lat%nn_new(ts1_site,3,3) = 4
+
+    lat%n_nn_new(ts1_site,4) = 3
+
+    lat%nn_new(ts1_site,4,1) = 3
+    lat%nn_new(ts1_site,4,2) = 4
+    lat%nn_new(ts1_site,4,3) = 5
+
+    lat%n_nn_new(ts1_site,5) = 3
+
+    lat%nn_new(ts1_site,5,1) = 4
+    lat%nn_new(ts1_site,5,2) = 5
+    lat%nn_new(ts1_site,5,3) = 6
+
+    lat%n_nn_new(ts1_site,6) = 2
+
+    lat%nn_new(ts1_site,6,1) = 1
+    lat%nn_new(ts1_site,6,2) = 3
+
+    do i=1, lat%n_nn(tc1_site,1)
+      lat%n_nn_new(tc1_site,i) = 3
+    end do
+
+    lat%nn_new(tc1_site,1,1) = 1
+    lat%nn_new(tc1_site,1,2) = 3
+    lat%nn_new(tc1_site,1,3) = 4
+
+    lat%nn_new(tc1_site,2,1) = 1
+    lat%nn_new(tc1_site,2,2) = 2
+    lat%nn_new(tc1_site,2,3) = 4
+
+    lat%nn_new(tc1_site,3,1) = 1
+    lat%nn_new(tc1_site,3,2) = 3
+    lat%nn_new(tc1_site,3,3) = 5
+
+    lat%nn_new(tc1_site,4,1) = 1
+    lat%nn_new(tc1_site,4,2) = 2
+    lat%nn_new(tc1_site,4,3) = 6
+
+    lat%nn_new(tc1_site,5,1) = 1
+    lat%nn_new(tc1_site,5,2) = 5
+    lat%nn_new(tc1_site,5,3) = 6
 
     lat%n_max_ads_sites = n_max_ads_sites
 

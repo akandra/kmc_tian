@@ -156,7 +156,7 @@ contains
     allocate( bimolecular_init%rate_info(lat%n_rows*lat%n_cols) )
 
     do i=1,lat%n_rows*lat%n_cols
-      allocate( bimolecular_init%rate_info(i)%list( lat%n_nn(1) * &
+      allocate( bimolecular_init%rate_info(i)%list( lat%n_nn(terrace_site,1) * &
                                                      max_avail_ads_sites  ) )
       bimolecular_init%rate_info(i)%list = rate_info_bimolecular( default_int, default_int, default_rate )
     end do
@@ -509,7 +509,7 @@ contains
 
     ! Loop over possible positions for reactant 2
     channel = 0
-    do m=1,lat%n_nn(1)
+    do m=1,lat%n_nn(lst_r1,1)
 
       ! Get position and site type of neighbour m
       call lat%neighbor(ads, m, row_r2, col_r2)
