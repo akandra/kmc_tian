@@ -63,7 +63,7 @@ module mc_lat_class
       procedure :: distance   => mc_lat_distance_with_pbc
       procedure :: n_ads_tot  => mc_lat_n_ads_total
 !      procedure :: hoshen_kopelman
-      procedure :: cluster_size => count_cluster_sizes
+!      procedure :: cluster_size => count_cluster_sizes
       procedure :: rdf_hist
       procedure :: conf_init  => mc_lat_conf_init
       procedure, nopass, public :: mc_lat_init
@@ -108,6 +108,13 @@ contains
     lat%n_nn(    ts2_site,:) = [6,6,6]
     lat%n_nn(    tc2_site,:) = [6,6,6]
     lat%n_nn(    tc1_site,:) = [5,5,5]
+    lat%n_nn(  stepA_site,:) = [6,6,6]
+    lat%n_nn(cornerA_site,:) = [6,6,6]
+    lat%n_nn(   ts1A_site,:) = [6,6,6]
+    lat%n_nn(   ts2A_site,:) = [6,6,6]
+    lat%n_nn(   tc1A_site,:) = [6,6,6]
+    lat%n_nn(   tc2A_site,:) = [6,6,6]
+
     lat%n_max_nn = 6
 
     allocate(lat%shell_list(n_max_lat_site_types, n_shells, maxval(lat%n_nn), 2))
@@ -457,7 +464,8 @@ contains
 
 
     ! Define where steps, corners, and other sites are
-    ! NEXT TIME: consider using the energy file to define lst
+    ! NEXTTIME: consider using the energy file to define lst
+    ! Warning! A-type steps are not fully implemented
     lat%lst = terrace_site
     if ( c_pars%step_period > 5) then
       do j=1,lat%n_cols,c_pars%step_period

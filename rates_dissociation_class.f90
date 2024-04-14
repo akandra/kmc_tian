@@ -72,7 +72,7 @@ module rates_dissociation_class
     !---------------------------------------------------------------------------
     ! Gives a list of reaction information for a given adsorbate
     !   * list elements give the reaction channel which specifies the rate,
-    !     latice site type, and adsorption site type (ast) of reactants and
+    !     lattice site type, and adsorption site type (ast) of reactants and
     !     products
     !   * the structure also gives the direction of the site for product 2
     !     relative to that of the reactant
@@ -359,7 +359,7 @@ contains
                 end do
                 if (duplicate_error) stop 993
 
-                ! check energy is defined for reactant's and for products' site_type and ads_site
+                ! check if energy is defined for reactant's and for products' site_type and ads_site
                 if( e_pars%ads_energy(current_reactant_id, i1, i2) == e_pars%undefined_energy .or. &
                     e_pars%ads_energy(current_product1_id, i3, i4) == e_pars%undefined_energy .or. &
                     e_pars%ads_energy(current_product2_id, i5, i6) == e_pars%undefined_energy ) then

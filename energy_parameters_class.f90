@@ -112,6 +112,7 @@ contains
 !            print*, 'id       =', current_species_id
 !            print*, control_pars%ads_names
 
+          ! Warning! A-type steps are not implemented
           case ('terrace','step','corner','ts1','tc1','ts2','tc2')
             if (parse_state /= parse_state_adsorption) &
               call error_message(file_name, line_number, buffer, "invalid site type statement")

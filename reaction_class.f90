@@ -375,7 +375,7 @@ contains
 
     integer :: m
 
-    do m=1,lat%n_nn(terrace_site,1) ! this is wrong
+    do m=1,lat%n_max_nn
       this%hopping%rates(ads,m)%list = 0.0_dp
     end do
     this%desorption%rates(ads) = 0.0_dp
@@ -401,12 +401,10 @@ contains
     integer :: id_r, id_r1, id_r2, id_p1, id_p2
     integer :: ast_p1, ast_p2
     integer :: row, col, row_new, col_new, lst_new, ast_new
+    integer :: lst
     integer, dimension(2*lat%n_nn(terrace_site,1)) :: change_list
 
     real(dp) :: u, temp_dp
-
-    n_nn = lat%n_nn(terrace_site,1) !  this is wrong
-    n_nn2 = n_nn/2
 
     ! do nothing if there is nothing to do
     if (this%acc_rate(n_reaction_types) == 0.0_dp) return
@@ -436,7 +434,9 @@ contains
         !                           (      ads,      m_nn,                        iads)
         temp_dp = 0.0_dp
         extloop: do ads=1,this%n_ads_total
-          do m_nn=1,n_nn
+          lst = lat%lst(lat%ads_list(ads)%col, lat%ads_list(ads)%row)
+          n_nn = lat%n_nn(lst,1)
+          do m_nn=1, n_nn
             ! a new position of particle (ads) after a hop to a neighbor (m_nn)
             call lat%neighbor(ads,m_nn,row_new,col_new)
             id_r = lat%ads_list(ads)%id
@@ -479,10 +479,11 @@ contains
         ! Update adsorbate position
         lat%occupations(row_new, col_new) = ads
 
-        ! scan over additional new neighbors
-        do m=1,n_nn2
-          ! position of neighbor nn_new(m_nn,m)
-          call lat%neighbor( ads, lat%nn_new(m_nn,m), row, col)
+        ! scan over additional new neighbors for hopping
+        ! from ads situated in lst to the neighbor m_nn
+        do m=1,lat%n_nn_new(lst,m_nn)
+          ! position of neighbor nn_new(lst,m_nn,m)
+          call lat%neighbor( ads, lat%nn_new(lst,m_nn,m), row, col)
           if (lat%occupations(row,col) > 0) then
             i_change = i_change + 1
             change_list(i_change) = lat%occupations(row,col)
@@ -516,6 +517,8 @@ contains
         i_change = 0
 
         ! scan over neighbors
+        lst = lat%lst(lat%ads_list(ads)%col, lat%ads_list(ads)%row)
+        n_nn = lat%n_nn(lst,1)
         do m=1,n_nn
           ! position of neighbor m
           call lat%neighbor(ads,m,row,col)
@@ -576,6 +579,8 @@ contains
         change_list(i_change) = ads
 
         ! scan over neighbors of reactant
+        lst = lat%lst(lat%ads_list(ads)%col, lat%ads_list(ads)%row)
+        n_nn = lat%n_nn(lst,1)
         do m=1,n_nn
           ! position of neighbor m
           call lat%neighbor(ads,m,row,col)
@@ -615,10 +620,10 @@ contains
         lat%ads_list(this%n_ads_total)%ast = ast_p2
         lat%n_ads(id_p2) = lat%n_ads(id_p2) + 1
 
-        ! scan over neighbors of product 2
-        do m=1,n_nn2
-          ! position of neighbor with direction nn_new(m_nn,m)
-          call lat%neighbor( this%n_ads_total, lat%nn_new(m_nn,m), row, col)
+        ! scan over new neighbors of product 2
+        do m=1,lat%n_nn_new(lst,m_nn)
+          ! position of neighbor with direction nn_new(lst,m_nn,m)
+          call lat%neighbor( this%n_ads_total, lat%nn_new(lst,m_nn,m), row, col)
           if (lat%occupations(row,col) > 0) then
             i_change = i_change + 1
             change_list(i_change) = lat%occupations(row,col)
@@ -658,7 +663,9 @@ contains
         m_nn   = this%association%rate_info(ads)%list(channel)%m
         ! scan over neighbors of reactant 1
 
-        do m=1,n_nn
+       lst = lat%lst(lat%ads_list(ads)%col, lat%ads_list(ads)%row)
+       n_nn = lat%n_nn(lst,1)
+       do m=1,n_nn
             ! position of neighbor m
             call lat%neighbor(ads,m,row,col)
             if (lat%occupations(row,col) > 0) then
@@ -670,10 +677,10 @@ contains
               end if
             end if
         end do
-        ! scan over neighbors of reactant 2
-        do m=1,n_nn2
-          ! position of neighbor with direction nn_new(m_nn,m)
-          call lat%neighbor( ads_r2, lat%nn_new(m_nn,m), row, col)
+        ! scan over new neighbors of reactant 2
+        do m=1,lat%n_nn_new(lst,m_nn)
+          ! position of neighbor with direction nn_new(lst,m_nn,m)
+          call lat%neighbor( ads_r2, lat%nn_new(lst,m_nn,m), row, col)
           if (lat%occupations(row,col) > 0) then
             i_change = i_change + 1
             change_list(i_change) = lat%occupations(row,col)
@@ -745,6 +752,8 @@ contains
         m_nn   = this%bimolecular%rate_info(ads)%list(channel)%m
 
         ! scan over neighbors of reactant 1
+        lst = lat%lst(lat%ads_list(ads)%col, lat%ads_list(ads)%row)
+        n_nn = lat%n_nn(lst,1)
         do m=1,n_nn
             ! position of neighbor m
             call lat%neighbor(ads,m,row,col)
@@ -754,10 +763,10 @@ contains
               change_list(i_change) = lat%occupations(row,col)
             end if
         end do
-        ! scan over neighbors of reactant 2
-        do m=1,n_nn2
-          ! position of neighbor with direction nn_new(m_nn,m)
-          call lat%neighbor( ads_r2, lat%nn_new(m_nn,m), row, col)
+        ! scan over new neighbors of reactant 2
+        do m=1,lat%n_nn_new(lst,m_nn)
+          ! position of neighbor with direction nn_new(lst,m_nn,m)
+          call lat%neighbor( ads_r2, lat%nn_new(lst,m_nn,m), row, col)
           if (lat%occupations(row,col) > 0) then
             i_change = i_change + 1
             change_list(i_change) = lat%occupations(row,col)

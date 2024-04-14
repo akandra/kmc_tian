@@ -75,10 +75,8 @@ contains
     integer,  parameter   :: default_int = 0
     real(dp), parameter   :: default_rate  = -1.0_dp
 
-    integer :: n_nn, n_nn2, max_avail_ads_sites
+    integer :: max_avail_ads_sites
 
-    n_nn  = lat%n_nn(terrace_site,1) ! this is wrong
-    n_nn2 = n_nn/2
     ! maximal number of available ads. sites
     max_avail_ads_sites = 1
 
@@ -92,9 +90,9 @@ contains
     end do
 
     ! Allocate and initialize rates array
-    allocate( hopping_init%rates(lat%n_rows*lat%n_cols,n_nn) )
+    allocate( hopping_init%rates(lat%n_rows*lat%n_cols,lat%n_max_nn) )
     do i=1,lat%n_rows*lat%n_cols
-    do m=1,n_nn
+    do m=1,lat%n_max_nn
       allocate( hopping_init%rates(i,m)%list(max_avail_ads_sites) )
       hopping_init%rates(i,m)%list = 0.0_dp
     end do
