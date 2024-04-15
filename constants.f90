@@ -19,9 +19,9 @@ module constants
 
   ! Version number taken from a preprocessor variable
   ! Linux
-  character(len=40), parameter :: version = ""!__GIT_VERSION__
+  !character(len=40), parameter :: version = __GIT_VERSION__
   ! Windows
-  !character(len=40), parameter :: version =  ""
+  character(len=40), parameter :: version =  ""
 
   !-------- Site type info ---------!
 
@@ -37,16 +37,16 @@ module constants
   integer, parameter :: terrace_site = 1
   integer, parameter :: step_site    = 2
   integer, parameter :: corner_site  = 3
-  integer, parameter :: ts1_site     = 4
-  integer, parameter :: tc1_site     = 5
+  integer, parameter :: tc1_site     = 4
+  integer, parameter :: tc2_site     = 5
   integer, parameter :: ts2_site     = 6
-  integer, parameter :: tc2_site     = 7
+  integer, parameter :: ts1_site     = 7
   integer, parameter :: stepA_site   = 8
   integer, parameter :: cornerA_site = 9
-  integer, parameter :: ts1A_site    = 10
-  integer, parameter :: tc1A_site    = 11
+  integer, parameter :: tc1A_site    = 10
+  integer, parameter :: tc2A_site    = 11
   integer, parameter :: ts2A_site    = 12
-  integer, parameter :: tc2A_site    = 13
+  integer, parameter :: ts1A_site    = 13
 
   !-------- Adsorption sites info ---------!
 

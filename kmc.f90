@@ -6,6 +6,7 @@ use control_parameters_class
 use energy_parameters_class
 use mmc
 use kmc
+use checks
 
 implicit none
 
@@ -39,6 +40,9 @@ select case (c_pars%algorithm)
 
   case ('bkl')
     call Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
+
+  case ('chk')
+    call code_checks(lat, c_pars, e_pars)
 
   case default
     stop 'Error: mc algorithm not defined'

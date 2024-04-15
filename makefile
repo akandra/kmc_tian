@@ -25,6 +25,7 @@ SOURCE = open_file.f90 constants.f90 \
 	rates_hopping_class.f90 rates_desorption_class.f90 rates_dissociation_class.f90 \
 	rates_association_class.f90  rates_bimolecular_class.f90 \
 	reaction_class.f90  \
+	checks_mod.f90 \
 	kmc_mod.f90 \
 	kmc.f90
 OBJS = $(subst .f90,.o,$(SOURCE))
