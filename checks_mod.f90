@@ -69,15 +69,15 @@ subroutine check_nn_new_list(lat)
     lst_new = lat%lst(pos_nn(i+1,1),pos_nn(i+1,2))
     write(6,'(A3,i3,A5,i3)') 'nn:',i, ' lst:',lst_new
 
-    write(6,'(A)') 'dublicates:'
+!    write(6,'(A)') 'dublicates:'
     do j=1,lat%n_nn(lst_new,1)
 
       call lat%neighbor(i+1,j,row_new,col_new)
-      do k=1,lat%n_nn(lst,1)+1
-        if (pos_nn(k,1)==row_new .and. pos_nn(k,2)==col_new) then
+!      do k=1,lat%n_nn(lst,1)+1
+!        if (pos_nn(k,1)==row_new .and. pos_nn(k,2)==col_new) then
           write(6,'(3i4)') j,row_new,col_new
-        end if
-      end do
+!        end if
+!      end do
 
     end do
     write(6,'(A,10i4)') 'nn_new list: ',(lat%nn_new(lst,i,k), k=1,lat%n_nn_new(lst,i))
