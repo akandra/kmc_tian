@@ -148,7 +148,7 @@ contains
     do i=1,lat%n_rows*lat%n_cols
       allocate( dissociation_init%rate_info(i)%list( max_avail_ads_sites * &
                                                      max_avail_ads_sites * &
-                                                     lat%n_nn(terrace_site,1)) )
+                                                     lat%n_max_nn) )
       dissociation_init%rate_info(i)%list = rate_info_dissociation( 0, 0, 0.0_dp )
     end do
 

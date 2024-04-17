@@ -14,7 +14,7 @@ module control_parameters_class
     character(len=10) :: algorithm  ! MC algorithm to use (bkl, mmc, mmc-gc)
     integer :: n_rows               ! number of rows
     integer :: n_cols               ! number of columns
-    integer :: step_period          ! = step_density^-1, 0 means no steps
+    integer :: step_period          ! = 1/step_density (0 means no steps)
     integer :: n_species            ! number of the adsorbate types
     integer :: save_period          ! period for the output
     character(len=10),&

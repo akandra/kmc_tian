@@ -326,7 +326,6 @@ contains
     end do
 
     lat%n_nn_new(ts2_site,:)     = lat%n_nn_new(terrace_site,:)
-    lat%n_nn_new(tc2_site,:)     = lat%n_nn_new(terrace_site,:)
     lat%n_nn_new(stepA_site,:)   = lat%n_nn_new(terrace_site,:)
     lat%n_nn_new(cornerA_site,:) = lat%n_nn_new(terrace_site,:)
     lat%n_nn_new(ts1A_site,:)    = lat%n_nn_new(terrace_site,:)
@@ -334,7 +333,6 @@ contains
     lat%n_nn_new(tc1A_site,:)    = lat%n_nn_new(terrace_site,:)
     lat%n_nn_new(tc2A_site,:)    = lat%n_nn_new(terrace_site,:)
     lat%nn_new(ts2_site,    :,:) = lat%nn_new(terrace_site,:,:)
-    lat%nn_new(tc2_site,    :,:) = lat%nn_new(terrace_site,:,:)
     lat%nn_new(stepA_site,  :,:) = lat%nn_new(terrace_site,:,:)
     lat%nn_new(cornerA_site,:,:) = lat%nn_new(terrace_site,:,:)
     lat%nn_new(ts1A_site,   :,:) = lat%nn_new(terrace_site,:,:)
@@ -450,6 +448,31 @@ contains
     lat%nn_new(tc1_site,5,1) = 1
     lat%nn_new(tc1_site,5,2) = 5
     lat%nn_new(tc1_site,5,3) = 6
+
+
+    lat%n_nn_new(tc2_site,1) = lat%n_nn_new(terrace_site,1)
+    lat%nn_new(tc2_site,1,:) = lat%nn_new(terrace_site,1,:)
+
+    lat%n_nn_new(tc2_site,2) = lat%n_nn_new(terrace_site,2)
+    lat%nn_new(tc2_site,2,:) = lat%nn_new(terrace_site,2,:)
+
+    lat%n_nn_new(tc2_site,3) = 2
+
+    lat%nn_new(tc2_site,3,1) = 1
+    lat%nn_new(tc2_site,3,2) = 2
+
+    lat%n_nn_new(tc2_site,4) = 2
+
+    lat%nn_new(tc2_site,4,1) = 1
+    lat%nn_new(tc2_site,4,2) = 3
+
+    lat%n_nn_new(tc2_site,5) = 2
+
+    lat%nn_new(tc2_site,5,1) = 5
+    lat%nn_new(tc2_site,5,2) = 6
+
+    lat%n_nn_new(tc2_site,6) = lat%n_nn_new(terrace_site,6)
+    lat%nn_new(tc2_site,6,:) = lat%nn_new(terrace_site,6,:)
 
     lat%n_max_ads_sites = n_max_ads_sites
 

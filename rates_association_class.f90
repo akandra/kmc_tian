@@ -154,7 +154,7 @@ contains
 
     do i=1,lat%n_rows*lat%n_cols
       ! come back
-      allocate( association_init%rate_info(i)%list( lat%n_nn(terrace_site,1) * &
+      allocate( association_init%rate_info(i)%list( lat%n_max_nn * &
                                                      max_avail_ads_sites  ) )
       association_init%rate_info(i)%list = rate_info_association( default_int, default_int, default_rate )
     end do

@@ -82,18 +82,17 @@ contains
     class(reaction_type),     intent(inout) :: this
     class(mc_lat),            intent(inout) :: lat
 
-    integer :: n_nn, i, m, ads, channel
-
-    n_nn  = lat%n_nn(terrace_site,1) ! this is wrong
+    integer :: i, m, ads, channel, n_nn
 
     ! initialize the accumulated rate for hopping
     this%acc_rate(hopping_id) = 0.0_dp
     ! rate for hopping reactions
     if (this%hopping%is_defined) then
       do ads=1,this%n_ads_total
-      do m=1,n_nn
-        this%acc_rate(hopping_id) = this%acc_rate(hopping_id) + sum(this%hopping%rates(ads,m)%list)
-      end do
+        n_nn = lat%n_nn( lat%lst( lat%ads_list(ads)%row,lat%ads_list(ads)%col ), 1)
+        do m=1,n_nn
+          this%acc_rate(hopping_id) = this%acc_rate(hopping_id) + sum(this%hopping%rates(ads,m)%list)
+        end do
       end do
     end if
 
@@ -402,7 +401,7 @@ contains
     integer :: ast_p1, ast_p2
     integer :: row, col, row_new, col_new, lst_new, ast_new
     integer :: lst
-    integer, dimension(2*lat%n_nn(terrace_site,1)) :: change_list
+    integer, dimension(2*lat%n_max_nn) :: change_list
 
     real(dp) :: u, temp_dp
 

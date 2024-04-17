@@ -29,8 +29,8 @@ module constants
   integer, parameter :: n_max_lat_site_types = 13
   ! List of site types
   character(len=10), dimension(n_max_lat_site_types), parameter :: &
-            lat_site_names = [character(10):: 'terrace', 'step', 'corner', 'ts1', 'tc1', 'ts2', 'tc2',&
-                                                         'stepA','cornerA','ts1A','tc1A','ts2A','tc2A']
+            lat_site_names = [character(10):: 'terrace', 'step', 'corner', 'tc1', 'tc2', 'ts2', 'ts1',&
+                                                         'stepA','cornerA','tc1A','tc2A','ts2A','ts1A']
 
 
   ! Site type ids
