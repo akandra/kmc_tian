@@ -478,7 +478,12 @@ contains
       stop 988
 
     else
-      write(*, '(A/)') ' bimolecular: passed check that energies are defined for all rates'
+
+      if (bimolecular_init%is_defined) then
+        write(6, '(A/)') ' bimolecular: passed check that energies are defined for all rates'
+      else
+        write(6, '(A)') ' no bimolecular reactions'
+      end if
 
     end if
 

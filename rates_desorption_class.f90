@@ -222,7 +222,13 @@ contains
     close(inp_unit)
 
     if (.not. undefined_energy) then
-      write(*, '(/A)') ' Desorption: passed check that energies are defined for all rates'
+
+      if (desorption_init%is_defined) then
+        write(6, '(A/)') ' desorption: passed check that energies are defined for all rates'
+      else
+        write(6, '(A)') ' no desorption reactions'
+      end if
+
     end if
 
 
@@ -238,42 +244,46 @@ contains
     ! Note ads_energies could be allocated of n_site_types rather than n_max_lat_site_types
     !
 
-    undefined_rate = .false.
-    do species   = 1, c_pars%n_species
-    do st1       = 1, n_max_lat_site_types
-    do ast1      = 1, n_max_ads_sites
+    if (desorption_init%is_defined) then
 
-      e_defined1 = e_pars%ads_energy(species, st1, ast1) /= e_pars%undefined_energy
-      r_defined  = desorption_init%process (species, st1, ast1) /= default_rate
+      undefined_rate = .false.
+      do species   = 1, c_pars%n_species
+      do st1       = 1, n_max_lat_site_types
+      do ast1      = 1, n_max_ads_sites
 
-      if ( e_defined1 .and. (.not. r_defined)) then
-        if (.not. undefined_rate) then
-          undefined_rate = .true.
-          print '(2A)',  ' Desorption: warning missing rate definitions in the file ', file_name
-          print '(A)',  ' Missing definitions:'
-          print '(6x, A)', 'ads  lat_site    ads_site'
+        e_defined1 = e_pars%ads_energy(species, st1, ast1) /= e_pars%undefined_energy
+        r_defined  = desorption_init%process (species, st1, ast1) /= default_rate
+
+        if ( e_defined1 .and. (.not. r_defined)) then
+          if (.not. undefined_rate) then
+            undefined_rate = .true.
+            print '(2A)',  ' Desorption: warning missing rate definitions in the file ', file_name
+            print '(A)',  ' Missing definitions:'
+            print '(6x, A)', 'ads  lat_site    ads_site'
+          end if
+
+          print '(6x, a5, A10, 2x, a3, 6x, a10, 2x, a3, 6x, L1)' ,            &
+                  c_pars%ads_names(species),             &
+                  lat_site_names(st1), ads_site_names(ast1)
         end if
 
-        print '(6x, a5, A10, 2x, a3, 6x, a10, 2x, a3, 6x, L1)' ,            &
-                c_pars%ads_names(species),             &
-                lat_site_names(st1), ads_site_names(ast1)
+      end do
+      end do
+      end do
+
+      if(undefined_rate) then
+        print '(A)', ' Add rate definitions if they should be present'
+        print *
+      else
+        print '(A)', ' Desorption: passed rates consistency check'
+        print *
       end if
 
-    end do
-    end do
-    end do
+      if(undefined_energy) then
+        print '(A)', ' Desorption: error - undefined energy -- aborting execution'
+        stop 997
+      end if
 
-    if(undefined_rate) then
-      print '(/A)', ' Add rate definitions if they should be preent'
-      print *
-    else
-      print '(A)', ' Desorption: passed rates consistency check'
-      print *
-    end if
-
-    if(undefined_energy) then
-      print '(A)', ' Desorption: error - undefined energy -- aborting execution'
-      stop 997
     end if
 
   end function desorption_init

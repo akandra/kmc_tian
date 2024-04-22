@@ -449,7 +449,12 @@ contains
       stop 995
 
     else
-      write(*, '(A/)') ' Dissociation: passed check that energies are defined for all rates'
+
+      if (dissociation_init%is_defined) then
+        write(6, '(A/)') ' dissociation: passed check that energies are defined for all rates'
+      else
+        write(6, '(A)') ' no dissociation reactions'
+      end if
 
     end if
 

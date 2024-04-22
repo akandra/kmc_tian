@@ -455,7 +455,12 @@ contains
       stop 995
 
     else
-      write(*, '(A/)') ' Association: passed check that energies are defined for all rates'
+
+      if (association_init%is_defined) then
+        write(6, '(A/)') ' association: passed check that energies are defined for all rates'
+      else
+        write(6, '(A)') ' no association reactions'
+      end if
 
     end if
 

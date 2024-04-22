@@ -60,6 +60,7 @@ module mc_lat_class
       procedure :: print_ads  => mc_lat_print_ads
       procedure :: hop        => mc_lat_hop_with_pbc
       procedure :: neighbor   => mc_lat_neighbor_with_pbc
+      procedure :: adjacent   => mc_lat_adjacent
       procedure :: distance   => mc_lat_distance_with_pbc
       procedure :: n_ads_tot  => mc_lat_n_ads_total
 !      procedure :: hoshen_kopelman
@@ -492,12 +493,18 @@ contains
     lat%lst = terrace_site
     if ( c_pars%step_period > 5) then
       do j=1,lat%n_cols,c_pars%step_period
-          lat%lst(:,j)   = step_site
-          lat%lst(:,j+1) = corner_site
-          lat%lst(:,j+2) = tc1_site
-          lat%lst(:,j+3) = tc2_site
-          lat%lst(:,j+c_pars%step_period-1) = ts1_site
-          lat%lst(:,j+c_pars%step_period-2) = ts2_site
+!          lat%lst(:,j)   = step_site
+!          lat%lst(:,j+1) = corner_site
+!          lat%lst(:,j+2) = tc1_site
+!          lat%lst(:,j+3) = tc2_site
+!          lat%lst(:,j+c_pars%step_period-1) = ts1_site
+!          lat%lst(:,j+c_pars%step_period-2) = ts2_site
+          lat%lst(:,j) = corner_site
+          lat%lst(:,j+1) = tc1_site
+          lat%lst(:,j+2) = tc2_site
+          lat%lst(:,j+c_pars%step_period-3) = ts2_site
+          lat%lst(:,j+c_pars%step_period-2) = ts1_site
+          lat%lst(:,j+c_pars%step_period-1) = step_site
       end do
       n_site_types = n_max_lat_site_types
     elseif ( c_pars%step_period == 0) then
@@ -816,6 +823,26 @@ contains
     col = modulo(col_old + this%shell_list(this%lst(row_old,col_old),ishell,ihop,2) - 1, this%n_cols) + 1
 
   end subroutine
+
+! ---------------------------------------------------------------------
+! Function returning true if two lattice site types are adjacent
+! ---------------------------------------------------------------------
+  function mc_lat_adjacent(this,lst1,lst2)
+
+    class(mc_lat), intent(in) :: this
+    integer, intent(in)  :: lst1,lst2
+    logical :: mc_lat_adjacent
+
+    integer, dimension(1) :: col_lst1
+
+
+    col_lst1 = findloc(this%lst(1,:), lst1)
+
+    mc_lat_adjacent = .false.
+    if (this%lst(1, modulo(col_lst1(1) + 1 - 1, this%n_cols) + 1) == lst2) mc_lat_adjacent = .true.
+    if (this%lst(1, modulo(col_lst1(1) - 1 - 1, this%n_cols) + 1) == lst2) mc_lat_adjacent = .true.
+
+  end function
 
 ! ---------------------------------------------------------------------
 ! Subroutine applying PBCs to calculate distance

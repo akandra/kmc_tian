@@ -92,6 +92,11 @@ contains
         n_nn = lat%n_nn( lat%lst( lat%ads_list(ads)%row,lat%ads_list(ads)%col ), 1)
         do m=1,n_nn
           this%acc_rate(hopping_id) = this%acc_rate(hopping_id) + sum(this%hopping%rates(ads,m)%list)
+if (sum(this%hopping%rates(ads,m)%list) < 0) then
+  print*, 'lst ', lat%lst( lat%ads_list(ads)%row,lat%ads_list(ads)%col), &
+  'nn ',m, 'rate ', this%hopping%rates(ads,m)%list
+  read(*,*)
+end if
         end do
       end do
     end if
@@ -415,6 +420,7 @@ contains
     ! determine the type of reaction
     do reaction_id=1,n_reaction_types
       if (u < this%acc_rate(reaction_id)) exit
+      print*,reaction_id, this%acc_rate(reaction_id), u
     end do
 
 ! Debug printing
@@ -425,7 +431,6 @@ contains
 !  call lat%print_ocs
 !  call lat%print_ads
 !end if
-
     select case (reaction_id)
 
       case(hopping_id)
@@ -433,7 +438,7 @@ contains
         !                           (      ads,      m_nn,                        iads)
         temp_dp = 0.0_dp
         extloop: do ads=1,this%n_ads_total
-          lst = lat%lst(lat%ads_list(ads)%col, lat%ads_list(ads)%row)
+          lst = lat%lst(lat%ads_list(ads)%row, lat%ads_list(ads)%col)
           n_nn = lat%n_nn(lst,1)
           do m_nn=1, n_nn
             ! a new position of particle (ads) after a hop to a neighbor (m_nn)
@@ -516,7 +521,7 @@ contains
         i_change = 0
 
         ! scan over neighbors
-        lst = lat%lst(lat%ads_list(ads)%col, lat%ads_list(ads)%row)
+        lst = lat%lst(lat%ads_list(ads)%row, lat%ads_list(ads)%col)
         n_nn = lat%n_nn(lst,1)
         do m=1,n_nn
           ! position of neighbor m
@@ -578,7 +583,7 @@ contains
         change_list(i_change) = ads
 
         ! scan over neighbors of reactant
-        lst = lat%lst(lat%ads_list(ads)%col, lat%ads_list(ads)%row)
+        lst = lat%lst(lat%ads_list(ads)%row, lat%ads_list(ads)%col)
         n_nn = lat%n_nn(lst,1)
         do m=1,n_nn
           ! position of neighbor m
@@ -662,9 +667,9 @@ contains
         m_nn   = this%association%rate_info(ads)%list(channel)%m
         ! scan over neighbors of reactant 1
 
-       lst = lat%lst(lat%ads_list(ads)%col, lat%ads_list(ads)%row)
-       n_nn = lat%n_nn(lst,1)
-       do m=1,n_nn
+        lst = lat%lst(lat%ads_list(ads)%row, lat%ads_list(ads)%col)
+        n_nn = lat%n_nn(lst,1)
+        do m=1,n_nn
             ! position of neighbor m
             call lat%neighbor(ads,m,row,col)
             if (lat%occupations(row,col) > 0) then
@@ -751,7 +756,7 @@ contains
         m_nn   = this%bimolecular%rate_info(ads)%list(channel)%m
 
         ! scan over neighbors of reactant 1
-        lst = lat%lst(lat%ads_list(ads)%col, lat%ads_list(ads)%row)
+        lst = lat%lst(lat%ads_list(ads)%row, lat%ads_list(ads)%col)
         n_nn = lat%n_nn(lst,1)
         do m=1,n_nn
             ! position of neighbor m

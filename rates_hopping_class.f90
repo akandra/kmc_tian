@@ -127,97 +127,92 @@ contains
         words = ''
         call split_string(buffer, words, nwords)
 
-        select case (words(1)) ! take a keyword
-!------------------------------------------------------------------------------
-          case('hopping')                               ! select case (words(1)
-!------------------------------------------------------------------------------
-            hopping_init%is_defined = .true.
+        if (words(1) == 'hopping') then
 
-            if (parse_state /= parse_state_default) &
-              call error_message(file_name, line_number, buffer, &
-                         "invalid ending of the reaction section")
-            parse_state = parse_state_hopping
-            if (nwords/=3) call error_message(file_name, line_number, buffer, &
-                               "hopping key must have 2 parameters")
+          hopping_init%is_defined = .true.
 
-            read(words(2),'(A)') current_species_name
-            current_species_id = get_index(current_species_name, c_pars%ads_names )
-            if (current_species_id == 0) call error_message(file_name, line_number, buffer, &
-                                                  "inconsistent hopping definition")
+          if (parse_state /= parse_state_default) &
+            call error_message(file_name, line_number, buffer, &
+                       "invalid ending of the reaction section")
+          parse_state = parse_state_hopping
+          if (nwords/=3) call error_message(file_name, line_number, buffer, &
+                             "hopping key must have 2 parameters")
 
-            current_law_id = get_index(words(3), law_names )
-            if (current_law_id == 0) call error_message(file_name, line_number, buffer, &
-                                                  "unknown temperature law")
+          read(words(2),'(A)') current_species_name
+          current_species_id = get_index(current_species_name, c_pars%ads_names )
+          if (current_species_id == 0) call error_message(file_name, line_number, buffer, &
+                                                "inconsistent hopping definition")
+
+          current_law_id = get_index(words(3), law_names )
+          if (current_law_id == 0) call error_message(file_name, line_number, buffer, &
+                                                "unknown temperature law")
 !            print*, 'name     =', current_species_name
 !            print*, 'id       =', current_species_id
 !            print*, c_pars%ads_names
 
-!------------------------------------------------------------------------------
-          case ('terrace','step','corner')              ! select case(words(1))
-!------------------------------------------------------------------------------
+        elseif (get_index(words(1),lat_site_names) /= 0) then
 
+          select case (parse_state)
 
-            select case (parse_state)
+            case(parse_state_ignore)
+              ! ignore
+              ! print *, 'warning ignoring line', line_number, buffer
 
-              case(parse_state_ignore)
-                ! ignore
-                ! print *, 'warning ignoring line', line_number, buffer
+            case(hopping_id)
 
-              case(hopping_id)
+              i1 = get_index(words(1),lat_site_names)
+              i2 = get_index(words(2),ads_site_names)
+              i3 = get_index(words(3),lat_site_names)
+              i4 = get_index(words(4),ads_site_names)
 
-                i1 = get_index(words(1),lat_site_names)
-                i2 = get_index(words(2),ads_site_names)
-                i3 = get_index(words(3),lat_site_names)
-                i4 = get_index(words(4),ads_site_names)
+              if ( i1==0 .or. i2==0 .or. i3==0 .or. i4==0) &
+                call error_message(file_name, line_number, buffer, &
+                           "wrong site name in the hopping section")
 
-                if ( i1==0 .or. i2==0 .or. i3==0 .or. i4==0) &
+              ! check for duplicate entry
+              if (hopping_init%process(current_species_id,i1,i2,i3,i4 ) /= default_rate)&
+                call error_message(file_name, line_number, buffer, "duplicated entry (check symetry duplicates)")
+
+              ! check energy is defined for initial and final site_type and ads_site
+              if( e_pars%ads_energy(current_species_id, i1, i2) == e_pars%undefined_energy .or. &
+                  e_pars%ads_energy(current_species_id, i3, i4) == e_pars%undefined_energy ) then
+
                   call error_message(file_name, line_number, buffer, &
-                             "wrong site name in the hopping section")
+                                     " in hopping rate defined for site with undefined adsorption energy", &
+                                     stop=.false., warning=.false.)
 
-                ! check for duplicate entry
-                if (hopping_init%process(current_species_id,i1,i2,i3,i4 ) /= default_rate)&
-                  call error_message(file_name, line_number, buffer, "duplicated entry (check symetry duplicates)")
+                  undefined_energy = .true.
+              end if
 
-                ! check energy is defined for initial and final site_type and ads_site
-                if( e_pars%ads_energy(current_species_id, i1, i2) == e_pars%undefined_energy .or. &
-                    e_pars%ads_energy(current_species_id, i3, i4) == e_pars%undefined_energy ) then
+              select case (current_law_id)
 
-                    call error_message(file_name, line_number, buffer, &
-                                       " in hopping rate defined for site with undefined adsorption energy", &
-                                       stop=.false., warning=.false.)
+                case (Arrhenius_id)
+                  if (nwords/=6) call error_message(file_name, line_number, buffer,&
+                                            "Arrhenius must have 2 parameters")
+                  read(words(5),*) pars(1)
+                  read(words(6),*) pars(2)
+                  hopping_init%process(current_species_id,i1,i2,i3,i4 ) = &
+                              arrhenius(c_pars%temperature, pars(1:2))
+                  ! symmetrize
+                  hopping_init%process(current_species_id,i3,i4,i1,i2 ) = &
+                  hopping_init%process(current_species_id,i1,i2,i3,i4 )
 
-                    undefined_energy = .true.
-                end if
+                case (extArrhenius_id)
+                  if (nwords/=7) call error_message(file_name, line_number, buffer,&
+                                            "extArrhenius must have 3 parameters")
+                  read(words(5),*) pars(1)
+                  read(words(6),*) pars(2)
+                  read(words(7),*) pars(3)
+                  hopping_init%process(current_species_id,i1,i2,i3,i4 ) = &
+                              extArrhenius(c_pars%temperature, pars(1:3))
+                  ! symmetrize
+                  hopping_init%process(current_species_id,i3,i4,i1,i2 ) = &
+                  hopping_init%process(current_species_id,i1,i2,i3,i4 )
 
-                select case (current_law_id)
+                case default
+                  call error_message(file_name, line_number, buffer, "This should not happen! Check the code!")
 
-                  case (Arrhenius_id)
-                    if (nwords/=6) call error_message(file_name, line_number, buffer,&
-                                              "Arrhenius must have 2 parameters")
-                    read(words(5),*) pars(1)
-                    read(words(6),*) pars(2)
-                    hopping_init%process(current_species_id,i1,i2,i3,i4 ) = &
-                                arrhenius(c_pars%temperature, pars(1:2))
-                    ! symmetrize
-                    hopping_init%process(current_species_id,i3,i4,i1,i2 ) = &
-                    hopping_init%process(current_species_id,i1,i2,i3,i4 )
-
-                  case (extArrhenius_id)
-                    if (nwords/=7) call error_message(file_name, line_number, buffer,&
-                                              "extArrhenius must have 3 parameters")
-                    read(words(5),*) pars(1)
-                    read(words(6),*) pars(2)
-                    read(words(7),*) pars(3)
-                    hopping_init%process(current_species_id,i1,i2,i3,i4 ) = &
-                                extArrhenius(c_pars%temperature, pars(1:3))
-                    ! symmetrize
-                    hopping_init%process(current_species_id,i3,i4,i1,i2 ) = &
-                    hopping_init%process(current_species_id,i1,i2,i3,i4 )
-
-                  case default
-                    call error_message(file_name, line_number, buffer, "This should not happen! Check the code!")
-
-                end select
+              end select
 
 !                 print*, 'reaction: ', reaction_names(parse_state),&
 !                        ' for species:', current_species_name
@@ -231,37 +226,30 @@ contains
 
             end select
 
-!------------------------------------------------------------------------------
-          case('')                                      ! select case(words(1))
-!------------------------------------------------------------------------------
-            if (buffer == '') then
-              parse_state = parse_state_default
-!              print*, 'blank line '
-!            else
-!              print*, 'comment: ', trim(buffer)
-            end if
+        elseif (words(1) == '') then
 
-!------------------------------------------------------------------------------
-          case default                                  ! select case(words(1))
-!------------------------------------------------------------------------------
+            if (buffer == '') parse_state = parse_state_default
+
+        else
+
             if ( parse_state == parse_state_default .and. get_index(words(1),reaction_names) /= 0 ) &
               parse_state = parse_state_ignore
 
             if (parse_state /= parse_state_ignore) &
               call error_message(file_name, line_number, buffer, "hopping: unknown key")
 
-        end select                                      ! select case(words(1))
+        end if
 
     end do ! while ios=0
 
     close(inp_unit)
 
     if (undefined_energy) then
-      write(*, '(A)') ' Hopping: error, rates defined for sites with undefined energies'
+      write(*, '(A)') ' hopping: error, rates defined for sites with undefined energies'
       stop 996
 
     else
-      write(*, '(A)') ' Hopping: passed check that energies are defined for all rates'
+      write(*, '(A)') ' hopping: passed check that energies are defined for all rates'
 
     end if
 
@@ -281,48 +269,50 @@ contains
     undefined_rate = .false.
     do species   = 1, c_pars%n_species
     do st1       = 1, n_max_lat_site_types
-    do ast1      = 1, n_max_ads_sites
     do st2       = st1, n_max_lat_site_types
-    do ast2      = 1, n_max_ads_sites
+      if (lat%adjacent(st1,st2) .or. st1==st2) then
+        do ast1      = 1, n_max_ads_sites
+        do ast2      = 1, n_max_ads_sites
 
-      e_defined1 = e_pars%ads_energy(species, st1, ast1) /= e_pars%undefined_energy
-      e_defined2 = e_pars%ads_energy(species, st2, ast2) /= e_pars%undefined_energy
-      r_defined  = hopping_init%process (species, st1, ast1, st2, ast2) /= default_rate
+          e_defined1 = e_pars%ads_energy(species, st1, ast1) /= e_pars%undefined_energy
+          e_defined2 = e_pars%ads_energy(species, st2, ast2) /= e_pars%undefined_energy
+          r_defined  = hopping_init%process (species, st1, ast1, st2, ast2) /= default_rate
 
-      if ( (e_defined1 .and. e_defined2) .and. (.not. r_defined)) then
-        if (.not. undefined_rate) then
-          undefined_rate = .true.
-          print*
-!          print '(A)',  '--- Dear Sir, Madam:'
-!          print '(A)',  '      It is my duty to inform you that there are missing rate definitions in'
-          print '(A)',  ' Hopping: missing rate definitions'
-          print '(2A)', '    file name:', file_name
-          print '(A)',  '    missing definitions:'
-          print '(/6x, A)', 'ads  lat_site    ads_site lat_site    ads_site'
+          if ( (e_defined1 .and. e_defined2) .and. (.not. r_defined)) then
+            if (.not. undefined_rate) then
+              undefined_rate = .true.
+              print*
+    !          print '(A)',  '--- Dear Sir, Madam:'
+    !          print '(A)',  '      It is my duty to inform you that there are missing rate definitions in'
+              print '(A)',  ' hopping: missing rate definitions'
+              print '(2A)', '    file name:', file_name
+              print '(A)',  '    missing definitions:'
+              print '(/6x, A)', 'ads  lat_site    ads_site lat_site    ads_site'
 
-        end if
+            end if
 
-        print '(6x, a5, A10, 2x, a3, 6x, a10, 2x, a3, 6x, L1, 7x, L1, 7x, L1)' ,            &
-                c_pars%ads_names(species),             &
-                lat_site_names(st1), ads_site_names(ast1), &
-                lat_site_names(st2), ads_site_names(ast2)
-                !e_defined1, e_defined2, r_defined
+            print '(6x, a5, A10, 2x, a3, 6x, a10, 2x, a3, 6x, L1, 7x, L1, 7x, L1)' ,            &
+                    c_pars%ads_names(species),             &
+                    lat_site_names(st1), ads_site_names(ast1), &
+                    lat_site_names(st2), ads_site_names(ast2)
+                    !e_defined1, e_defined2, r_defined
+          end if
+
+        end do
+        end do
       end if
-
-    end do
-    end do
     end do
     end do
     end do
 
     if(undefined_rate) then
-      print '(/A)', ' Hopping: please supply the required rates'
+      print '(A)', ' hopping: please supply the required rates'
  !     print '(/6x, A)', 'As always, I remain your humble servant, kMC Code'
  !     print *
       stop 997
 
     else
-      print '(A)', ' Hopping: passed required rates consistency check'
+      print '(A/)', ' hopping: passed required rates consistency check'
 !      print*
 !      stop 'debugging stop'
 

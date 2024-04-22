@@ -46,7 +46,7 @@ RFLAGS = -O2 -module $(RDIR)
 .PHONY: all debug release prepare_debug prepare_release remaked remaker clean_debug clean_release
 
 # Debug rules
-Debug: prepare_debug $(DEXEC)
+debug: prepare_debug $(DEXEC)
 
 $(DEXEC): $(DOBJS)
 	$(FC) $(CFLAGS) $(DFLAGS) -o $(DEXEC) $^
