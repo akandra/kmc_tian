@@ -48,7 +48,7 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
   integer :: j, k, n_chan  ! only for debug printout
 
   ! initialize vector of conditions for debug trap
-  debug =  .false.
+  debug = .false.
 
   version_header = '! kmc_tian Release ' // version
 
@@ -96,7 +96,7 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
   ! Loop over trajectories
   do itraj=c_pars%start_traj, c_pars%start_traj - 1 + c_pars%n_trajs
 
-    debug(1) = (itraj==3)
+!    debug(1) = (itraj==3)
 
     if (c_pars%show_progress > 0) call progress_bar( 'current trajectory', 0 , &
                                  '   total', 100*(itraj-c_pars%start_traj+1)/c_pars%n_trajs )
@@ -306,7 +306,7 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
           ! reaction counts
           write(outcnt_unit,'(1pe12.3,100i20)') time_bin, r%counter
           ! Reset reaction counters
-          r%counter = 0
+!          r%counter = 0
 
           if (r%n_ads_total>0) then
 

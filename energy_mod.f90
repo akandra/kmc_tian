@@ -36,8 +36,7 @@ real(dp) function energy(ref, lat, e_pars)
     do i_shell=1,n_shells
     do i=1, lat%n_nn(ref_lst,i_shell) ! Sum up the int. energy over all nearest neighbors
 
-      row = modulo(ref_row + lat%shell_list(ref_lst, i_shell,i,1) - 1,lat%n_rows) + 1
-      col = modulo(ref_col + lat%shell_list(ref_lst, i_shell,i,2) - 1,lat%n_cols) + 1
+      call lat%neighbor(ref, i, row, col, i_shell)
       i_n = lat%occupations(row,col)
 
       if (i_n > 0) then
@@ -91,14 +90,13 @@ real(dp) function total_energy(lat, e_pars)
       do i_shell=1,n_shells
       do i=1, lat%n_nn(ref_lst,i_shell)
 
-        row = modulo(ref_row + lat%shell_list(ref_lst, i_shell,i,1) - 1,lat%n_rows) + 1
-        col = modulo(ref_col + lat%shell_list(ref_lst, i_shell,i,2) - 1,lat%n_cols) + 1
+        call lat%neighbor(ref, i, row, col, i_shell)
         i_n = lat%occupations(row,col)
 
         if (i_n > 0) then
 
+          if (i_n < ref) cycle ! Avoid double counting
           id = lat%ads_list(i_n)%id
-          if (id < ref_id) cycle ! Avoid double counting
           if (e_pars%int_energy_skip(ref_id, ref_lst, id, lat%lst(row,col),i_shell)) cycle
 
           if (e_pars%int_energy_law_id(ref_id, ref_lst, id, lat%lst(row, col)) /= linear_id) then
@@ -107,7 +105,6 @@ real(dp) function total_energy(lat, e_pars)
             stop
 
           end if
-
           energy_acc = energy_acc + e_pars%int_energy_pars(ref_id, ref_lst, id, lat%lst(row,col),i_shell)
 
         end if

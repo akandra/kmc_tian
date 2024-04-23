@@ -672,7 +672,6 @@ contains
       allocate(n_ads_in(n_species_in))
 
       do iconf=1,conf
-
         read(inp_unit, '(A)', iostat=ios) line
         if (ios /= 0) exit
         read(inp_unit,*) n_ads_in

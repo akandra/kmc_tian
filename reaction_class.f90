@@ -45,6 +45,7 @@ module reaction_class
     procedure :: construct_1
     procedure :: cleanup_rates
     procedure :: do_reaction
+    procedure :: update_neighbors
 
   end type
 
@@ -151,6 +152,7 @@ end if
 !    end do
 
   end subroutine accumulate_rates
+
 
 !-----------------------------------------------------------------------------
   subroutine construct(this, lat, e_pars)
@@ -400,18 +402,20 @@ end if
     class(mc_lat),            intent(inout)     :: lat
     class(energy_parameters), intent(in)    :: e_pars
 
-    integer :: i, m, ads, iads, reaction_id, i_change, channel
+    integer :: i, m, ads, iads, reaction_id, channel
     integer :: n_nn, n_nn2, m_nn, col_p2, row_p2, proc, ads_r2
     integer :: id_r, id_r1, id_r2, id_p1, id_p2
     integer :: ast_p1, ast_p2
     integer :: row, col, row_new, col_new, lst_new, ast_new
-    integer :: lst
-    integer, dimension(2*lat%n_max_nn) :: change_list
+    integer :: lst, lst_r2
+    logical, dimension(:), allocatable :: rate_update_q
 
     real(dp) :: u, temp_dp
 
     ! do nothing if there is nothing to do
     if (this%acc_rate(n_reaction_types) == 0.0_dp) return
+
+    allocate(rate_update_q(lat%n_rows*lat%n_cols))
 
     ! ------- Select the process
 
@@ -424,13 +428,16 @@ end if
     end do
 
 ! Debug printing
-!if (debug(1)) then
-!  print*
-!  print*,'do reaction debugging printout:'
-!  print *, 'Before ', trim(reaction_names(reaction_id)),':'
-!  call lat%print_ocs
-!  call lat%print_ads
-!end if
+!debug(1) = (this%counter(reaction_id,1) == 9 .or. this%counter(reaction_id,1) == 8)
+!debug(2) = (this%counter(reaction_id,1) == 8)
+!debug(1) = .true.
+if (debug(1)) then
+  print*
+  print*,'do reaction debugging printout:'
+  print *, 'Before ', trim(reaction_names(reaction_id)),' #',this%counter(reaction_id,1)+1, ':'
+  call lat%print_ocs
+  call lat%print_ads
+end if
     select case (reaction_id)
 
       case(hopping_id)
@@ -448,7 +455,14 @@ end if
             do iads=1,size(lat%avail_ads_sites(id_r,lst_new)%list)
               ast_new = lat%avail_ads_sites(id_r,lst_new)%list(iads)
               temp_dp = temp_dp + this%hopping%rates(ads,m_nn)%list(iads)
-              if (u < temp_dp) exit extloop
+              if (u < temp_dp) then
+                if (debug(1)) then
+                  print*
+                  print*, 'ads ', ads, 'm_nn ', m_nn, 'iads', iads
+                  print*, 'rate ', this%hopping%rates(ads,:)%list(iads)
+                end if
+                exit extloop
+              end if
             end do
           end do
         end do extloop
@@ -456,23 +470,12 @@ end if
         ! Update hopping rate constants
         ! Particle (ads) is going to hop in direction (m_nn) to ads. site (iads)
 
-        ! create a list of adsorbates affected by hop
-
-        change_list = 0
-        i_change = 1
-        ! Put the hopping particle iads into the list
-        change_list(i_change) = ads
-
-        ! scan over old neighbors
-        do m=1,n_nn
-          ! position of neighbor m
-          call lat%neighbor(ads,m,row,col)
-          if (lat%occupations(row,col) > 0) then
-            i_change = i_change + 1
-            change_list(i_change) = lat%occupations(row,col)
-          end if
-        end do
-
+        ! initialize a logical array indicating adsorbates affected by hop
+        rate_update_q = .false.
+        ! Put the hopping particle into the list
+        rate_update_q(ads) = .true.
+        ! scan over neighbors before hop
+        call this%update_neighbors(rate_update_q, ads, lst, lat)
         ! Make a hop:
         ! Delete an adsorbate from its old position
         lat%occupations(lat%ads_list(ads)%row, lat%ads_list(ads)%col) = 0
@@ -483,22 +486,15 @@ end if
         ! Update adsorbate position
         lat%occupations(row_new, col_new) = ads
 
-        ! scan over additional new neighbors for hopping
-        ! from ads situated in lst to the neighbor m_nn
-        do m=1,lat%n_nn_new(lst,m_nn)
-          ! position of neighbor nn_new(lst,m_nn,m)
-          call lat%neighbor( ads, lat%nn_new(lst,m_nn,m), row, col)
-          if (lat%occupations(row,col) > 0) then
-            i_change = i_change + 1
-            change_list(i_change) = lat%occupations(row,col)
-          end if
-        end do
+        ! scan over neighbors after hop
+        call this%update_neighbors(rate_update_q, ads, lst_new, lat)
 
         ! Reset the rate info for ads
         call this%cleanup_rates(ads,lat)
+
         ! Update rate array for the affected adsorbates
-        do i=1,i_change
-          call this%construct_1(change_list(i), lat, e_pars)
+        do i=1,this%n_ads_total
+          if (rate_update_q(i)) call this%construct_1(i, lat, e_pars)
         end do
 
         ! Update reaction counter
@@ -516,21 +512,11 @@ end if
         ! Update desorption rate constants
         ! Particle (ads) is going to desorb to nowhere
 
-        ! create a list of adsorbates affected by desorption
-        change_list = 0
-        i_change = 0
-
-        ! scan over neighbors
         lst = lat%lst(lat%ads_list(ads)%row, lat%ads_list(ads)%col)
-        n_nn = lat%n_nn(lst,1)
-        do m=1,n_nn
-          ! position of neighbor m
-          call lat%neighbor(ads,m,row,col)
-          if (lat%occupations(row,col) > 0) then
-            i_change = i_change + 1
-            change_list(i_change) = lat%occupations(row,col)
-          end if
-        end do
+        ! initialize a logical array indicating adsorbates affected by desorption
+        rate_update_q = .false.
+        ! scan over neighbors before desorption
+        call this%update_neighbors(rate_update_q, ads, lst, lat)
 
         ! ---------- Do desorption:
         id_r = lat%ads_list(ads)%id
@@ -552,11 +538,11 @@ end if
           this%bimolecular%rate_info(ads)  = this%bimolecular%rate_info(this%n_ads_total)
         end if
 
+        ! account for the tightening the ads. list
+        rate_update_q(ads) = rate_update_q(this%n_ads_total)
         ! Update rate array for the affected adsorbates
-        do i=1,i_change
-          ! account for the tightening the ads. list
-          if (change_list(i) == this%n_ads_total) change_list(i) = ads
-          call this%construct_1(change_list(i), lat, e_pars)
+        do i=1,this%n_ads_total - 1
+          if (rate_update_q(i)) call this%construct_1(i, lat, e_pars)
         end do
         ! Reset the rate info for the last adsorbate
         call this%cleanup_rates(this%n_ads_total,lat)
@@ -576,23 +562,13 @@ end if
         end do
         end do extloop2
 
-        ! create a list of adsorbates affected by dissociation
-        change_list = 0
-        i_change = 1
-        ! Put the reactant's (which to become p1) ads  into the list
-        change_list(i_change) = ads
-
-        ! scan over neighbors of reactant
         lst = lat%lst(lat%ads_list(ads)%row, lat%ads_list(ads)%col)
-        n_nn = lat%n_nn(lst,1)
-        do m=1,n_nn
-          ! position of neighbor m
-          call lat%neighbor(ads,m,row,col)
-          if (lat%occupations(row,col) > 0) then
-            i_change = i_change + 1
-            change_list(i_change) = lat%occupations(row,col)
-          end if
-        end do
+        ! initialize a logical array indicating adsorbates affected by dissociation
+        rate_update_q = .false.
+        ! Put the dissociating particle into the list
+        rate_update_q(ads) = .true.
+        ! scan over neighbors before dissociation
+        call this%update_neighbors(rate_update_q, ads, lst, lat)
 
         ! Do dissociation:
         ! Find process number
@@ -624,24 +600,14 @@ end if
         lat%ads_list(this%n_ads_total)%ast = ast_p2
         lat%n_ads(id_p2) = lat%n_ads(id_p2) + 1
 
-        ! scan over new neighbors of product 2
-        do m=1,lat%n_nn_new(lst,m_nn)
-          ! position of neighbor with direction nn_new(lst,m_nn,m)
-          call lat%neighbor( this%n_ads_total, lat%nn_new(lst,m_nn,m), row, col)
-          if (lat%occupations(row,col) > 0) then
-            i_change = i_change + 1
-            change_list(i_change) = lat%occupations(row,col)
-          end if
-        end do
-        ! add product 2 to change_list
-        i_change = i_change + 1
-        change_list(i_change) = lat%occupations(row_p2,col_p2)
+        ! scan over neighbors after dissociation
+        call this%update_neighbors(rate_update_q, this%n_ads_total, lat%lst(row_p2,col_p2), lat)
 
         ! Reset the rate info for ads (product 1)
         call this%cleanup_rates(ads, lat)
         ! Update rate array for the affected adsorbates
-        do i=1,i_change
-          call this%construct_1(change_list(i), lat, e_pars)
+        do i=1,this%n_ads_total
+          if (rate_update_q(i)) call this%construct_1(i, lat, e_pars)
         end do
 
         ! Update reaction counter
@@ -657,39 +623,22 @@ end if
         end do
         end do extloop3
 
-        ! create a list of adsorbates affected by association
-        change_list = 0
-        i_change = 1
-        ! Put the reactant's (which is to become p1) ads  into the list
-        change_list(i_change) = ads
-
-        ! Get the direction to reactant 2
+        ! Get the position and number of reactant 2
         m_nn   = this%association%rate_info(ads)%list(channel)%m
-        ! scan over neighbors of reactant 1
+        call lat%neighbor(ads,m,row,col)
+        ads_r2 = lat%occupations(row,col)
+        ! Get reactants' lst
+        lst    = lat%lst(lat%ads_list(ads)%row,    lat%ads_list(ads)%col)
+        lst_r2 = lat%lst(lat%ads_list(ads_r2)%row, lat%ads_list(ads_r2)%col)
 
-        lst = lat%lst(lat%ads_list(ads)%row, lat%ads_list(ads)%col)
-        n_nn = lat%n_nn(lst,1)
-        do m=1,n_nn
-            ! position of neighbor m
-            call lat%neighbor(ads,m,row,col)
-            if (lat%occupations(row,col) > 0) then
-              if (m==m_nn) then ! m is reactant 2
-                ads_r2 = lat%occupations(row,col)
-              else              ! m is just a neighbor affected by reaction
-                i_change = i_change + 1
-                change_list(i_change) = lat%occupations(row,col)
-              end if
-            end if
-        end do
-        ! scan over new neighbors of reactant 2
-        do m=1,lat%n_nn_new(lst,m_nn)
-          ! position of neighbor with direction nn_new(lst,m_nn,m)
-          call lat%neighbor( ads_r2, lat%nn_new(lst,m_nn,m), row, col)
-          if (lat%occupations(row,col) > 0) then
-            i_change = i_change + 1
-            change_list(i_change) = lat%occupations(row,col)
-          end if
-        end do
+        ! initialize a logical array indicating adsorbates affected by dissociation
+        rate_update_q = .false.
+        ! account for reactants
+        rate_update_q(ads)    = .true.
+        rate_update_q(ads_r2) = .true.
+        ! scan over reactants' neighbors
+        call this%update_neighbors(rate_update_q,    ads,    lst, lat)
+        call this%update_neighbors(rate_update_q, ads_r2, lst_r2, lat)
 
         ! --------------Do association:
         ! Find process number
@@ -723,11 +672,12 @@ end if
         ! Reset the rate info for ads (product 1) and for the last adsorbate
         call this%cleanup_rates(ads,lat)
         call this%cleanup_rates(this%n_ads_total,lat)
+
+        ! account for the tightening the ads. list
+        rate_update_q(ads_r2) = rate_update_q(this%n_ads_total)
         ! Update rate array for the affected adsorbates
-        do i=1,i_change
-          ! account for the tightening the ads. list
-          if (change_list(i) == this%n_ads_total) change_list(i) = ads_r2
-          call this%construct_1(change_list(i), lat, e_pars)
+        do i=1,this%n_ads_total - 1
+          if (rate_update_q(i)) call this%construct_1(i, lat, e_pars)
         end do
         ! Update the the number of adsorbates
         this%n_ads_total = this%n_ads_total - 1
@@ -746,36 +696,23 @@ end if
         end do
         end do extloop4
 
-        ! create a list of adsorbates affected by bimolecular reaction
-        change_list = 0
-        i_change = 1
-        ! Put the  the first reactant's (which is to become p1) ads  into the list
-        change_list(i_change) = ads
-
-        ! Get the direction to reactant 2
+        ! Get the position and number of reactant 2
         m_nn   = this%bimolecular%rate_info(ads)%list(channel)%m
+        call lat%neighbor(ads,m,row,col)
+        ads_r2 = lat%occupations(row,col)
+        ! Get reactants' lst
+        lst    = lat%lst(lat%ads_list(ads)%row,    lat%ads_list(ads)%col)
+        lst_r2 = lat%lst(lat%ads_list(ads_r2)%row, lat%ads_list(ads_r2)%col)
 
-        ! scan over neighbors of reactant 1
-        lst = lat%lst(lat%ads_list(ads)%row, lat%ads_list(ads)%col)
-        n_nn = lat%n_nn(lst,1)
-        do m=1,n_nn
-            ! position of neighbor m
-            call lat%neighbor(ads,m,row,col)
-            if (lat%occupations(row,col) > 0) then
-              if (m==m_nn) ads_r2 = lat%occupations(row,col)
-              i_change = i_change + 1
-              change_list(i_change) = lat%occupations(row,col)
-            end if
-        end do
-        ! scan over new neighbors of reactant 2
-        do m=1,lat%n_nn_new(lst,m_nn)
-          ! position of neighbor with direction nn_new(lst,m_nn,m)
-          call lat%neighbor( ads_r2, lat%nn_new(lst,m_nn,m), row, col)
-          if (lat%occupations(row,col) > 0) then
-            i_change = i_change + 1
-            change_list(i_change) = lat%occupations(row,col)
-          end if
-        end do
+        ! initialize a logical array indicating adsorbates affected by bimolecular reaction
+        rate_update_q = .false.
+        ! account for reactants
+        rate_update_q(ads)    = .true.
+        rate_update_q(ads_r2) = .true.
+        ! scan over reactants' neighbors
+        call this%update_neighbors(rate_update_q,    ads,    lst, lat)
+        call this%update_neighbors(rate_update_q, ads_r2, lst_r2, lat)
+
 
         ! --------------Do bimolecular reaction:
         ! Find process number
@@ -802,8 +739,8 @@ end if
         call this%cleanup_rates(ads,lat)
         call this%cleanup_rates(ads_r2,lat)
         ! Update rate array for the affected adsorbates
-        do i=1,i_change
-          call this%construct_1(change_list(i), lat, e_pars)
+        do i=1,this%n_ads_total
+          if (rate_update_q(i)) call this%construct_1(i, lat, e_pars)
         end do
 
         ! Update reaction counter
@@ -820,20 +757,46 @@ end if
 
     ! Update the accumulated rates
     call this%accumulate_rates(lat)
+
+    deallocate(rate_update_q)
+
 ! Debug printing
-!if (debug(1)) then
-!  print*
-!  print*, 'After ', trim(reaction_names(reaction_id)),':'
-!  call lat%print_ocs
-!  call lat%print_ads
-!  print*, 'reactant 1:', ads
-!  print*, 'Number of affected adsorbates:', i_change
-!  print*, 'Change list:'
-!  print*, change_list
+if (debug(1)) then
+  print*
+  print*, 'After ', trim(reaction_names(reaction_id)),' #',this%counter(reaction_id,1), ':'
+  call lat%print_ocs
+  call lat%print_ads
+  print*, 'reactant 1:', ads
 !  !if (reaction_id==bimolecular_id) pause
-!end if
+end if
 
 
   end subroutine do_reaction
+
+
+
+!-----------------------------------------------------------------------------
+  subroutine update_neighbors(this, rate_update_q, ads, lst, lat)
+!-----------------------------------------------------------------------------
+
+    class(reaction_type),     intent(in)        :: this
+    logical, dimension(:),    intent(inout)     :: rate_update_q
+    integer,                  intent(in)        :: ads
+    integer,                  intent(in)        :: lst
+    class(mc_lat),            intent(in)        :: lat
+
+    integer:: shell, m, row, col
+
+    do shell=1,n_shells
+      do m=1,lat%n_nn(lst,shell)
+        ! position of neighbor m
+        call lat%neighbor(ads,m,row,col,shell)
+        if (lat%occupations(row,col) > 0) then
+          rate_update_q( lat%occupations(row,col) ) = .true.
+        end if
+      end do
+    end do
+
+  end subroutine update_neighbors
 
 end module reaction_class

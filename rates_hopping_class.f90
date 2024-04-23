@@ -376,15 +376,28 @@ contains
           ! Calculate energy of ads in new position
           energy_new = energy(ads, lat, e_pars)
 
+if (debug(2)) then
+  print*, '-----------construct debug(2)'
+  print*, 'pos new 1 ', lat%ads_list(1)%row, lat%ads_list(1)%col
+  print*, 'pos new 2 ', lat%ads_list(2)%row, lat%ads_list(2)%col
+  print *, 'ads ', ads, 'm ', m,  'E_old = ', energy_old, 'E_new = ', energy_new
+end if
           ! Apply detailed balance when
           ! energy in the old position < energy in the new position
           if (energy_old < energy_new) then
               this%rates(ads,m)%list(iads) = this%process(id, lst_old, ast_old, lst_new, ast_new)&
                   *exp( -beta*(energy_new - energy_old) )
-!                print*
-!                print*, 'id ',id, ' old site ',lst_old,' old ads. site ', ast_old
-!                print*, ' new site ',lst_new,' new ads. site ', ast_new
-!                print*, 'rate ',this%process(id, lst_old, ast_old, lst_new, ast_new)
+!                  if (row_old == 1 .and. lat%ads_list(ads)%row == 6.and. lat%ads_list(2)%row == 5  ) then
+!                    print*, '-----------------hopping'
+!                    print*, 'id ',id, ' old site ',lst_old,' old ads. site ', ast_old
+!                    print*, ' new site ',lst_new,' new ads. site ', ast_new
+!                    print*, 'pos_old ', row_old, col_old
+!                    print*, 'pos 1 ', lat%ads_list(1)%row, lat%ads_list(1)%col
+!                    print*, 'pos 2 ', lat%ads_list(2)%row, lat%ads_list(2)%col
+!                    print*, 'rate ',this%process(id, lst_old, ast_old, lst_new, ast_new)
+!                    print*, 'E_old ', energy_old, 'E_new ', energy_new, 'db factor ', exp( -beta*(energy_new - energy_old) )
+!                    print*, 'ads ', ads, 'm ', m, 'iads', iads, 'rate constant ', this%rates(ads,m)%list(iads)
+!                  end if
           else
               this%rates(ads,m)%list(iads) = this%process(id, lst_old, ast_old, lst_new, ast_new)
 !                print*, id,lst_old, ast_old, lst_new, ast_new,this%process(id, lst_old, ast_old, lst_new, ast_new)
