@@ -93,11 +93,6 @@ contains
         n_nn = lat%n_nn( lat%lst( lat%ads_list(ads)%row,lat%ads_list(ads)%col ), 1)
         do m=1,n_nn
           this%acc_rate(hopping_id) = this%acc_rate(hopping_id) + sum(this%hopping%rates(ads,m)%list)
-if (sum(this%hopping%rates(ads,m)%list) < 0) then
-  print*, 'lst ', lat%lst( lat%ads_list(ads)%row,lat%ads_list(ads)%col), &
-  'nn ',m, 'rate ', this%hopping%rates(ads,m)%list
-  read(*,*)
-end if
         end do
       end do
     end if

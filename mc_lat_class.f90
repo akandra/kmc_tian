@@ -103,7 +103,7 @@ contains
 
     ! Shell-wise number of neighbors for hex lattice with B-type steps
     lat%n_nn(terrace_site,:) = [6,6,6]
-    lat%n_nn(   step_site,:) = [5,5,5]
+    lat%n_nn(   step_site,:) = [5,5,7]
     lat%n_nn( corner_site,:) = [4,4,6]
     lat%n_nn(    ts1_site,:) = [6,7,4]
     lat%n_nn(    ts2_site,:) = [6,6,6]
@@ -116,7 +116,7 @@ contains
     lat%n_nn(   tc1A_site,:) = [6,6,6]
     lat%n_nn(   tc2A_site,:) = [6,6,6]
 
-    lat%n_max_nn = 6
+    lat%n_max_nn = 7
 
     allocate(lat%shell_list(n_max_lat_site_types, n_shells, maxval(lat%n_nn), 2))
 
@@ -173,13 +173,15 @@ contains
     ! NN list for the hexagonal structure (row,col)
 
     ! ts2   ts1    s      c     tc1
+    !                   04***
+    !
     !  11    12    13***  14**  15
     !
     !     21    22**   23*   24*   25***
     !
     !        31*** 32*   33    34**   35
     !
-    !           41**  42*   43*   44   45
+    !           41**  42*   43*   44*** 45
     !
     !              51*** 52**  53*** 54    55
 
@@ -201,6 +203,8 @@ contains
     lat%shell_list(step_site,3,3,:) = (/-2, 0/) ! step -> step (d=2)
     lat%shell_list(step_site,3,4,:) = (/ 2,-2/) ! step -> ts2  (d=2)
     lat%shell_list(step_site,3,5,:) = (/ 0,-2/) ! step -> ts2  (d=2)
+    lat%shell_list(step_site,3,6,:) = (/-3, 1/) ! step -> corner (d>2)
+    lat%shell_list(step_site,3,7,:) = (/ 1, 1/) ! step -> corner (d>2)
 
     ! corner
     ! NN list for the hexagonal 111-structure (row,col)
@@ -832,14 +836,20 @@ contains
     integer, intent(in)  :: lst1,lst2
     logical :: mc_lat_adjacent
 
-    integer, dimension(1) :: col_lst1
+    integer :: ifirst, ilast
+    integer, dimension(:), allocatable :: col_lst1
 
-
-    col_lst1 = findloc(this%lst(1,:), lst1)
+    col_lst1 = get_indices(lst1, this%lst(1,:))
+    ifirst = col_lst1(1)
+    ilast  = col_lst1( size(col_lst1) )
 
     mc_lat_adjacent = .false.
-    if (this%lst(1, modulo(col_lst1(1) + 1 - 1, this%n_cols) + 1) == lst2) mc_lat_adjacent = .true.
-    if (this%lst(1, modulo(col_lst1(1) - 1 - 1, this%n_cols) + 1) == lst2) mc_lat_adjacent = .true.
+    if (this%lst(1, modulo(ifirst + 1 - 1, this%n_cols) + 1) == lst2) mc_lat_adjacent = .true.
+    if (this%lst(1, modulo(ifirst - 1 - 1, this%n_cols) + 1) == lst2) mc_lat_adjacent = .true.
+    if (this%lst(1, modulo(ilast  + 1 - 1, this%n_cols) + 1) == lst2) mc_lat_adjacent = .true.
+    if (this%lst(1, modulo(ilast  - 1 - 1, this%n_cols) + 1) == lst2) mc_lat_adjacent = .true.
+
+    deallocate(col_lst1)
 
   end function
 

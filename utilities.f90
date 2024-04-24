@@ -255,6 +255,22 @@ contains
   end function get_index
 
 !------------------------------------------------------------------------------
+  function get_indices (i, list)
+!------------------------------------------------------------------------------
+    integer, intent(in)  :: i
+    integer, intent(in)  :: list(:)
+    integer              :: j, index
+    integer, dimension(:),   allocatable :: indices
+    integer, dimension(:),   allocatable :: get_indices
+
+    indices = merge( 0, [ ( j, j = 1, size(list) ) ], list /= i )
+    get_indices = pack(indices, indices /= 0)
+
+    deallocate(indices)
+
+  end function get_indices
+
+!------------------------------------------------------------------------------
   subroutine error_message(file_name, line_number, line, message, warning, stop)
 !------------------------------------------------------------------------------
     character(*), intent(in)      :: file_name
