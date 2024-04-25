@@ -68,6 +68,8 @@ module mc_lat_class
       procedure :: rdf_hist
       procedure :: conf_init  => mc_lat_conf_init
       procedure, nopass, public :: mc_lat_init
+      procedure :: update_neighbors
+
 
   end type mc_lat
 
@@ -1184,6 +1186,29 @@ contains
   end do
 
   end subroutine
+
+!-----------------------------------------------------------------------------
+  subroutine update_neighbors(this, rate_update_q, ads, lst)
+!-----------------------------------------------------------------------------
+
+    class(mc_lat),            intent(in)        :: this
+    logical, dimension(:),    intent(inout)     :: rate_update_q
+    integer,                  intent(in)        :: ads
+    integer,                  intent(in)        :: lst
+
+    integer:: shell, m, row, col
+
+    do shell=1,n_shells
+      do m=1,this%n_nn(lst,shell)
+        ! position of neighbor m
+        call this%neighbor(ads,m,row,col,shell)
+        if (this%occupations(row,col) > 0) then
+          rate_update_q( this%occupations(row,col) ) = .true.
+        end if
+      end do
+    end do
+
+  end subroutine update_neighbors
 
 end module mc_lat_class
 

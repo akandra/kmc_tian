@@ -12,12 +12,10 @@ public:: code_checks
 
 contains
 
-subroutine code_checks(lat, c_pars, e_pars)
+subroutine code_checks(lat, c_pars)
 
   type(mc_lat), intent(inout) :: lat
   type(control_parameters), intent(in) :: c_pars
-  type(energy_parameters ), intent(in)    :: e_pars
-
 
   call check_nn_new_list(lat,c_pars)
 

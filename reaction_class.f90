@@ -45,7 +45,6 @@ module reaction_class
     procedure :: construct_1
     procedure :: cleanup_rates
     procedure :: do_reaction
-    procedure :: update_neighbors
 
   end type
 
@@ -480,7 +479,7 @@ end if
         ! Put the hopping particle into the list
         rate_update_q(ads) = .true.
         ! scan over neighbors before hop
-        call this%update_neighbors(rate_update_q, ads, lst, lat)
+        call lat%update_neighbors(rate_update_q, ads, lst)
         ! Make a hop:
         ! Delete an adsorbate from its old position
         lat%occupations(lat%ads_list(ads)%row, lat%ads_list(ads)%col) = 0
@@ -492,7 +491,7 @@ end if
         lat%occupations(row_new, col_new) = ads
 
         ! scan over neighbors after hop
-        call this%update_neighbors(rate_update_q, ads, lst_new, lat)
+        call lat%update_neighbors(rate_update_q, ads, lst_new)
 
         ! Reset the rate info for ads
         call this%cleanup_rates(ads,lat)
@@ -521,7 +520,7 @@ end if
         ! initialize a logical array indicating adsorbates affected by desorption
         rate_update_q = .false.
         ! scan over neighbors before desorption
-        call this%update_neighbors(rate_update_q, ads, lst, lat)
+        call lat%update_neighbors(rate_update_q, ads, lst)
 
         ! ---------- Do desorption:
         id_r = lat%ads_list(ads)%id
@@ -573,7 +572,7 @@ end if
         ! Put the dissociating particle into the list
         rate_update_q(ads) = .true.
         ! scan over neighbors before dissociation
-        call this%update_neighbors(rate_update_q, ads, lst, lat)
+        call lat%update_neighbors(rate_update_q, ads, lst)
 
         ! Do dissociation:
         ! Find process number
@@ -606,7 +605,7 @@ end if
         lat%n_ads(id_p2) = lat%n_ads(id_p2) + 1
 
         ! scan over neighbors after dissociation
-        call this%update_neighbors(rate_update_q, this%n_ads_total, lat%lst(row_p2,col_p2), lat)
+        call lat%update_neighbors(rate_update_q, this%n_ads_total, lat%lst(row_p2,col_p2))
 
         ! Reset the rate info for ads (product 1)
         call this%cleanup_rates(ads, lat)
@@ -642,8 +641,8 @@ end if
         rate_update_q(ads)    = .true.
         rate_update_q(ads_r2) = .true.
         ! scan over reactants' neighbors
-        call this%update_neighbors(rate_update_q,    ads,    lst, lat)
-        call this%update_neighbors(rate_update_q, ads_r2, lst_r2, lat)
+        call lat%update_neighbors(rate_update_q,    ads,    lst)
+        call lat%update_neighbors(rate_update_q, ads_r2, lst_r2)
 
         ! --------------Do association:
         ! Find process number
@@ -715,8 +714,8 @@ end if
         rate_update_q(ads)    = .true.
         rate_update_q(ads_r2) = .true.
         ! scan over reactants' neighbors
-        call this%update_neighbors(rate_update_q,    ads,    lst, lat)
-        call this%update_neighbors(rate_update_q, ads_r2, lst_r2, lat)
+        call lat%update_neighbors(rate_update_q,    ads,    lst)
+        call lat%update_neighbors(rate_update_q, ads_r2, lst_r2)
 
 
         ! --------------Do bimolecular reaction:
@@ -777,31 +776,5 @@ end if
 
 
   end subroutine do_reaction
-
-
-
-!-----------------------------------------------------------------------------
-  subroutine update_neighbors(this, rate_update_q, ads, lst, lat)
-!-----------------------------------------------------------------------------
-
-    class(reaction_type),     intent(in)        :: this
-    logical, dimension(:),    intent(inout)     :: rate_update_q
-    integer,                  intent(in)        :: ads
-    integer,                  intent(in)        :: lst
-    class(mc_lat),            intent(in)        :: lat
-
-    integer:: shell, m, row, col
-
-    do shell=1,n_shells
-      do m=1,lat%n_nn(lst,shell)
-        ! position of neighbor m
-        call lat%neighbor(ads,m,row,col,shell)
-        if (lat%occupations(row,col) > 0) then
-          rate_update_q( lat%occupations(row,col) ) = .true.
-        end if
-      end do
-    end do
-
-  end subroutine update_neighbors
 
 end module reaction_class
