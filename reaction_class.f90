@@ -462,7 +462,9 @@ end if
                 if (debug(1)) then
                   print*
                   print*, 'ads ', ads, 'm_nn ', m_nn, 'iads', iads
-                  print*, 'rate ', this%hopping%rates(ads,:)%list(iads)
+                  do i=1, size(this%hopping%rates(ads,:))
+                    print*, 'rate ', this%hopping%rates(ads,i)%list(iads)
+                  end do
                 end if
                 exit extloop
               end if
