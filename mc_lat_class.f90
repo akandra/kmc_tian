@@ -575,7 +575,8 @@ contains
     character(len=max_string_length) :: ads_names_in(100)
     integer, allocatable :: n_ads_in(:)
     integer :: ios, iconf, i, idummy, conf
-    integer :: counter, s_counter, current_species, ads_site
+!dja    integer :: counter, s_counter, current_species, ads_site
+    integer :: counter,  ads_site
     integer :: i_rand, species, row, col
 
     ! Clean up lattice structure

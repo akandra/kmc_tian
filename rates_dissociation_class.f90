@@ -466,13 +466,14 @@ contains
 !-------------------------------------------------------------------------------
 !  subroutine construct
 !-------------------------------------------------------------------------------
-  subroutine construct(this, ads, lat, e_pars, beta)
+!dja  subroutine construct(this, ads, lat, e_pars, beta)
+  subroutine construct(this, ads, lat)
 
     class(dissociation_type), intent(inout) :: this
     integer, intent(in) :: ads
     class(mc_lat), intent(inout) :: lat
-    class(energy_parameters), intent(in) :: e_pars
-    real(dp), intent(in) :: beta
+!dja    class(energy_parameters), intent(in) :: e_pars
+!dja    real(dp), intent(in) :: beta
 
     integer :: id_r, id_p1, id_p2, m, iprocs, i_ast_p1, i_ast_p2
     integer :: row, col, lst, ast

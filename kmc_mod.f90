@@ -31,11 +31,11 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
   integer :: time_segment, time_segment_old, time_segment_new
   integer :: i, species, species1, species2
   integer :: kmc_nsteps
-  integer, dimension(lat%n_rows,lat%n_cols) :: cluster_label
-  ! Warning: size of cluster_sizes and hist array are large
-  !          consider a way to decrease them
-  integer, dimension(lat%n_rows*lat%n_cols) :: cluster_sizes
-  integer :: largest_label
+!dja  integer, dimension(lat%n_rows,lat%n_cols) :: cluster_label
+!dja  ! Warning: size of cluster_sizes and hist array are large
+!dja   !          consider a way to decrease them
+!dja  integer, dimension(lat%n_rows*lat%n_cols) :: cluster_sizes
+!dja  integer :: largest_label
   integer, dimension(c_pars%n_species,lat%n_rows*lat%n_cols) :: hist
   real(dp) :: time, end_of_time, time_bin, time_shift
   real(dp) :: delta_t
@@ -45,8 +45,8 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
 
   integer, dimension(c_pars%n_species,c_pars%n_species,c_pars%rdf_n_bins) :: rdf_hist
 
-  integer :: j, k, n_chan  ! only for debug printout
-
+!dja  integer :: j, k, n_chan  ! only for debug printout
+  integer :: j, k  ! only for debug printout
   ! initialize vector of conditions for debug trap
   debug = .false.
 

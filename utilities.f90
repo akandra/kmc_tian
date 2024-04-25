@@ -259,7 +259,7 @@ contains
 !------------------------------------------------------------------------------
     integer, intent(in)  :: i
     integer, intent(in)  :: list(:)
-    integer              :: j, index
+    integer              :: j   !dja , index
     integer, dimension(:),   allocatable :: indices
     integer, dimension(:),   allocatable :: get_indices
 

@@ -83,7 +83,8 @@ contains
     class(reaction_type),     intent(inout) :: this
     class(mc_lat),            intent(inout) :: lat
 
-    integer :: i, m, ads, channel, n_nn
+!dja    integer :: i, m, ads, channel, n_nn
+    integer :: m, ads, channel, n_nn
 
     ! initialize the accumulated rate for hopping
     this%acc_rate(hopping_id) = 0.0_dp
@@ -158,15 +159,15 @@ contains
 
     integer       :: ads
     ! Debugging variables
-    integer :: chan, i, m
-    integer :: r_id, r_ast, r_lst
-    integer :: p1_id, p1_ast, p1_lst
-    integer :: p2_id, p2_ast, p2_lst
-    integer :: r1_id, r1_ast, r1_lst
-    integer :: r2_id, r2_ast, r2_lst
-    real(dp) :: rate
-    character(len=max_string_length) :: lst_name, lst_p1_name, lst_p2_name, lst_r1_name, lst_r2_name
-    character(len=max_string_length) :: ast_r_name, ast_r1_name, ast_r2_name, ast_p1_name, ast_p2_name
+!dja    integer :: chan, i, m
+!dja    integer :: r_id, r_ast, r_lst
+!dja    integer :: p1_id, p1_ast, p1_lst
+!dja    integer :: p2_id, p2_ast, p2_lst
+!dja    integer :: r1_id, r1_ast, r1_lst
+!dja    integer :: r2_id, r2_ast, r2_lst
+!dja    real(dp) :: rate
+!dja    character(len=max_string_length) :: lst_name, lst_p1_name, lst_p2_name, lst_r1_name, lst_r2_name
+!dja    character(len=max_string_length) :: ast_r_name, ast_r1_name, ast_r2_name, ast_p1_name, ast_p2_name
 
     ! Hopping
     if (this%hopping%is_defined) then
@@ -186,7 +187,8 @@ contains
     if (this%dissociation%is_defined) then
 
       do ads = 1, this%n_ads_total
-        call this%dissociation%construct(ads, lat, e_pars, this%beta)
+!dja    call this%dissociation%construct(ads, lat, e_pars, this%beta)
+        call this%dissociation%construct(ads, lat)
       end do
 
     end if
@@ -195,7 +197,8 @@ contains
     if (this%association%is_defined) then
 
       do ads = 1, this%n_ads_total
-        call this%association%construct(ads, lat, e_pars, this%beta)
+!dja    call this%association%construct(ads, lat, e_pars, this%beta)
+        call this%association%construct(ads, lat)
       end do
 
     end if
@@ -204,7 +207,8 @@ contains
     if (this%bimolecular%is_defined) then
 
       do ads = 1, this%n_ads_total
-        call this%bimolecular%construct(ads, lat, e_pars, this%beta)
+!dja    call this%bimolecular%construct(ads, lat, e_pars, this%beta)
+        call this%bimolecular%construct(ads, lat)
       end do
 
     end if
@@ -359,11 +363,14 @@ contains
     ! Desorption
     if (this%desorption%is_defined)   call this%desorption%construct(ads, lat, e_pars, this%beta)
     ! Dissociation
-    if (this%dissociation%is_defined) call this%dissociation%construct(ads, lat, e_pars, this%beta)
+!djaif (this%dissociation%is_defined) call this%dissociation%construct(ads, lat, e_pars, this%beta)
+    if (this%dissociation%is_defined) call this%dissociation%construct(ads, lat)
     ! Association
-    if (this%association%is_defined)  call this%association%construct(ads, lat, e_pars, this%beta)
+!djaif (this%association%is_defined)  call this%association%construct(ads, lat, e_pars, this%beta)
+    if (this%association%is_defined)  call this%association%construct(ads, lat)
     ! Bimolecular
-    if (this%bimolecular%is_defined)  call this%bimolecular%construct(ads, lat, e_pars, this%beta)
+!djaif (this%bimolecular%is_defined)  call this%bimolecular%construct(ads, lat, e_pars, this%beta)
+    if (this%bimolecular%is_defined)  call this%bimolecular%construct(ads, lat)
 
   end subroutine construct_1
 
@@ -398,7 +405,8 @@ contains
     class(energy_parameters), intent(in)    :: e_pars
 
     integer :: i, m, ads, iads, reaction_id, channel
-    integer :: n_nn, n_nn2, m_nn, col_p2, row_p2, proc, ads_r2
+!dja    integer :: n_nn, n_nn2, m_nn, col_p2, row_p2, proc, ads_r2
+    integer :: n_nn, m_nn, col_p2, row_p2, proc, ads_r2
     integer :: id_r, id_r1, id_r2, id_p1, id_p2
     integer :: ast_p1, ast_p2
     integer :: row, col, row_new, col_new, lst_new, ast_new
