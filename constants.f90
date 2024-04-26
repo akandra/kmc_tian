@@ -19,9 +19,9 @@ module constants
 
   ! Version number taken from a preprocessor variable
   ! Linux
-  !character(len=40), parameter :: version = __GIT_VERSION__
+  character(len=40), parameter :: version = __GIT_VERSION__
   ! Windows
-  character(len=40), parameter :: version =  ""
+  !character(len=40), parameter :: version =  ""
 
   !-------- Site type info ---------!
 

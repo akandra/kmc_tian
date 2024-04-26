@@ -1,6 +1,6 @@
 # git version enviromental variable
 ifneq ("$(wildcard .git)","")
-	GIT_VERSION := "$(shell git describe --dirty --always --tags)"
+	GIT_VERSION := "$(shell git describe --always --tags)"
 else
 	GIT_VERSION := "no git version info available"
 endif
