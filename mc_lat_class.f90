@@ -499,12 +499,6 @@ contains
     lat%lst = terrace_site
     if ( c_pars%step_period > 5) then
       do j=1,lat%n_cols,c_pars%step_period
-!          lat%lst(:,j)   = step_site
-!          lat%lst(:,j+1) = corner_site
-!          lat%lst(:,j+2) = tc1_site
-!          lat%lst(:,j+3) = tc2_site
-!          lat%lst(:,j+c_pars%step_period-1) = ts1_site
-!          lat%lst(:,j+c_pars%step_period-2) = ts2_site
           lat%lst(:,j) = corner_site
           lat%lst(:,j+1) = tc1_site
           lat%lst(:,j+2) = tc2_site
@@ -518,6 +512,23 @@ contains
     else
       stop "mc_lat_init: step period between 1 and 5 not supported."
     end if
+
+    ! Check if adsorption energy is defined for each lst
+    do i=1,lat%n_rows
+    do j=1,lat%n_cols
+    do k=1,c_pars%n_species
+
+      if ( all(e_pars%ads_energy(k, lat%lst(i,j), :) == e_pars%undefined_energy)) then
+        print*
+        write(6,*) "Error! mc_lat_init: adsorption energy is not defined for ", &
+                   trim(c_pars%ads_names(k)), " at the ", trim(lat_site_names(lat%lst(i,j))), " site."
+        write(6,*) "Please, correct your energy file."
+        stop
+      end if
+
+    end do
+    end do
+    end do
 
     allocate(lat%avail_ads_sites(c_pars%n_species,n_site_types))
 
