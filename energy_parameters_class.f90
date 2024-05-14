@@ -211,7 +211,28 @@ contains
 
     energy_parameters_init%is_interaction = &
               any(.not.energy_parameters_init%int_energy_skip)
+
     ! Check the input consistency
+    loop1: do i1 =1,control_pars%n_species
+    do i1s=1,n_max_lat_site_types
+    do i1a=1,n_max_ads_sites
+    do i2 =1,control_pars%n_species
+    do i2s=1,n_max_lat_site_types
+    do i2a=1,n_max_ads_sites
+      if (any(.not. energy_parameters_init%int_energy_skip(i1,i1s,i1a, i2,i2s,i2a, :))) then
+
+        if (energy_parameters_init%ads_energy(i1,i1s,i1a) == default_dp) then
+          write(*,*) ' Warning: an interaction is defined with an undefined adsorption site'
+          exit loop1
+        end if
+
+      end if
+    end do
+    end do
+    end do
+    end do
+    end do
+    end do loop1
 
   end function
 

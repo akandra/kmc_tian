@@ -370,7 +370,7 @@ contains
                     e_pars%ads_energy(p1_id, lst(3), ast(3)) == e_pars%undefined_energy ) then
 
                   call error_message(file_name, line_number, buffer, &
-                                       " rate defined for site with undefined adsorption energy", &
+                                       "rate defined for site with undefined adsorption energy", &
                                        stop=.false., warning=.false.)
                     undefined_energy = .true.
                 end if

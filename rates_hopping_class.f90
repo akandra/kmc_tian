@@ -90,9 +90,9 @@ contains
     end do
 
     ! Allocate and initialize rates array
-    allocate( hopping_init%rates(lat%n_rows*lat%n_cols,lat%n_max_nn) )
+    allocate( hopping_init%rates(lat%n_rows*lat%n_cols,lat%n_max_nn+1) ) ! '+1' accounts for intra-site hops
     do i=1,lat%n_rows*lat%n_cols
-    do m=1,lat%n_max_nn
+    do m=1,lat%n_max_nn+1
       allocate( hopping_init%rates(i,m)%list(max_avail_ads_sites) )
       hopping_init%rates(i,m)%list = 0.0_dp
     end do
@@ -178,7 +178,7 @@ contains
                   e_pars%ads_energy(current_species_id, i3, i4) == e_pars%undefined_energy ) then
 
                   call error_message(file_name, line_number, buffer, &
-                                     " in hopping rate defined for site with undefined adsorption energy", &
+                                     "rate defined for site with undefined adsorption energy", &
                                      stop=.false., warning=.false.)
 
                   undefined_energy = .true.
@@ -343,6 +343,8 @@ contains
     ast_old = lat%ads_list(ads)%ast
     id      = lat%ads_list(ads)%id
 
+    ! Construct rates for hops to neighbors
+
     ! Delete particle ads from the old position
     ! we do it here since we never work with occupations inside the following loop
     lat%occupations(row_old,col_old) = 0
@@ -376,12 +378,13 @@ contains
           ! Calculate energy of ads in new position
           energy_new = energy(ads, lat, e_pars)
 
-if (debug(2)) then
-  print*, '-----------construct debug(2)'
-  print*, 'pos new 1 ', lat%ads_list(1)%row, lat%ads_list(1)%col
-  print*, 'pos new 2 ', lat%ads_list(2)%row, lat%ads_list(2)%col
-  print *, 'ads ', ads, 'm ', m,  'E_old = ', energy_old, 'E_new = ', energy_new
-end if
+          if (debug(2)) then
+            print*, '-----------construct debug(2)'
+            print*, 'pos new 1 ', lat%ads_list(1)%row, lat%ads_list(1)%col
+            print*, 'pos new 2 ', lat%ads_list(2)%row, lat%ads_list(2)%col
+            print *, 'ads ', ads, 'm ', m,  'E_old = ', energy_old, 'E_new = ', energy_new
+          end if
+
           ! Apply detailed balance when
           ! energy in the old position < energy in the new position
           if (energy_old < energy_new) then
@@ -423,6 +426,69 @@ end if
     end do ! m
 
     lat%occupations(row_old,col_old) = ads
+
+
+    ! Construct rates for intra-site hops
+
+    m = lat%n_nn(lst_old, 1) + 1
+
+    ! Loop over adsorption site types
+    do iads = 1, size(lat%avail_ads_sites(id,lst_old)%list)
+
+      ast_new = lat%avail_ads_sites(id,lst_old)%list(iads)
+
+      if ( ast_new == ast_old) then ! exclude a hop into the same ast
+
+        this%rates(ads,m)%list(iads) = 0
+
+      else
+
+        ! Move particle ads to adsorption site list(iads)
+        lat%ads_list(ads)%ast = ast_new
+
+        ! Calculate energy of ads in new position
+        energy_new = energy(ads, lat, e_pars)
+
+        if (debug(2)) then
+          print*, '-----------construct debug(2)'
+          print*, 'pos new 1 ', lat%ads_list(1)%row, lat%ads_list(1)%col
+          print*, 'pos new 2 ', lat%ads_list(2)%row, lat%ads_list(2)%col
+          print *, 'ads ', ads, 'm ', m,  'E_old = ', energy_old, 'E_new = ', energy_new
+        end if
+
+        ! Apply detailed balance when
+        ! energy in the old position < energy in the new position
+        if (energy_old < energy_new) then
+            this%rates(ads,m)%list(iads) = this%process(id, lst_old, ast_old, lst_old, ast_new)&
+                *exp( -beta*(energy_new - energy_old) )
+!                  if (row_old == 1 .and. lat%ads_list(ads)%row == 6.and. lat%ads_list(2)%row == 5  ) then
+!                    print*, '-----------------hopping'
+!                    print*, 'id ',id, ' old site ',lst_old,' old ads. site ', ast_old
+!                    print*, ' new site ',lst_new,' new ads. site ', ast_new
+!                    print*, 'pos_old ', row_old, col_old
+!                    print*, 'pos 1 ', lat%ads_list(1)%row, lat%ads_list(1)%col
+!                    print*, 'pos 2 ', lat%ads_list(2)%row, lat%ads_list(2)%col
+!                    print*, 'rate ',this%process(id, lst_old, ast_old, lst_new, ast_new)
+!                    print*, 'E_old ', energy_old, 'E_new ', energy_new, 'db factor ', exp( -beta*(energy_new - energy_old) )
+!                    print*, 'ads ', ads, 'm ', m, 'iads', iads, 'rate constant ', this%rates(ads,m)%list(iads)
+!                  end if
+        else
+            this%rates(ads,m)%list(iads) = this%process(id, lst_old, ast_old, lst_old, ast_new)
+!                print*, id,lst_old, ast_old, lst_new, ast_new,this%process(id, lst_old, ast_old, lst_new, ast_new)
+        end if
+
+!            print '(A,i4,A,i4,A,i4)', 'ads ',ads,' neighbor ',m,' ads. site ',lat%ads_list(ads)%ast
+!            print '(A,e18.4,A,e18.4)',' E_old = ', energy_old, ' E_new = ',energy_new
+!            print *,' r_hop = ',this%process(id, lst_old, ast_old, lst_new, ast_new),&
+!                                      ' rate = ', this%rates(ads,m)%list(iads)
+!            write(*,*) 'pause'
+!            read(*,*)
+      end if
+    end do ! iads
+
+    ! Return particle ads to the old position
+    lat%ads_list(ads)%ast = ast_old
+
 
   end subroutine construct
 

@@ -365,7 +365,7 @@ contains
                     e_pars%ads_energy(current_product2_id, i5, i6) == e_pars%undefined_energy ) then
 
                     call error_message(file_name, line_number, buffer, &
-                                       " rate defined for site with undefined adsorption energy", &
+                                       "rate defined for site with undefined adsorption energy", &
                                        stop=.false., warning=.false.)
 
                     undefined_energy = .true.

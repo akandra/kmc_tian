@@ -91,7 +91,7 @@ contains
     if (this%hopping%is_defined) then
       do ads=1,this%n_ads_total
         n_nn = lat%n_nn( lat%lst( lat%ads_list(ads)%row,lat%ads_list(ads)%col ), 1)
-        do m=1,n_nn
+        do m=1,n_nn+1 ! '+1' accounts for intra-site hops
           this%acc_rate(hopping_id) = this%acc_rate(hopping_id) + sum(this%hopping%rates(ads,m)%list)
         end do
       end do
@@ -382,7 +382,7 @@ contains
 
     integer :: m
 
-    do m=1,lat%n_max_nn
+    do m=1,lat%n_max_nn+1 ! '+1' accounts for intra-site hops
       this%hopping%rates(ads,m)%list = 0.0_dp
     end do
     this%desorption%rates(ads) = 0.0_dp
@@ -449,10 +449,12 @@ end if
         extloop: do ads=1,this%n_ads_total
           lst = lat%lst(lat%ads_list(ads)%row, lat%ads_list(ads)%col)
           n_nn = lat%n_nn(lst,1)
+          id_r  = lat%ads_list(ads)%id
+
+          ! hop to a neighbor cell
           do m_nn=1, n_nn
             ! a new position of particle (ads) after a hop to a neighbor (m_nn)
             call lat%neighbor(ads,m_nn,row_new,col_new)
-            id_r = lat%ads_list(ads)%id
             lst_new = lat%lst(row_new,col_new)
             do iads=1,size(lat%avail_ads_sites(id_r,lst_new)%list)
               ast_new = lat%avail_ads_sites(id_r,lst_new)%list(iads)
@@ -469,6 +471,24 @@ end if
               end if
             end do
           end do
+
+          ! hop within the same cell
+          do iads=1,size(lat%avail_ads_sites(id_r,lst)%list)
+            ast_new = lat%avail_ads_sites(id_r,lst)%list(iads)
+            temp_dp = temp_dp + this%hopping%rates(ads,n_nn+1)%list(iads)
+            if (u < temp_dp) then
+              if (debug(1)) then
+                print*
+                print*, 'ads ', ads, 'intra-site ', 'iads', iads
+                do i=1, size(this%hopping%rates(ads,:))
+                  print*, 'rate ', this%hopping%rates(ads,i)%list(iads)
+                end do
+              end if
+              m_nn = n_nn + 1
+              exit extloop
+            end if
+          end do
+
         end do extloop
 
         ! Update hopping rate constants
@@ -480,18 +500,27 @@ end if
         rate_update_q(ads) = .true.
         ! scan over neighbors before hop
         call lat%update_neighbors(rate_update_q, ads, lst)
-        ! Make a hop:
-        ! Delete an adsorbate from its old position
-        lat%occupations(lat%ads_list(ads)%row, lat%ads_list(ads)%col) = 0
-        ! Put the adsorbate in a new position
-        lat%ads_list(ads)%row  = row_new
-        lat%ads_list(ads)%col  = col_new
-        lat%ads_list(ads)%ast  = ast_new
-        ! Update adsorbate position
-        lat%occupations(row_new, col_new) = ads
 
-        ! scan over neighbors after hop
-        call lat%update_neighbors(rate_update_q, ads, lst_new)
+        ! make intra-site hop
+        if (m_nn == n_nn + 1) then
+          ! Put the adsorbate into a new ast
+          lat%ads_list(ads)%ast  = ast_new
+
+        ! make hop to a neighbor
+        else
+          ! Delete an adsorbate from its old position
+          lat%occupations(lat%ads_list(ads)%row, lat%ads_list(ads)%col) = 0
+          ! Put the adsorbate in a new position
+          lat%ads_list(ads)%row  = row_new
+          lat%ads_list(ads)%col  = col_new
+          lat%ads_list(ads)%ast  = ast_new
+          ! Update adsorbate position
+          lat%occupations(row_new, col_new) = ads
+
+          ! scan over neighbors after hop
+          call lat%update_neighbors(rate_update_q, ads, lst_new)
+
+        end if
 
         ! Reset the rate info for ads
         call this%cleanup_rates(ads,lat)
