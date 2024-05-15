@@ -259,14 +259,24 @@ contains
 !------------------------------------------------------------------------------
     integer, intent(in)  :: i
     integer, intent(in)  :: list(:)
-    integer              :: j   !dja , index
-    integer, dimension(:),   allocatable :: indices
-    integer, dimension(:),   allocatable :: get_indices
+    integer              :: j
+    integer, dimension(2) :: get_indices
 
-    indices = merge( 0, [ ( j, j = 1, size(list) ) ], list /= i )
-    get_indices = pack(indices, indices /= 0)
+    get_indices = 0
 
-    deallocate(indices)
+    do j=1,size(list)
+      if (list(j) == i) then
+        get_indices(1) = j
+        exit
+      end if
+    end do
+
+    do j=size(list),1,-1
+      if (list(j) == i) then
+        get_indices(2) = j
+        exit
+      end if
+    end do
 
   end function get_indices
 

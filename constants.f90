@@ -31,6 +31,7 @@ module constants
   character(len=10), dimension(n_max_lat_site_types), parameter :: &
             lat_site_names = [character(10):: 'terrace', 'step', 'corner', 'tc1', 'tc2', 'ts2', 'ts1',&
                                                          'stepA','cornerA','tc1A','tc2A','ts2A','ts1A']
+  character(len=10), parameter :: same_lst_mark = '*'
 
 
   ! Site type ids
@@ -88,6 +89,9 @@ module constants
   integer, parameter :: dissociation_id = 3
   integer, parameter :: association_id  = 4
   integer, parameter :: bimolecular_id  = 5
+
+  ! Check mark
+  character(len=2), parameter :: check_mark = '->'
 
 
   !-------- Temperature dependences info ---------!

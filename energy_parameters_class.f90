@@ -55,9 +55,8 @@ contains
     integer           :: parse_state_adsorption   =1
     integer           :: parse_state_interaction  =2
 
-
+    logical :: first_warning = .true.
     integer,  parameter:: default_int = 0
-    real(dp), parameter:: default_dp  = huge(0.0_dp)
 
     i = control_pars%n_species
     allocate(energy_parameters_init%ads_energy(i,n_max_lat_site_types,n_max_ads_sites))
@@ -68,12 +67,12 @@ contains
     allocate(energy_parameters_init%int_energy_skip(i,n_max_lat_site_types,n_max_ads_sites,&
                                                     i,n_max_lat_site_types,n_max_ads_sites,n_shells))
 
-    energy_parameters_init%ads_energy = default_dp
+    energy_parameters_init%undefined_energy = huge(0.0_dp)
+    energy_parameters_init%ads_energy = energy_parameters_init%undefined_energy
     energy_parameters_init%int_energy_law_id = default_int
-    energy_parameters_init%int_energy_pars = default_dp
+    energy_parameters_init%int_energy_pars = energy_parameters_init%undefined_energy
     energy_parameters_init%int_energy_skip = .true.
     energy_parameters_init%is_interaction  = .false.
-    energy_parameters_init%undefined_energy = default_dp
 
     !  read energy definitions from the input file
     file_name = control_pars%energy_file_name
@@ -128,7 +127,7 @@ contains
           if ( i2==0 ) &
               call error_message(file_name, line_number, buffer, &
                            "unknown adsorption site type in the adsorption section")
-          if (energy_parameters_init%ads_energy(current_species_id,i1,i2 ) /= default_dp)&
+          if (energy_parameters_init%ads_energy(current_species_id,i1,i2 ) /= energy_parameters_init%undefined_energy)&
               call error_message(file_name, line_number, buffer, "duplicated entry")
 
           read(words(3),*) energy_parameters_init%ads_energy(current_species_id,i1,i2 )
@@ -213,26 +212,31 @@ contains
               any(.not.energy_parameters_init%int_energy_skip)
 
     ! Check the input consistency
-    loop1: do i1 =1,control_pars%n_species
+    do i1 =1,control_pars%n_species
     do i1s=1,n_max_lat_site_types
     do i1a=1,n_max_ads_sites
-    do i2 =1,control_pars%n_species
-    do i2s=1,n_max_lat_site_types
-    do i2a=1,n_max_ads_sites
-      if (any(.not. energy_parameters_init%int_energy_skip(i1,i1s,i1a, i2,i2s,i2a, :))) then
-
-        if (energy_parameters_init%ads_energy(i1,i1s,i1a) == default_dp) then
-          write(*,*) ' Warning: an interaction is defined with an undefined adsorption site'
-          exit loop1
-        end if
-
+      if (energy_parameters_init%ads_energy(i1,i1s,i1a) == energy_parameters_init%undefined_energy) then
+        do i2 =1,control_pars%n_species
+        do i2s=1,n_max_lat_site_types
+        do i2a=1,n_max_ads_sites
+          if (any(.not. energy_parameters_init%int_energy_skip(i1,i1s,i1a, i2,i2s,i2a, :))) then
+            if (first_warning) then
+              write(*,'(A)') ' Warning:'
+              write(*,'(A)') '    file: '//trim(file_name)
+              first_warning = .false.
+            end if
+            write(*,'(A)')   '    interaction section: adsorption energy for '//&
+                                  trim(control_pars%ads_names(i1))//' '//&
+                                  trim(lat_site_names(i1s))//' '//trim(ads_site_names(i1a))//' '//&
+                                  'not defined'
+          end if
+        end do
+        end do
+        end do
       end if
     end do
     end do
     end do
-    end do
-    end do
-    end do loop1
 
   end function
 

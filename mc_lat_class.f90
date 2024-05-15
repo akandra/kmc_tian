@@ -851,19 +851,23 @@ contains
     logical :: mc_lat_adjacent
 
     integer :: ifirst, ilast
-    integer, dimension(:), allocatable :: col_lst1
+    integer, dimension(2) :: col_lst1
 
     col_lst1 = get_indices(lst1, this%lst(1,:))
     ifirst = col_lst1(1)
-    ilast  = col_lst1( size(col_lst1) )
+    ilast  = col_lst1(2)
+
+!    print *, 'adjacent: get_indices ', col_lst1
+!    print *, 'adjacent: length ', size(col_lst1)
 
     mc_lat_adjacent = .false.
-    if (this%lst(1, modulo(ifirst + 1 - 1, this%n_cols) + 1) == lst2) mc_lat_adjacent = .true.
-    if (this%lst(1, modulo(ifirst - 1 - 1, this%n_cols) + 1) == lst2) mc_lat_adjacent = .true.
-    if (this%lst(1, modulo(ilast  + 1 - 1, this%n_cols) + 1) == lst2) mc_lat_adjacent = .true.
-    if (this%lst(1, modulo(ilast  - 1 - 1, this%n_cols) + 1) == lst2) mc_lat_adjacent = .true.
+    if (ifirst /= 0) then
+      if (this%lst(1, modulo(ifirst + 1 - 1, this%n_cols) + 1) == lst2) mc_lat_adjacent = .true.
+      if (this%lst(1, modulo(ifirst - 1 - 1, this%n_cols) + 1) == lst2) mc_lat_adjacent = .true.
+      if (this%lst(1, modulo(ilast  + 1 - 1, this%n_cols) + 1) == lst2) mc_lat_adjacent = .true.
+      if (this%lst(1, modulo(ilast  - 1 - 1, this%n_cols) + 1) == lst2) mc_lat_adjacent = .true.
+    end if
 
-    deallocate(col_lst1)
 
   end function
 

@@ -35,6 +35,13 @@ module rates_hopping_class
     !                   .  .  .  .  .
     real(dp), dimension(:, :, :, :, :), allocatable :: process
 
+    !               (   n_species                       -> which species
+    !                   .  n_site_type                  -> where from
+    !                   .  .  n_adsorption_sites
+    !                   .  .  .  n_adsorption_sites )   -> where to
+    !                   .  .  .  .
+    real(dp), dimension(:, :, :, :), allocatable :: process_intra
+
   contains
     procedure :: construct
     procedure :: print
@@ -53,7 +60,7 @@ contains
 
     integer :: i, ios, nwords, line_number, i1, i2, i3, i4, m
 
-    integer :: species, st1, st2, ast1, ast2
+    integer :: species, st1, st2, ast1, ast2, col_st1(2)
     logical :: e_defined1, e_defined2, r_defined, undefined_rate, undefined_energy
 
     character(len=max_string_length)                :: buffer
@@ -76,6 +83,9 @@ contains
     real(dp), parameter   :: default_rate  = -1.0_dp
 
     integer :: max_avail_ads_sites
+
+    character(len=2) :: check_str
+    logical :: is_same_lst
 
     ! maximal number of available ads. sites
     max_avail_ads_sites = 1
@@ -101,8 +111,11 @@ contains
     allocate(hopping_init%process( c_pars%n_species,&
                                  n_max_lat_site_types, n_max_ads_sites,&
                                  n_max_lat_site_types, n_max_ads_sites) )
+    allocate(hopping_init%process_intra( c_pars%n_species,&
+                                 n_max_lat_site_types, n_max_ads_sites, n_max_ads_sites) )
 
-    hopping_init%process = default_rate
+    hopping_init%process       = default_rate
+    hopping_init%process_intra = default_rate
 
     !  read rate definitions from the input file
     file_name = c_pars%rate_file_name
@@ -160,9 +173,11 @@ contains
 
             case(hopping_id)
 
+              is_same_lst = words(3) == same_lst_mark
               i1 = get_index(words(1),lat_site_names)
               i2 = get_index(words(2),ads_site_names)
               i3 = get_index(words(3),lat_site_names)
+              if (is_same_lst) i3 = i1
               i4 = get_index(words(4),ads_site_names)
 
               if ( i1==0 .or. i2==0 .or. i3==0 .or. i4==0) &
@@ -170,9 +185,13 @@ contains
                            "wrong site name in the hopping section")
 
               ! check for duplicate entry
-              if (hopping_init%process(current_species_id,i1,i2,i3,i4 ) /= default_rate)&
-                call error_message(file_name, line_number, buffer, "duplicated entry (check symetry duplicates)")
-
+              if (is_same_lst) then
+                if (hopping_init%process_intra(current_species_id,i1,i2,i4 ) /= default_rate)&
+                  call error_message(file_name, line_number, buffer, "duplicated entry (check symmetry duplicates)")
+              else
+                if (hopping_init%process(current_species_id,i1,i2,i3,i4 ) /= default_rate)&
+                  call error_message(file_name, line_number, buffer, "duplicated entry (check symmetry duplicates)")
+              end if
               ! check energy is defined for initial and final site_type and ads_site
               if( e_pars%ads_energy(current_species_id, i1, i2) == e_pars%undefined_energy .or. &
                   e_pars%ads_energy(current_species_id, i3, i4) == e_pars%undefined_energy ) then
@@ -191,11 +210,19 @@ contains
                                             "Arrhenius must have 2 parameters")
                   read(words(5),*) pars(1)
                   read(words(6),*) pars(2)
-                  hopping_init%process(current_species_id,i1,i2,i3,i4 ) = &
-                              arrhenius(c_pars%temperature, pars(1:2))
-                  ! symmetrize
-                  hopping_init%process(current_species_id,i3,i4,i1,i2 ) = &
-                  hopping_init%process(current_species_id,i1,i2,i3,i4 )
+                  if (is_same_lst) then
+                    hopping_init%process_intra(current_species_id,i1,i2,i4 ) = &
+                                arrhenius(c_pars%temperature, pars(1:2))
+                    ! symmetrize
+                    hopping_init%process_intra(current_species_id,i1,i4,i2 ) = &
+                    hopping_init%process_intra(current_species_id,i1,i2,i4 )
+                  else
+                    hopping_init%process(current_species_id,i1,i2,i3,i4 ) = &
+                                arrhenius(c_pars%temperature, pars(1:2))
+                    ! symmetrize
+                    hopping_init%process(current_species_id,i3,i4,i1,i2 ) = &
+                    hopping_init%process(current_species_id,i1,i2,i3,i4 )
+                  end if
 
                 case (extArrhenius_id)
                   if (nwords/=7) call error_message(file_name, line_number, buffer,&
@@ -203,11 +230,19 @@ contains
                   read(words(5),*) pars(1)
                   read(words(6),*) pars(2)
                   read(words(7),*) pars(3)
-                  hopping_init%process(current_species_id,i1,i2,i3,i4 ) = &
-                              extArrhenius(c_pars%temperature, pars(1:3))
-                  ! symmetrize
-                  hopping_init%process(current_species_id,i3,i4,i1,i2 ) = &
-                  hopping_init%process(current_species_id,i1,i2,i3,i4 )
+                  if (is_same_lst) then
+                    hopping_init%process_intra(current_species_id,i1,i2,i4 ) = &
+                                extArrhenius(c_pars%temperature, pars(1:3))
+                    ! symmetrize
+                    hopping_init%process_intra(current_species_id,i1,i4,i2 ) = &
+                    hopping_init%process_intra(current_species_id,i1,i2,i4 )
+                  else
+                    hopping_init%process(current_species_id,i1,i2,i3,i4 ) = &
+                                extArrhenius(c_pars%temperature, pars(1:3))
+                    ! symmetrize
+                    hopping_init%process(current_species_id,i3,i4,i1,i2 ) = &
+                    hopping_init%process(current_species_id,i1,i2,i3,i4 )
+                  end if
 
                 case default
                   call error_message(file_name, line_number, buffer, "This should not happen! Check the code!")
@@ -285,7 +320,7 @@ contains
     !          print '(A)',  '--- Dear Sir, Madam:'
     !          print '(A)',  '      It is my duty to inform you that there are missing rate definitions in'
               print '(A)',  ' hopping: missing rate definitions'
-              print '(2A)', '    file name:', file_name
+              print '(2A)', '    file: ', file_name
               print '(A)',  '    missing definitions:'
               print '(/6x, A)', 'ads  lat_site    ads_site lat_site    ads_site'
 
@@ -296,6 +331,7 @@ contains
                     lat_site_names(st1), ads_site_names(ast1), &
                     lat_site_names(st2), ads_site_names(ast2)
                     !e_defined1, e_defined2, r_defined
+!            print '(A,L)', 'Is adjacent? ', lat%adjacent(st1,st2)
           end if
 
         end do
@@ -317,6 +353,62 @@ contains
 !      stop 'debugging stop'
 
     end if
+
+  ! Hopping rates report
+
+  write(*,'(A)') 'Hopping Rates Report.'
+  write(*,'(A)') '--------------------------'
+  do species=1,c_pars%n_species
+  do st1       = 1, n_max_lat_site_types
+
+    col_st1 = get_indices(st1,lat%lst(1,:))
+    if (col_st1(1) > 0) then
+
+      do i1=1,size(lat%avail_ads_sites(species,st1)%list)
+        ast1 = lat%avail_ads_sites(species,st1)%list(i1)
+
+          write(*,'(A11,A11,A4)') c_pars%ads_names(species),lat_site_names(st1),ads_site_names(ast1)
+
+          ! Intra-site hops
+          do i2=1,size(lat%avail_ads_sites(species,st1)%list)
+            ast2 = lat%avail_ads_sites(species,st1)%list(i2)
+            if (ast2 /= ast1) then
+              check_str = '  '
+              if (hopping_init%process_intra(species,st1,ast1,ast2) /= default_rate) check_str = check_mark
+              write(*,'(5X,A2,X,A11,A11,A4)') check_str, c_pars%ads_names(species), same_lst_mark, ads_site_names(ast2)
+            end if
+
+          end do
+
+          ! Inter-site hops
+          do m = -1,1
+
+!            i_lst = modulo(col_st1(1) + m + 1, lat%n_cols) -1
+
+            if (col_st1(1) + m == 0) then
+              st2 = lat%lst(1,lat%n_cols)
+            elseif (col_st1(1) + m == lat%n_cols) then
+              st2 = lat%lst(1,1)
+            else
+              st2 = lat%lst(1,col_st1(1)+m)
+            end if
+
+            do i2=1,size(lat%avail_ads_sites(species,st2)%list)
+              ast2 = lat%avail_ads_sites(species,st2)%list(i2)
+              check_str = '  '
+              if (hopping_init%process(species,st1,ast1,st2,ast2) /= default_rate) check_str = check_mark
+              write(*,'(5X,A2,X,A11,A11,A4)') check_str, c_pars%ads_names(species), lat_site_names(st2), ads_site_names(ast2)
+            end do
+
+          end do
+          write(*,*) ''
+
+      end do
+
+    end if
+
+  end do
+  end do
 
   end function hopping_init
 
@@ -459,31 +551,14 @@ contains
         ! Apply detailed balance when
         ! energy in the old position < energy in the new position
         if (energy_old < energy_new) then
-            this%rates(ads,m)%list(iads) = this%process(id, lst_old, ast_old, lst_old, ast_new)&
+            this%rates(ads,m)%list(iads) = this%process_intra(id, lst_old, ast_old, ast_new)&
                 *exp( -beta*(energy_new - energy_old) )
-!                  if (row_old == 1 .and. lat%ads_list(ads)%row == 6.and. lat%ads_list(2)%row == 5  ) then
-!                    print*, '-----------------hopping'
-!                    print*, 'id ',id, ' old site ',lst_old,' old ads. site ', ast_old
-!                    print*, ' new site ',lst_new,' new ads. site ', ast_new
-!                    print*, 'pos_old ', row_old, col_old
-!                    print*, 'pos 1 ', lat%ads_list(1)%row, lat%ads_list(1)%col
-!                    print*, 'pos 2 ', lat%ads_list(2)%row, lat%ads_list(2)%col
-!                    print*, 'rate ',this%process(id, lst_old, ast_old, lst_new, ast_new)
-!                    print*, 'E_old ', energy_old, 'E_new ', energy_new, 'db factor ', exp( -beta*(energy_new - energy_old) )
-!                    print*, 'ads ', ads, 'm ', m, 'iads', iads, 'rate constant ', this%rates(ads,m)%list(iads)
-!                  end if
         else
-            this%rates(ads,m)%list(iads) = this%process(id, lst_old, ast_old, lst_old, ast_new)
-!                print*, id,lst_old, ast_old, lst_new, ast_new,this%process(id, lst_old, ast_old, lst_new, ast_new)
+            this%rates(ads,m)%list(iads) = this%process_intra(id, lst_old, ast_old, ast_new)
         end if
 
-!            print '(A,i4,A,i4,A,i4)', 'ads ',ads,' neighbor ',m,' ads. site ',lat%ads_list(ads)%ast
-!            print '(A,e18.4,A,e18.4)',' E_old = ', energy_old, ' E_new = ',energy_new
-!            print *,' r_hop = ',this%process(id, lst_old, ast_old, lst_new, ast_new),&
-!                                      ' rate = ', this%rates(ads,m)%list(iads)
-!            write(*,*) 'pause'
-!            read(*,*)
       end if
+
     end do ! iads
 
     ! Return particle ads to the old position
