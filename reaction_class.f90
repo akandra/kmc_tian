@@ -419,6 +419,11 @@ contains
 
     allocate(rate_update_q(lat%n_rows*lat%n_cols))
 
+! Debug printing
+!debug(1) = (this%counter(reaction_id,1) == 9 .or. this%counter(reaction_id,1) == 8)
+!debug(2) = (this%counter(reaction_id,1) == 8)
+!debug(1) = .true.
+
     ! ------- Select the process
 
     ! random rate value to select a process
@@ -426,13 +431,9 @@ contains
     ! determine the type of reaction
     do reaction_id=1,n_reaction_types
       if (u < this%acc_rate(reaction_id)) exit
-      print*,reaction_id, this%acc_rate(reaction_id), u
+      if (debug(1)) print*,reaction_id, this%acc_rate(reaction_id), u
     end do
 
-! Debug printing
-!debug(1) = (this%counter(reaction_id,1) == 9 .or. this%counter(reaction_id,1) == 8)
-!debug(2) = (this%counter(reaction_id,1) == 8)
-!debug(1) = .true.
 if (debug(1)) then
   print*
   print*,'do reaction debugging printout:'

@@ -289,75 +289,10 @@ contains
     end if
 
 
-    ! ---------------------------------------------------------------------------------------------
-    ! Check the input consistency
-    ! ---------------------------------------------------------------------------------------------
-    !
-    ! Check if rates are defined for all values of site_types, ads_sites
-    !   for which adsorption energies are defined
-    ! Adsorpton energies (n_species x n_site_type x n_adsorption_sites)
-    ! real(dp), dimension(:,:,:), allocatable :: ads_energy
-    !
-    ! Note ads_energies could be allocated of n_site_types rather than n_max_lat_site_types
-    !
-
-    undefined_rate = .false.
-    do species   = 1, c_pars%n_species
-    do st1       = 1, n_max_lat_site_types
-    do st2       = st1, n_max_lat_site_types
-      if (lat%adjacent(st1,st2) .or. st1==st2) then
-        do ast1      = 1, n_max_ads_sites
-        do ast2      = 1, n_max_ads_sites
-
-          e_defined1 = e_pars%ads_energy(species, st1, ast1) /= e_pars%undefined_energy
-          e_defined2 = e_pars%ads_energy(species, st2, ast2) /= e_pars%undefined_energy
-          r_defined  = hopping_init%process (species, st1, ast1, st2, ast2) /= default_rate
-
-          if ( (e_defined1 .and. e_defined2) .and. (.not. r_defined)) then
-            if (.not. undefined_rate) then
-              undefined_rate = .true.
-              print*
-    !          print '(A)',  '--- Dear Sir, Madam:'
-    !          print '(A)',  '      It is my duty to inform you that there are missing rate definitions in'
-              print '(A)',  ' hopping: missing rate definitions'
-              print '(2A)', '    file: ', file_name
-              print '(A)',  '    missing definitions:'
-              print '(/6x, A)', 'ads  lat_site    ads_site lat_site    ads_site'
-
-            end if
-
-            print '(6x, a5, A10, 2x, a3, 6x, a10, 2x, a3, 6x, L1, 7x, L1, 7x, L1)' ,            &
-                    c_pars%ads_names(species),             &
-                    lat_site_names(st1), ads_site_names(ast1), &
-                    lat_site_names(st2), ads_site_names(ast2)
-                    !e_defined1, e_defined2, r_defined
-!            print '(A,L)', 'Is adjacent? ', lat%adjacent(st1,st2)
-          end if
-
-        end do
-        end do
-      end if
-    end do
-    end do
-    end do
-
-    if(undefined_rate) then
-      print '(A)', ' hopping: please supply the required rates'
- !     print '(/6x, A)', 'As always, I remain your humble servant, kMC Code'
- !     print *
-      stop 997
-
-    else
-      print '(A/)', ' hopping: passed required rates consistency check'
-!      print*
-!      stop 'debugging stop'
-
-    end if
-
   ! Hopping rates report
 
-  write(*,'(A)') 'Hopping Rates Report.'
-  write(*,'(A)') '--------------------------'
+  write(*,'(A)') '  Hopping Rates Report.'
+  write(*,'(A)') '  --------------------------'
   do species=1,c_pars%n_species
   do st1       = 1, n_max_lat_site_types
 
@@ -367,7 +302,7 @@ contains
       do i1=1,size(lat%avail_ads_sites(species,st1)%list)
         ast1 = lat%avail_ads_sites(species,st1)%list(i1)
 
-          write(*,'(A11,A11,A4)') c_pars%ads_names(species),lat_site_names(st1),ads_site_names(ast1)
+          write(*,'(2X,A11,A11,A4)') c_pars%ads_names(species),lat_site_names(st1),ads_site_names(ast1)
 
           ! Intra-site hops
           do i2=1,size(lat%avail_ads_sites(species,st1)%list)
@@ -383,15 +318,7 @@ contains
           ! Inter-site hops
           do m = -1,1
 
-!            i_lst = modulo(col_st1(1) + m + 1, lat%n_cols) -1
-
-            if (col_st1(1) + m == 0) then
-              st2 = lat%lst(1,lat%n_cols)
-            elseif (col_st1(1) + m == lat%n_cols) then
-              st2 = lat%lst(1,1)
-            else
-              st2 = lat%lst(1,col_st1(1)+m)
-            end if
+            st2 = lat%lst(1, modulo(col_st1(1) + m - 1, lat%n_cols) + 1)
 
             do i2=1,size(lat%avail_ads_sites(species,st2)%list)
               ast2 = lat%avail_ads_sites(species,st2)%list(i2)
@@ -409,6 +336,96 @@ contains
 
   end do
   end do
+
+
+! Became obsolete due to the Hopping Rates Report above
+    ! ---------------------------------------------------------------------------------------------
+    ! Check the input consistency
+    ! ---------------------------------------------------------------------------------------------
+    !
+    ! Check if rates are defined for all values of site_types, ads_sites
+    !   for which adsorption energies are defined
+    ! Adsorpton energies (n_species x n_site_type x n_adsorption_sites)
+    ! real(dp), dimension(:,:,:), allocatable :: ads_energy
+    !
+    ! Note ads_energies could be allocated of n_site_types rather than n_max_lat_site_types
+    !
+
+!    undefined_rate = .false.
+!    do species   = 1, c_pars%n_species
+!    do st1       = 1, n_max_lat_site_types
+!    do st2       = st1, n_max_lat_site_types
+!      if (lat%adjacent(st1,st2) .or. st1==st2) then
+!        do ast1      = 1, n_max_ads_sites
+!        do ast2      = 1, n_max_ads_sites
+!
+!          e_defined1 = e_pars%ads_energy(species, st1, ast1) /= e_pars%undefined_energy
+!          e_defined2 = e_pars%ads_energy(species, st2, ast2) /= e_pars%undefined_energy
+!          r_defined  = hopping_init%process (species, st1, ast1, st2, ast2) /= default_rate
+!
+!          if ( (e_defined1 .and. e_defined2) .and. (.not. r_defined)) then
+!            if (.not. undefined_rate) then
+!              undefined_rate = .true.
+!              print*
+!    !          print '(A)',  '--- Dear Sir, Madam:'
+!    !          print '(A)',  '      It is my duty to inform you that there are missing rate definitions in'
+!              print '(A)',  ' hopping: missing rate definitions'
+!              print '(2A)', '    file: ', file_name
+!              print '(A)',  '    missing definitions:'
+!              print '(/6x, A)', 'ads  lat_site    ads_site lat_site    ads_site'
+!
+!            end if
+!
+!            print '(6x, a5, A10, 2x, a3, 6x, a10, 2x, a3, 6x, L1, 7x, L1, 7x, L1)' ,            &
+!                    c_pars%ads_names(species),             &
+!                    lat_site_names(st1), ads_site_names(ast1), &
+!                    lat_site_names(st2), ads_site_names(ast2)
+!                    !e_defined1, e_defined2, r_defined
+!!            print '(A,L)', 'Is adjacent? ', lat%adjacent(st1,st2)
+!          end if
+!
+!        end do
+!        end do
+!      end if
+!    end do
+!    end do
+!    end do
+!
+!    if(undefined_rate) then
+!      print '(A)', ' hopping: please supply the required rates'
+! !     print '(/6x, A)', 'As always, I remain your humble servant, kMC Code'
+! !     print *
+!      stop 997
+!
+!    else
+!      print '(A/)', ' hopping: passed required rates consistency check'
+!!      print*
+!!      stop 'debugging stop'
+!
+!    end if
+
+  ! Replace default rates with zeros to escape negative rates
+
+    do species=1,c_pars%n_species
+    do st1=1, n_max_lat_site_types
+    do st2=1, n_max_lat_site_types
+    do i1=1,size(lat%avail_ads_sites(species,st1)%list)
+    do i2=1,size(lat%avail_ads_sites(species,st2)%list)
+
+      ast1 = lat%avail_ads_sites(species,st1)%list(i1)
+      ast2 = lat%avail_ads_sites(species,st2)%list(i2)
+
+      if (hopping_init%process(species,st1,ast1,st2,ast2) == default_rate)&
+        hopping_init%process(species,st1,ast1,st2,ast2) = 0.0_dp
+
+      if (hopping_init%process_intra(species,st1,ast1,ast2) == default_rate)&
+        hopping_init%process_intra(species,st1,ast1,ast2) = 0.0_dp
+
+    end do
+    end do
+    end do
+    end do
+    end do
 
   end function hopping_init
 

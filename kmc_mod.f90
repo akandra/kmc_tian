@@ -218,7 +218,8 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
     time_loop: do while ( time < end_of_time )
 
       ! propagate the time
-      delta_t = -log(ran1())/r%acc_rate(n_reaction_types)   ! when does a reaction should occur?
+      delta_t = -log(ran1())/r%acc_rate(n_reaction_types)   ! when does a reaction occur?
+!      write(*,*) 'Total rate: ', r%acc_rate(n_reaction_types), 'time step: ', delta_t
       time = time + delta_t
 
       ! set time to the final value at the end of trajectory
@@ -254,7 +255,8 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
 
         end if
 
-        ! Do write when switched to the next bin taking into account jumps over more than 1 by repeating output values
+        ! Write when switched to the next bin taking into account jumps over more than 1 bin
+        ! by repeating output values
         do ibin_current=ibin+1,ibin_new
 
           if (c_pars%show_progress > 0) call progress_bar(&
@@ -354,8 +356,8 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
       ! End the trajectory if there's no processes left
       if (r%acc_rate(n_reaction_types) == 0.0_dp) then
         print*
-        print *, 'total rate is zero: exiting kMC loop'
-        print*
+        print *, 'nothing to do, since total rate is zero: exiting kMC loop'
+!        print*
         exit
       end if
 
