@@ -90,7 +90,19 @@ module constants
   integer, parameter :: association_id  = 4
   integer, parameter :: bimolecular_id  = 5
 
-  ! Check mark
+  !-------- Hopping Rate Constants' Interaction Correction Laws ---------!
+
+  ! List of interaction laws
+  character(len=10), dimension(2), parameter :: &
+          rcic_law_names = [character(10)::'linear']
+  ! law ids and number of parameters
+  integer, parameter :: rcic_linear_id = 1
+  integer, parameter :: rcic_linear_npars = 2
+  ! Maximum number of parameters
+  integer, parameter :: n_max_rcic_pars = 2
+
+
+  !-------- Check mark
   character(len=2), parameter :: check_mark = '->'
 
 

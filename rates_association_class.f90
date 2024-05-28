@@ -5,7 +5,7 @@ module rates_association_class
   !---------------------------------------------------------------------------
   !  * controlled by the association keyword section of the .reaction file
   !  * p1 is assumed to be at the same lattice site as r1 with its adsorption
-  !    site type (ast) choosen from those specified in the .reaction file
+  !    site type (ast) chosen from those specified in the .reaction file
   !  * if there exists information that p1 is exclusively formed at one of the
   !    reactant sites, this reactant should be listed as r1; if there are two different
   !    rates, they should be listed separately in the input file

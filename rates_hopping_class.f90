@@ -18,6 +18,11 @@ module rates_hopping_class
     real(dp), dimension(:), allocatable :: list ! n_avail_ads_sites
   end type
 
+  type :: int_law
+    integer :: id                               ! law id
+    real(dp), dimension(n_max_rcic_pars) :: pars ! parameter list
+  end type
+
   type :: hopping_type
 
     logical :: is_defined = .false.
@@ -27,20 +32,23 @@ module rates_hopping_class
     !                          .  .
     type(v_list_dp), dimension(:, :), allocatable :: rates
 
-    !               (   n_species                       -> which species
-    !                   .  n_site_type                  -> where from
-    !                   .  .  n_adsorption_sites
-    !                   .  .  .  n_site_type            -> where to
-    !                   .  .  .  .  n_adsorption_sites )
-    !                   .  .  .  .  .
-    real(dp), dimension(:, :, :, :, :), allocatable :: process
+          !               (   n_species                       -> which species
+          !                   .  n_site_type                  -> where from
+          !                   .  .  n_adsorption_sites
+          !                   .  .  .  n_site_type            -> where to
+          !                   .  .  .  .  n_adsorption_sites )
+          !                   .  .  .  .  .
+    real(dp),       dimension(:, :, :, :, :), allocatable :: process
+    type(int_law),  dimension(:, :, :, :, :), allocatable :: rate_correction
 
-    !               (   n_species                       -> which species
-    !                   .  n_site_type                  -> where from
-    !                   .  .  n_adsorption_sites
-    !                   .  .  .  n_adsorption_sites )   -> where to
-    !                   .  .  .  .
-    real(dp), dimension(:, :, :, :), allocatable :: process_intra
+
+          !               (   n_species                       -> which species
+          !                   .  n_site_type                  -> where from
+          !                   .  .  n_adsorption_sites
+          !                   .  .  .  n_adsorption_sites )   -> where to
+          !                   .  .  .  .
+    real(dp),       dimension(:, :, :, :), allocatable :: process_intra
+    type(int_law),  dimension(:, :, :, :), allocatable :: rate_correction_intra
 
   contains
     procedure :: construct
@@ -117,6 +125,15 @@ contains
     hopping_init%process       = default_rate
     hopping_init%process_intra = default_rate
 
+    allocate(hopping_init%rate_correction( c_pars%n_species,&
+                                 n_max_lat_site_types, n_max_ads_sites,&
+                                 n_max_lat_site_types, n_max_ads_sites) )
+    allocate(hopping_init%rate_correction_intra( c_pars%n_species,&
+                                 n_max_lat_site_types, n_max_ads_sites, n_max_ads_sites) )
+
+    hopping_init%rate_correction       = int_law(default_int,default_rate)
+    hopping_init%rate_correction_intra = int_law(default_int,default_rate)
+
     !  read rate definitions from the input file
     file_name = c_pars%rate_file_name
     call open_for_read(inp_unit, file_name )
@@ -139,6 +156,29 @@ contains
         ! Split an input string
         words = ''
         call split_string(buffer, words, nwords)
+
+        if (words(1) == 'hopping') then
+
+          hopping_init%is_defined = .true.
+
+          if (parse_state /= parse_state_default) &
+            call error_message(file_name, line_number, buffer, &
+                       "invalid ending of the reaction section")
+          parse_state = parse_state_hopping
+          if (nwords/=2) call error_message(file_name, line_number, buffer, &
+                             "hopping key must have 1 parameter")
+
+          read(words(2),'(A)') current_species_name
+          current_species_id = get_index(current_species_name, c_pars%ads_names )
+          if (current_species_id == 0) call error_message(file_name, line_number, buffer, &
+                                                "inconsistent hopping key definition")
+
+          current_law_id = get_index(words(3), law_names )
+          if (current_law_id == 0) call error_message(file_name, line_number, buffer, &
+                                                "unknown temperature law")
+!            print*, 'name     =', current_species_name
+!            print*, 'id       =', current_species_id
+!            print*, c_pars%ads_names
 
         if (words(1) == 'hopping') then
 
