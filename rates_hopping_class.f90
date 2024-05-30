@@ -18,37 +18,41 @@ module rates_hopping_class
     real(dp), dimension(:), allocatable :: list ! n_avail_ads_sites
   end type
 
-  type :: int_law
-    integer :: id                               ! law id
+  type :: int_law_pars
+    integer                              :: id   ! law id
     real(dp), dimension(n_max_rcic_pars) :: pars ! parameter list
   end type
 
   type :: hopping_type
 
-    logical :: is_defined = .false.
+    logical :: is_defined           = .false.
+    logical :: has_temperature_law  = .false.
+    logical :: has_interaction_law  = .false.
+
     ! Hopping Rates
     !                          n_adsorbate              -> which particle
     !                          .  n_neighbor            -> where to
     !                          .  .
     type(v_list_dp), dimension(:, :), allocatable :: rates
 
-          !               (   n_species                       -> which species
-          !                   .  n_site_type                  -> where from
-          !                   .  .  n_adsorption_sites
-          !                   .  .  .  n_site_type            -> where to
-          !                   .  .  .  .  n_adsorption_sites )
-          !                   .  .  .  .  .
-    real(dp),       dimension(:, :, :, :, :), allocatable :: process
-    type(int_law),  dimension(:, :, :, :, :), allocatable :: rate_correction
+
+          !                    (   n_species                       -> which species
+          !                        .  n_site_type                  -> where from
+          !                        .  .  n_adsorption_sites
+          !                        .  .  .  n_site_type            -> where to
+          !                        .  .  .  .  n_adsorption_sites )
+          !                        .  .  .  .  .
+    real(dp),            dimension(:, :, :, :, :), allocatable :: process
+    type(int_law_pars),  dimension(:, :, :, :, :), allocatable :: rate_corr_pars
 
 
-          !               (   n_species                       -> which species
-          !                   .  n_site_type                  -> where from
-          !                   .  .  n_adsorption_sites
-          !                   .  .  .  n_adsorption_sites )   -> where to
-          !                   .  .  .  .
-    real(dp),       dimension(:, :, :, :), allocatable :: process_intra
-    type(int_law),  dimension(:, :, :, :), allocatable :: rate_correction_intra
+          !                    (   n_species                       -> which species
+          !                        .  n_site_type                  -> where from
+          !                        .  .  n_adsorption_sites
+          !                        .  .  .  n_adsorption_sites )   -> where to
+          !                        .  .  .  .
+    real(dp),            dimension(:, :, :, :), allocatable :: process_intra
+    type(int_law_pars),  dimension(:, :, :, :), allocatable :: rate_corr_pars_intra
 
   contains
     procedure :: construct
@@ -77,12 +81,15 @@ contains
 
     character(len=10)     :: current_species_name
     integer               :: current_species_id
-    integer               :: current_law_id
+    integer               :: temperature_law_id
+    integer               :: interaction_law_id
 
     integer               :: parse_state
-    integer, parameter    :: parse_state_ignore  = -1
-    integer, parameter    :: parse_state_default =  0
-    integer, parameter    :: parse_state_hopping =  hopping_id
+    integer, parameter    :: parse_state_ignore   = -1
+    integer, parameter    :: parse_state_default  =  0
+    integer, parameter    :: parse_state_hopping1 =  1
+    integer, parameter    :: parse_state_hopping2 =  2
+
 
 
     real(dp), dimension(3):: pars = 0.0_dp
@@ -95,7 +102,19 @@ contains
     character(len=2) :: check_str
     logical :: is_same_lst
 
-    ! maximal number of available ads. sites
+!    !-----------------------------------------------------------
+!    ! test the split string function
+!    !-----------------------------------------------------------
+!    words = ''
+!    buffer = 'hello world ! bye '
+!    call split_string(buffer, words, nwords)
+!    print *, 'buffer = ', buffer
+!    print '(3A10)', 'words  = ', words(1), words(2), words(3)
+!    print *, 'nwords = ', nwords
+
+
+
+    ! determine maximum number of available ads. sites
     max_avail_ads_sites = 1
 
     do i=1,c_pars%n_species
@@ -125,14 +144,14 @@ contains
     hopping_init%process       = default_rate
     hopping_init%process_intra = default_rate
 
-    allocate(hopping_init%rate_correction( c_pars%n_species,&
+    allocate(hopping_init%rate_corr_pars( c_pars%n_species,&
                                  n_max_lat_site_types, n_max_ads_sites,&
                                  n_max_lat_site_types, n_max_ads_sites) )
-    allocate(hopping_init%rate_correction_intra( c_pars%n_species,&
+    allocate(hopping_init%rate_corr_pars_intra( c_pars%n_species,&
                                  n_max_lat_site_types, n_max_ads_sites, n_max_ads_sites) )
 
-    hopping_init%rate_correction       = int_law(default_int,default_rate)
-    hopping_init%rate_correction_intra = int_law(default_int,default_rate)
+    hopping_init%rate_corr_pars       = int_law_pars(default_int,default_rate)
+    hopping_init%rate_corr_pars_intra = int_law_pars(default_int,default_rate)
 
     !  read rate definitions from the input file
     file_name = c_pars%rate_file_name
@@ -143,177 +162,235 @@ contains
     line_number = 0
     undefined_energy = .false.
 
+
+    !---------------------------------------------------------------------------
+    ! loop over all lines of rate input file
+    !---------------------------------------------------------------------------
+
     do while (ios == 0)
 
       read(inp_unit, '(A)', iostat=ios) buffer
+
       line_number = line_number + 1
-        ! ios < 0: end of record condition encountered or endfile condition detected
-        ! ios > 0: an error is detected
-        ! ios = 0  otherwise
+      ! ios = 0: valid record read
+      ! ios < 0: end of record condition encountered or end of file condition detected
+      ! ios > 0: an error is detected
 
       if (ios /= 0) exit
 
-        ! Split an input string
-        words = ''
-        call split_string(buffer, words, nwords)
+      ! Split an input string
+      words = ''
+      call split_string(buffer, words, nwords)
 
-        if (words(1) == 'hopping') then
+      ! skip lines that are commented out but preserve blank lines which signify end of section
+      if (nwords == 0 .and. buffer /= '') then
+        ! print *, 'line ', line_number, ' is a comment line'
+        cycle
+      end if
 
-          hopping_init%is_defined = .true.
+!      print *, 'line ', line_number, 'buffer = ', trim(buffer)
+!      print *, 'nwords =', nwords, 'words=', trim(words(1)),'  ',trim(words(2)),'  ',trim(words(3)),'  ',trim(words(4))
+!      print *
 
-          if (parse_state /= parse_state_default) &
-            call error_message(file_name, line_number, buffer, &
-                       "invalid ending of the reaction section")
-          parse_state = parse_state_hopping
-          if (nwords/=2) call error_message(file_name, line_number, buffer, &
-                             "hopping key must have 1 parameter")
+      select case (parse_state)
 
-          read(words(2),'(A)') current_species_name
-          current_species_id = get_index(current_species_name, c_pars%ads_names )
-          if (current_species_id == 0) call error_message(file_name, line_number, buffer, &
-                                                "inconsistent hopping key definition")
+        case(parse_state_default)
+          ! in parse state default:
+          !    word 'hopping' to mark beginning of a hopping section
+          !    ignore anything else until hopping section begins
 
-          current_law_id = get_index(words(3), law_names )
-          if (current_law_id == 0) call error_message(file_name, line_number, buffer, &
-                                                "unknown temperature law")
-!            print*, 'name     =', current_species_name
-!            print*, 'id       =', current_species_id
-!            print*, c_pars%ads_names
+          if (words(1) == 'hopping') then
+            hopping_init%is_defined = .true.
+            parse_state = parse_state_hopping1
 
-        if (words(1) == 'hopping') then
+            if (nwords == 2) then
+              read(words(2),'(A)') current_species_name
+              current_species_id = get_index(current_species_name, c_pars%ads_names)
+              if (current_species_id == 0) call error_message(file_name, line_number, buffer, &
+                                                              "inconsistent hopping key definition")
+            else
+              call error_message(file_name, line_number, buffer, &
+                         "hopping key must have 1 parameter -- species")
+            end if !nwords == 2
 
-          hopping_init%is_defined = .true.
+          end if !words(1)=='hopping'
 
-          if (parse_state /= parse_state_default) &
-            call error_message(file_name, line_number, buffer, &
-                       "invalid ending of the reaction section")
-          parse_state = parse_state_hopping
-          if (nwords/=3) call error_message(file_name, line_number, buffer, &
-                             "hopping key must have 2 parameters")
 
-          read(words(2),'(A)') current_species_name
-          current_species_id = get_index(current_species_name, c_pars%ads_names )
-          if (current_species_id == 0) call error_message(file_name, line_number, buffer, &
-                                                "inconsistent hopping definition")
+        case(parse_state_hopping1)
+          ! process:
+          !    temperature law records,
+          !    interaction law records,
+          !    section end (blank line)
 
-          current_law_id = get_index(words(3), law_names )
-          if (current_law_id == 0) call error_message(file_name, line_number, buffer, &
-                                                "unknown temperature law")
-!            print*, 'name     =', current_species_name
-!            print*, 'id       =', current_species_id
-!            print*, c_pars%ads_names
 
-        elseif (get_index(words(1),lat_site_names) /= 0) then
+          if (buffer == '') then
+            parse_state = parse_state_default
 
-          select case (parse_state)
+          elseif (words(1) =='temperature_law') then
+            temperature_law_id = get_index(words(2), law_names)
 
-            case(parse_state_ignore)
-              ! ignore
-              ! print *, 'warning ignoring line', line_number, buffer
+            if (temperature_law_id == 0) then
+              call error_message(file_name, line_number, buffer,&
+                                 "unknown temperature law")
+            else
+              hopping_init%has_temperature_law = .true.
 
-            case(hopping_id)
+            endif
 
-              is_same_lst = words(3) == same_lst_mark
-              i1 = get_index(words(1),lat_site_names)
-              i2 = get_index(words(2),ads_site_names)
-              i3 = get_index(words(3),lat_site_names)
-              if (is_same_lst) i3 = i1
-              i4 = get_index(words(4),ads_site_names)
+          elseif (words(1) =='interaction_law') then
+            interaction_law_id = get_index(words(2), law_names)
 
-              if ( i1==0 .or. i2==0 .or. i3==0 .or. i4==0) &
-                call error_message(file_name, line_number, buffer, &
-                           "wrong site name in the hopping section")
+            if (temperature_law_id == 0) then
+              call error_message(file_name, line_number, buffer,&
+                                 "unknown temperature law")
+            else
+              hopping_init%has_interaction_law=.true.
 
-              ! check for duplicate entry
-              if (is_same_lst) then
-                if (hopping_init%process_intra(current_species_id,i1,i2,i4 ) /= default_rate)&
-                  call error_message(file_name, line_number, buffer, "duplicated entry (check symmetry duplicates)")
-              else
-                if (hopping_init%process(current_species_id,i1,i2,i3,i4 ) /= default_rate)&
-                  call error_message(file_name, line_number, buffer, "duplicated entry (check symmetry duplicates)")
-              end if
-              ! check energy is defined for initial and final site_type and ads_site
-              if( e_pars%ads_energy(current_species_id, i1, i2) == e_pars%undefined_energy .or. &
-                  e_pars%ads_energy(current_species_id, i3, i4) == e_pars%undefined_energy ) then
+            endif
 
-                  call error_message(file_name, line_number, buffer, &
-                                     "rate defined for site with undefined adsorption energy", &
-                                     stop=.false., warning=.false.)
+          elseif (words(1) == 'hopping') then
+            call error_message(file_name, line_number, buffer,&
+                              "invalid ending of a hopping reaction section")
 
-                  undefined_energy = .true.
-              end if
+          endif
 
-              select case (current_law_id)
+          if ( hopping_init%has_temperature_law .and. hopping_init%has_interaction_law ) &
+            parse_state = parse_state_hopping2
 
-                case (Arrhenius_id)
-                  if (nwords/=6) call error_message(file_name, line_number, buffer,&
-                                            "Arrhenius must have 2 parameters")
-                  read(words(5),*) pars(1)
-                  read(words(6),*) pars(2)
-                  if (is_same_lst) then
-                    hopping_init%process_intra(current_species_id,i1,i2,i4 ) = &
-                                arrhenius(c_pars%temperature, pars(1:2))
-                    ! symmetrize
-                    hopping_init%process_intra(current_species_id,i1,i4,i2 ) = &
-                    hopping_init%process_intra(current_species_id,i1,i2,i4 )
-                  else
-                    hopping_init%process(current_species_id,i1,i2,i3,i4 ) = &
-                                arrhenius(c_pars%temperature, pars(1:2))
-                    ! symmetrize
-                    hopping_init%process(current_species_id,i3,i4,i1,i2 ) = &
-                    hopping_init%process(current_species_id,i1,i2,i3,i4 )
-                  end if
+        case(parse_state_hopping2)
+          ! in parse state hopping2 process:
+          !    section end (blank line)
+          !    from - to rate records,
 
-                case (extArrhenius_id)
-                  if (nwords/=7) call error_message(file_name, line_number, buffer,&
+          if (buffer == '') then
+            parse_state = parse_state_default
+
+          else
+            ! ---------------------------------------------------------
+            ! check if we have a valid from-to rate record
+            ! ---------------------------------------------------------
+            if (nwords < 4) &
+              call error_message(file_name, line_number, buffer, &
+                                 "invalid to-from rate record in the hopping section")
+            i1 = get_index(words(1),lat_site_names)
+            i2 = get_index(words(2),ads_site_names)
+            i3 = get_index(words(3),lat_site_names)
+            i4 = get_index(words(4),ads_site_names)
+            is_same_lst = (words(3) == same_lst_mark)
+            if (is_same_lst) i3=i1
+
+            ! check for invalid site name (invalid lst or ast in either from or to site)
+            if ( i1==0 .or. i2==0 .or. i3==0 .or. i4==0) &
+              call error_message(file_name, line_number, buffer, &
+                                 "wrong site name in the hopping section")
+
+            ! ---------------------------------------------------------
+            ! check for duplicate entry
+            ! ---------------------------------------------------------
+            if (is_same_lst) then
+              if (hopping_init%process_intra(current_species_id,i1,i2,i4 ) /= default_rate)&
+                call error_message(file_name, line_number, buffer, "duplicated entry (check symmetry duplicates)")
+            else
+              if (hopping_init%process(current_species_id,i1,i2,i3,i4 ) /= default_rate)&
+              call error_message(file_name, line_number, buffer, "duplicated entry (check symmetry duplicates)")
+            end if
+
+            ! check energy is defined for initial and final site_type and ads_site
+            if( e_pars%ads_energy(current_species_id, i1, i2) == e_pars%undefined_energy .or. &
+                e_pars%ads_energy(current_species_id, i3, i4) == e_pars%undefined_energy ) then
+              call error_message(file_name, line_number, buffer, &
+                               "rate defined for site with undefined adsorption energy", &
+                               stop=.false., warning=.false.)
+
+              undefined_energy = .true.
+            end if
+
+
+            ! ---------------------------------------------------------
+            ! we have a valid rate record. Apply the temperature law
+            ! ---------------------------------------------------------
+            select case (temperature_law_id)
+
+              case (Arrhenius_id)
+                if (nwords/=6) call error_message(file_name, line_number, buffer,&
+                                                  "Arrhenius must have 2 parameters")
+                read(words(5),*) pars(1)
+                read(words(6),*) pars(2)
+                if (is_same_lst) then
+                  hopping_init%process_intra(current_species_id,i1,i2,i4 ) = &
+                              arrhenius(c_pars%temperature, pars(1:2))
+                  ! symmetrize
+                  hopping_init%process_intra(current_species_id,i1,i4,i2 ) = &
+                  hopping_init%process_intra(current_species_id,i1,i2,i4 )
+                else
+                  hopping_init%process(current_species_id,i1,i2,i3,i4 ) = &
+                              arrhenius(c_pars%temperature, pars(1:2))
+                  ! symmetrize
+                  hopping_init%process(current_species_id,i3,i4,i1,i2 ) = &
+                  hopping_init%process(current_species_id,i1,i2,i3,i4 )
+                end if
+
+              case (extArrhenius_id)
+                if (nwords/=7) call error_message(file_name, line_number, buffer,&
                                             "extArrhenius must have 3 parameters")
-                  read(words(5),*) pars(1)
-                  read(words(6),*) pars(2)
-                  read(words(7),*) pars(3)
-                  if (is_same_lst) then
-                    hopping_init%process_intra(current_species_id,i1,i2,i4 ) = &
-                                extArrhenius(c_pars%temperature, pars(1:3))
-                    ! symmetrize
-                    hopping_init%process_intra(current_species_id,i1,i4,i2 ) = &
-                    hopping_init%process_intra(current_species_id,i1,i2,i4 )
-                  else
-                    hopping_init%process(current_species_id,i1,i2,i3,i4 ) = &
-                                extArrhenius(c_pars%temperature, pars(1:3))
-                    ! symmetrize
-                    hopping_init%process(current_species_id,i3,i4,i1,i2 ) = &
-                    hopping_init%process(current_species_id,i1,i2,i3,i4 )
-                  end if
+                read(words(5),*) pars(1)
+                read(words(6),*) pars(2)
+                read(words(7),*) pars(3)
 
-                case default
-                  call error_message(file_name, line_number, buffer, "This should not happen! Check the code!")
-
-              end select
-
-!                 print*, 'reaction: ', reaction_names(parse_state),&
-!                        ' for species:', current_species_name
-!                 print*, 'law: ', law_names(current_law_id),&
-!                        ' from:', lat_site_names(i1),ads_site_names(i2),&
-!                        ' to:'  , lat_site_names(i3),ads_site_names(i4)
-!                print'(A,3f16.3)', 'with pars: ', pars
+                if (is_same_lst) then
+                  hopping_init%process_intra(current_species_id,i1,i2,i4 ) = &
+                              extArrhenius(c_pars%temperature, pars(1:3))
+                  ! symmetrize
+                  hopping_init%process_intra(current_species_id,i1,i4,i2 ) = &
+                  hopping_init%process_intra(current_species_id,i1,i2,i4 )
+                else
+                  hopping_init%process(current_species_id,i1,i2,i3,i4 ) = &
+                              extArrhenius(c_pars%temperature, pars(1:3))
+                  ! symmetrize
+                  hopping_init%process(current_species_id,i3,i4,i1,i2 ) = &
+                  hopping_init%process(current_species_id,i1,i2,i3,i4 )
+                end if
 
               case default
-                call error_message(file_name, line_number, buffer, "invalid site type statement")
+                call error_message(file_name, line_number, buffer, "This should not happen! Check the code!")
 
-            end select
+            end select ! temperature_law_id
 
-        elseif (words(1) == '') then
+          endif ! buffer == ''
 
-            if (buffer == '') parse_state = parse_state_default
+        end select ! parse state
+!          print*, 'reaction: ', reaction_names(parse_state),&
+!                  ' for species:', current_species_name
+!          print*, 'law: ', law_names(temperature_law_id),&
+!                  ' from:', lat_site_names(i1),ads_site_names(i2),&
+!                  ' to:'  , lat_site_names(i3),ads_site_names(i4)
+!          print'(A,3f16.3)', 'with pars: ', pars
 
-        else
 
-            if ( parse_state == parse_state_default .and. get_index(words(1),reaction_names) /= 0 ) &
-              parse_state = parse_state_ignore
+! -------------------------------------------------------------------------------------------
+! old obsolete code
+! -------------------------------------------------------------------------------------------
+!
+!       elseif (words(1) == '') then
+!
+!            if (buffer == '') parse_state = parse_state_default
+!
+!        else
+!
+!            if ( parse_state == parse_state_default .and. get_index(words(1),reaction_names) /= 0 ) &
+!              parse_state = parse_state_ignore
+!
+!            if (parse_state /= parse_state_ignore) &
+!              call error_message(file_name, line_number, buffer, "hopping: unknown key")
+!
+!      end if
+!
+!          endif
 
-            if (parse_state /= parse_state_ignore) &
-              call error_message(file_name, line_number, buffer, "hopping: unknown key")
 
-        end if
+
+
+
 
     end do ! while ios=0
 
@@ -328,8 +405,9 @@ contains
 
     end if
 
-
+  ! ----------------------------------------------------------------------------
   ! Hopping rates report
+  ! ----------------------------------------------------------------------------
 
   write(*,'(A)') '  Hopping Rates Report.'
   write(*,'(A)') '  --------------------------'
@@ -378,71 +456,6 @@ contains
   end do
 
 
-! Became obsolete due to the Hopping Rates Report above
-    ! ---------------------------------------------------------------------------------------------
-    ! Check the input consistency
-    ! ---------------------------------------------------------------------------------------------
-    !
-    ! Check if rates are defined for all values of site_types, ads_sites
-    !   for which adsorption energies are defined
-    ! Adsorpton energies (n_species x n_site_type x n_adsorption_sites)
-    ! real(dp), dimension(:,:,:), allocatable :: ads_energy
-    !
-    ! Note ads_energies could be allocated of n_site_types rather than n_max_lat_site_types
-    !
-
-!    undefined_rate = .false.
-!    do species   = 1, c_pars%n_species
-!    do st1       = 1, n_max_lat_site_types
-!    do st2       = st1, n_max_lat_site_types
-!      if (lat%adjacent(st1,st2) .or. st1==st2) then
-!        do ast1      = 1, n_max_ads_sites
-!        do ast2      = 1, n_max_ads_sites
-!
-!          e_defined1 = e_pars%ads_energy(species, st1, ast1) /= e_pars%undefined_energy
-!          e_defined2 = e_pars%ads_energy(species, st2, ast2) /= e_pars%undefined_energy
-!          r_defined  = hopping_init%process (species, st1, ast1, st2, ast2) /= default_rate
-!
-!          if ( (e_defined1 .and. e_defined2) .and. (.not. r_defined)) then
-!            if (.not. undefined_rate) then
-!              undefined_rate = .true.
-!              print*
-!    !          print '(A)',  '--- Dear Sir, Madam:'
-!    !          print '(A)',  '      It is my duty to inform you that there are missing rate definitions in'
-!              print '(A)',  ' hopping: missing rate definitions'
-!              print '(2A)', '    file: ', file_name
-!              print '(A)',  '    missing definitions:'
-!              print '(/6x, A)', 'ads  lat_site    ads_site lat_site    ads_site'
-!
-!            end if
-!
-!            print '(6x, a5, A10, 2x, a3, 6x, a10, 2x, a3, 6x, L1, 7x, L1, 7x, L1)' ,            &
-!                    c_pars%ads_names(species),             &
-!                    lat_site_names(st1), ads_site_names(ast1), &
-!                    lat_site_names(st2), ads_site_names(ast2)
-!                    !e_defined1, e_defined2, r_defined
-!!            print '(A,L)', 'Is adjacent? ', lat%adjacent(st1,st2)
-!          end if
-!
-!        end do
-!        end do
-!      end if
-!    end do
-!    end do
-!    end do
-!
-!    if(undefined_rate) then
-!      print '(A)', ' hopping: please supply the required rates'
-! !     print '(/6x, A)', 'As always, I remain your humble servant, kMC Code'
-! !     print *
-!      stop 997
-!
-!    else
-!      print '(A/)', ' hopping: passed required rates consistency check'
-!!      print*
-!!      stop 'debugging stop'
-!
-!    end if
 
   ! Replace default rates with zeros to escape negative rates
 

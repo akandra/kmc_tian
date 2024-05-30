@@ -19,9 +19,9 @@ module constants
 
   ! Version number taken from a preprocessor variable
   ! Linux
-  character(len=40), parameter :: version = __GIT_VERSION__
+  ! character(len=40), parameter :: version = __GIT_VERSION__
   ! Windows
-  !character(len=40), parameter :: version =  ""
+  character(len=40), parameter :: version =  "windows v1"
 
   !-------- Site type info ---------!
 
@@ -93,7 +93,7 @@ module constants
   !-------- Hopping Rate Constants' Interaction Correction Laws ---------!
 
   ! List of interaction laws
-  character(len=10), dimension(2), parameter :: &
+  character(len=10), dimension(1), parameter :: &
           rcic_law_names = [character(10)::'linear']
   ! law ids and number of parameters
   integer, parameter :: rcic_linear_id = 1
