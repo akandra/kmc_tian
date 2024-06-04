@@ -208,7 +208,7 @@ contains
             if (current_product2_id == 0) call error_message(file_name, line_number, buffer, &
                                                   "inconsistent dissociation product 2 definition")
 
-            current_law_id = get_index(words(5), law_names )
+            current_law_id = get_index(words(5), rct_law_names )
             if (current_law_id == 0) call error_message(file_name, line_number, buffer, &
                                                   "dissociation: unknown temperature law")
 !            print*, 'reactant name and id: ', current_reactant_name, current_reactant_id
@@ -307,7 +307,7 @@ contains
             read(words(4),'(A)') current_product2_name
             current_product2_id = get_index(current_product2_name, c_pars%ads_names )
 
-            current_law_id = get_index(words(5), law_names )
+            current_law_id = get_index(words(5), rct_law_names )
 
 !            ! debugging printout
 !            print*, 'reactant name and id: ', current_reactant_name, current_reactant_id
@@ -406,7 +406,7 @@ contains
 !                 ! Debugging printout
 !                 print*, 'reaction: ', reaction_names(parse_state),&
 !                        ' for species:', current_reactant_name, current_product1_name, current_product2_name
-!                 print*, 'law: ', law_names(current_law_id),&
+!                 print*, 'law: ', rct_law_names(current_law_id),&
 !                        ' from:', lat_site_names(i1),ads_site_names(i2),&
 !                        ' to:'  , lat_site_names(i3),ads_site_names(i4),&
 !                        ' and '  , lat_site_names(i5),ads_site_names(i6)

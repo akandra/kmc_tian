@@ -215,7 +215,7 @@ contains
             if (p1_id == 0) call error_message(file_name, line_number, buffer, &
                                          "inconsistent association product 1 definition")
 
-            law_id = get_index(words(nwords), law_names )
+            law_id = get_index(words(nwords), rct_law_names )
             if (law_id == 0) call error_message(file_name, line_number, buffer, &
                                                   "association: unknown temperature law")
 !-------------------------------------------------------------------------------
@@ -307,7 +307,7 @@ contains
             read(words(4),'(A)') p1_name
             p1_id = get_index(p1_name, c_pars%ads_names )
 
-            law_id = get_index(words(nwords), law_names )
+            law_id = get_index(words(nwords), rct_law_names )
 
 !            ! debugging printout
 !            print*, 'reactant1 name and id: ', r1_name, r1_id
@@ -410,7 +410,7 @@ contains
                  ! Debugging printout
 !                 print*, 'reaction: ', reaction_names(parse_state),&
 !                        ' for species:', r1_name, r2_name, p1_name
-!                 print*, 'law: ', law_names(law_id),&
+!                 print*, 'law: ', rct_law_names(law_id),&
 !                        ' from:', lat_site_names(lst(1)),ads_site_names(ast(1)),&
 !                        ' and:'  , lat_site_names(lst(2)),ads_site_names(ast(2)),&
 !                        ' to: '  ,lat_site_names(lst(3)),ads_site_names(ast(3))

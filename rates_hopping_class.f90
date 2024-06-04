@@ -26,8 +26,6 @@ module rates_hopping_class
   type :: hopping_type
 
     logical :: is_defined           = .false.
-    logical :: has_temperature_law  = .false.
-    logical :: has_interaction_law  = .false.
 
     ! Hopping Rates
     !                          n_adsorbate              -> which particle
@@ -81,8 +79,8 @@ contains
 
     character(len=10)     :: current_species_name
     integer               :: current_species_id
-    integer               :: temperature_law_id
-    integer               :: interaction_law_id
+    integer               :: rct_law_id
+    integer               :: rcic_law_id
 
     integer               :: parse_state
     integer, parameter    :: parse_state_ignore   = -1
@@ -90,7 +88,8 @@ contains
     integer, parameter    :: parse_state_hopping1 =  1
     integer, parameter    :: parse_state_hopping2 =  2
 
-
+    logical :: rct_law_defined  = .false.
+    logical :: rcic_law_defined = .false.
 
     real(dp), dimension(3):: pars = 0.0_dp
 
@@ -101,17 +100,7 @@ contains
 
     character(len=2) :: check_str
     logical :: is_same_lst
-
-!    !-----------------------------------------------------------
-!    ! test the split string function
-!    !-----------------------------------------------------------
-!    words = ''
-!    buffer = 'hello world ! bye '
-!    call split_string(buffer, words, nwords)
-!    print *, 'buffer = ', buffer
-!    print '(3A10)', 'words  = ', words(1), words(2), words(3)
-!    print *, 'nwords = ', nwords
-
+    character(len=100) :: status_str
 
 
     ! determine maximum number of available ads. sites
@@ -182,15 +171,8 @@ contains
       words = ''
       call split_string(buffer, words, nwords)
 
-      ! skip lines that are commented out but preserve blank lines which signify end of section
-      if (nwords == 0 .and. buffer /= '') then
-        ! print *, 'line ', line_number, ' is a comment line'
-        cycle
-      end if
-
-!      print *, 'line ', line_number, 'buffer = ', trim(buffer)
-!      print *, 'nwords =', nwords, 'words=', trim(words(1)),'  ',trim(words(2)),'  ',trim(words(3)),'  ',trim(words(4))
-!      print *
+      ! skip blank lines and comments
+      if (nwords == 0) cycle
 
       select case (parse_state)
 
@@ -223,46 +205,60 @@ contains
           !    section end (blank line)
 
 
-          if (buffer == '') then
-            parse_state = parse_state_default
+          if (buffer == section_end) then
+
+              if ( .not. (rct_law_defined .or. rcic_law_defined) ) then
+                call error_message(file_name, line_number, buffer,&
+                                   "temperature_law and interaction law are not defined.")
+              elseif (rct_law_defined) then
+                call error_message(file_name, line_number, buffer,&
+                                   "interaction_law is not defined.")
+              elseif (rcic_law_defined) then
+                call error_message(file_name, line_number, buffer,&
+                                   "temperature_law is not defined.")
+              else
+                call error_message(file_name, line_number, buffer,&
+                                   "premature end of hopping section: should never occur")
+              endif
 
           elseif (words(1) =='temperature_law') then
-            temperature_law_id = get_index(words(2), law_names)
 
-            if (temperature_law_id == 0) then
+            rct_law_id = get_index(words(2), rct_law_names)
+
+            if (rct_law_id == 0) then
               call error_message(file_name, line_number, buffer,&
-                                 "unknown temperature law")
+                                 "invalid temperature law statement")
             else
-              hopping_init%has_temperature_law = .true.
+              rct_law_defined = .true.
 
             endif
 
           elseif (words(1) =='interaction_law') then
-            interaction_law_id = get_index(words(2), law_names)
+            rcic_law_id = get_index(words(2), rcic_law_names)
 
-            if (temperature_law_id == 0) then
+            if (rcic_law_id == 0) then
               call error_message(file_name, line_number, buffer,&
-                                 "unknown temperature law")
+                                 "invalid interaction law statement")
             else
-              hopping_init%has_interaction_law=.true.
+              rcic_law_defined = .true.
 
             endif
 
-          elseif (words(1) == 'hopping') then
+          elseif (get_index(words(1), reaction_names) > 0) then
             call error_message(file_name, line_number, buffer,&
-                              "invalid ending of a hopping reaction section")
+                  "declared inside of hopping"//' '//trim(current_species_name)//" section")
 
           endif
 
-          if ( hopping_init%has_temperature_law .and. hopping_init%has_interaction_law ) &
+          if ( rct_law_defined .and. rcic_law_defined ) &
             parse_state = parse_state_hopping2
 
         case(parse_state_hopping2)
           ! in parse state hopping2 process:
-          !    section end (blank line)
+          !    section end
           !    from - to rate records,
 
-          if (buffer == '') then
+          if (buffer == section_end) then
             parse_state = parse_state_default
 
           else
@@ -309,7 +305,7 @@ contains
             ! ---------------------------------------------------------
             ! we have a valid rate record. Apply the temperature law
             ! ---------------------------------------------------------
-            select case (temperature_law_id)
+            select case (rct_law_id)
 
               case (Arrhenius_id)
                 if (nwords/=6) call error_message(file_name, line_number, buffer,&
@@ -356,7 +352,7 @@ contains
 
             end select ! temperature_law_id
 
-          endif ! buffer == ''
+          endif ! buffer == section_end
 
         end select ! parse state
 !          print*, 'reaction: ', reaction_names(parse_state),&
@@ -395,6 +391,10 @@ contains
     end do ! while ios=0
 
     close(inp_unit)
+
+    if (parse_state /= parse_state_default) &
+      write(*, '(A)') ' hopping: error, incorrect end of hopping section'
+      stop 996
 
     if (undefined_energy) then
       write(*, '(A)') ' hopping: error, rates defined for sites with undefined energies'

@@ -105,15 +105,18 @@ module constants
   !-------- Check mark
   character(len=2), parameter :: check_mark = '->'
 
+  !-------- Section end keyword
+  character(len=10), parameter :: section_end = ''
+
 
   !-------- Temperature dependences info ---------!
 
   ! Number of temperature dependence equations
-  integer, parameter :: n_laws = 2
+  integer, parameter :: n_rct_laws = 2
   ! List of laws
-  character(len=20), dimension(n_laws), parameter :: &
-            law_names = [character(20)::'Arrhenius',&
-                         'extArrhenius']
+  character(len=20), dimension(n_rct_laws), parameter :: &
+            rct_law_names = &
+                [character(20)::'Arrhenius','extArrhenius']
   ! Law ids
   integer, parameter :: Arrhenius_id   = 1
   integer, parameter :: extArrhenius_id = 2

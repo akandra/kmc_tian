@@ -121,7 +121,7 @@ contains
             if (current_species_id == 0) call error_message(file_name, line_number, buffer, &
                                                   "inconsistent desorption definition")
 
-            current_law_id = get_index(words(3), law_names )
+            current_law_id = get_index(words(3), rct_law_names )
             if (current_law_id == 0) call error_message(file_name, line_number, buffer, &
                                                   "unknown temperature law")
 !            print*, 'name     =', current_species_name
@@ -187,7 +187,7 @@ contains
 
 !                 print*, 'reaction: ', reaction_names(parse_state),&
 !                        ' for species:', current_species_name
-!                 print*, 'law: ', law_names(current_law_id),&
+!                 print*, 'law: ', rct_law_names(current_law_id),&
 !                        ' from:', lat_site_names(i1),ads_site_names(i2)
 !                print'(A,3f16.3)', 'with pars: ', pars
 
