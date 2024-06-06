@@ -164,7 +164,6 @@ contains
       ! ios = 0: valid record read
       ! ios < 0: end of record condition encountered or end of file condition detected
       ! ios > 0: an error is detected
-      ! print *, 'line: ', line_number, ' ios=', ios, ' buffer=', trim(buffer), ' length=', len(trim(buffer))
       if (ios < 0) buffer=''  ! treat end of file like blank line
 
       ! Split an input string
@@ -186,6 +185,8 @@ contains
             parse_state = parse_state_hopping
             rct_law_defined  = .false.  ! reset necessary to allow multiple hopping sections
             rcic_law_defined = .false.  ! reset necessary to allow multiple hopping sections
+            rct_law_id_glob  = 0        ! reset necessary to allow multiple hopping sections
+            rcic_law_id_glob = 0        ! reset necessary to allow multiple hopping sections
 
             if (nwords == 2) then
               read(words(2),'(A)') current_species_name
@@ -291,7 +292,10 @@ contains
               undefined_energy = .true.
             end if
 
+            ! ---------------------------------------------------------
             ! we have a valid rate record. Process it
+            ! ---------------------------------------------------------
+            ! if record only has to-from site information then set the law ids and pars to global default values
             if (nwords == 4) then
               if (rct_law_defined .and. rcic_law_defined) then
                 rct_law_id  = rct_law_id_glob
@@ -302,18 +306,26 @@ contains
                 call error_message(file_name, line_number, buffer, &
                                  "temperature and/or interaction laws are not defined")
               end if
+
             else
+              ! set rct_law_id and rcic_law_id to 0 to indicate no law on this line found yet
+              rct_law_id  = 0
+              rcic_law_id = 0
+
               do i=5,nwords
-                ! find rct law
-                rct_law_id = get_index(words(i), rct_law_names)
-                if (rct_law_id /= 0) then
+                ! check  for rct law on this line
+                if (get_index(words(i), rct_law_names) /= 0) then
+                  rct_law_id = get_index(words(i), rct_law_names)
                   select case (rct_law_id)
                     case (Arrhenius_id)
+                      ! WARNING: the following test is not rigorous
+                      ! we should check that there are two numbers following word i
                       if (nwords<i+2) call error_message(file_name, line_number, buffer,&
                                                         "Arrhenius must have 2 parameters")
                       read(words(i+1),*) rct_pars(1)
                       read(words(i+2),*) rct_pars(2)
                     case (extArrhenius_id)
+                      ! to do: check that there are three numbers following i
                       if (nwords<i+3) call error_message(file_name, line_number, buffer,&
                                                   "extArrhenius must have 3 parameters")
                       read(words(i+1),*) rct_pars(1)
@@ -323,11 +335,14 @@ contains
                       call error_message(file_name, line_number, buffer, "This should not happen! Check the code!")
                   end select
                 end if
-                ! find rcic law
-                rcic_law_id = get_index(words(i), rcic_law_names)
-                if (rcic_law_id /= 0) then
+
+
+                ! check if we have an rcic law on this line
+                if (get_index(words(i), rcic_law_names) /= 0) then
+                  rcic_law_id = get_index(words(i), rcic_law_names)
                   select case (rcic_law_id)
                     case (rcic_linear_id)
+                      ! to do: check that there are two numbers following i
                       if (nwords<i+2) call error_message(file_name, line_number, buffer,&
                                                         "linear interaction law must have 2 parameters")
                       read(words(i+1),*) rcic_pars(1)
@@ -336,14 +351,31 @@ contains
                       call error_message(file_name, line_number, buffer, "This should not happen! Check the code!")
                   end select
                 end if
-              end do
-            end if
 
-            ! Check if rct and rcic laws are set
+              end do ! i=5,nwords
+
+              ! if rct_law  or rcic_law are not defined on this line, set to global defaults
+              if (rct_law_id  == 0)  rct_law_id =  rct_law_id_glob
+              if (rcic_law_id == 0) rcic_law_id = rcic_law_id_glob
+
+
+              ! check for valid temperature and interaction laws
+              if (rct_law_id == 0) &
+                call error_message(file_name, line_number, buffer, &
+                                  "no temperature law is specified")
+              if (rcic_law_id == 0) &
+                call error_message(file_name, line_number, buffer, &
+                                   "no interaction law is specified")
+
+            end if ! (nwords==4)
+
+
+            ! Check if rct and rcic laws are properly set
             if (rct_law_id == 0) &
-              call error_message(file_name, line_number, buffer, "invalid temperature law parameters")
+              call error_message(file_name, line_number, buffer, "invalid temperature law")
             if (rcic_law_id == 0) &
-              call error_message(file_name, line_number, buffer, "invalid interaction law parameters")
+              call error_message(file_name, line_number, buffer, "invalid interaction law")
+
             ! Set rate constants for hopping channels
             if (is_same_lst) then
               hopping_init%process_intra(current_species_id,i1,i2,i4 ) = &
@@ -369,14 +401,14 @@ contains
     if (parse_state /= parse_state_default) then
       !write(*, '(A)') ' hopping: error, incomplete hopping section'
       print *, 'parse state: ', parse_state
-      !stop 9961
+      !stop 996
       call error_message(file_name, line_number, buffer, &
            'hopping: error, incomplete hopping section')
     endif
 
     if (undefined_energy) then
       write(*, '(A)') ' hopping: error, rates defined for sites with undefined energies'
-      stop 9962
+      stop 997
 
     else
       write(*, '(A)') ' hopping: passed check that energies are defined for all rates'
