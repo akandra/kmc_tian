@@ -164,15 +164,15 @@ contains
       ! ios = 0: valid record read
       ! ios < 0: end of record condition encountered or end of file condition detected
       ! ios > 0: an error is detected
-
-      if (ios /= 0) exit
+      ! print *, 'line: ', line_number, ' ios=', ios, ' buffer=', trim(buffer), ' length=', len(trim(buffer))
+      if (ios <0) buffer=''  ! treat of file like blank lineb
 
       ! Split an input string
       words = ''
       call split_string(buffer, words, nwords)
 
-      ! skip blank lines and comments
-      if (nwords == 0) cycle
+      ! skip comments but preserve blank lines (signify end)
+      if (nwords == 0 .and. buffer /= '') cycle
 
       select case (parse_state)
 
@@ -184,12 +184,14 @@ contains
           if (words(1) == 'hopping') then
             hopping_init%is_defined = .true.
             parse_state = parse_state_hopping1
+            rct_law_defined  = .false.  ! reset necessary to allow multiple hopping sections
+            rcic_law_defined = .false.  ! reset necessary to allow multiple hopping sections
 
             if (nwords == 2) then
               read(words(2),'(A)') current_species_name
               current_species_id = get_index(current_species_name, c_pars%ads_names)
               if (current_species_id == 0) call error_message(file_name, line_number, buffer, &
-                                                              "inconsistent hopping key definition")
+                                                              "unknown species in hopping section definition")
             else
               call error_message(file_name, line_number, buffer, &
                          "hopping key must have 1 parameter -- species")
@@ -209,7 +211,7 @@ contains
 
               if ( .not. (rct_law_defined .or. rcic_law_defined) ) then
                 call error_message(file_name, line_number, buffer,&
-                                   "temperature_law and interaction law are not defined.")
+                                   "temperature law and interaction law are not defined.")
               elseif (rct_law_defined) then
                 call error_message(file_name, line_number, buffer,&
                                    "interaction_law is not defined.")
@@ -227,7 +229,7 @@ contains
 
             if (rct_law_id == 0) then
               call error_message(file_name, line_number, buffer,&
-                                 "invalid temperature law statement")
+                                 "Fi temperature law statement")
             else
               rct_law_defined = .true.
 
@@ -276,9 +278,11 @@ contains
             if (is_same_lst) i3=i1
 
             ! check for invalid site name (invalid lst or ast in either from or to site)
-            if ( i1==0 .or. i2==0 .or. i3==0 .or. i4==0) &
+            if ( i1==0 .or. i2==0 .or. i3==0 .or. i4==0) then
+              print *, 'parse state: ', parse_state
               call error_message(file_name, line_number, buffer, &
                                  "wrong site name in the hopping section")
+            end if
 
             ! ---------------------------------------------------------
             ! check for duplicate entry
@@ -355,12 +359,6 @@ contains
           endif ! buffer == section_end
 
         end select ! parse state
-!          print*, 'reaction: ', reaction_names(parse_state),&
-!                  ' for species:', current_species_name
-!          print*, 'law: ', law_names(temperature_law_id),&
-!                  ' from:', lat_site_names(i1),ads_site_names(i2),&
-!                  ' to:'  , lat_site_names(i3),ads_site_names(i4)
-!          print'(A,3f16.3)', 'with pars: ', pars
 
 
 ! -------------------------------------------------------------------------------------------
@@ -392,13 +390,17 @@ contains
 
     close(inp_unit)
 
-    if (parse_state /= parse_state_default) &
-      write(*, '(A)') ' hopping: error, incorrect end of hopping section'
-      stop 996
+    if (parse_state /= parse_state_default) then
+      !write(*, '(A)') ' hopping: error, incomplete hopping section'
+      print *, 'parse state: ', parse_state
+      !stop 9961
+      call error_message(file_name, line_number, buffer, &
+           'hopping: error, incomplete hopping section')
+    endif
 
     if (undefined_energy) then
       write(*, '(A)') ' hopping: error, rates defined for sites with undefined energies'
-      stop 996
+      stop 9962
 
     else
       write(*, '(A)') ' hopping: passed check that energies are defined for all rates'

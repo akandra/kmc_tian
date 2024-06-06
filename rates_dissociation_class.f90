@@ -176,41 +176,41 @@ contains
 
       if (ios /= 0) exit
 
-        ! Split an input string
-        words = ''
-        call split_string(buffer, words, nwords)
+      ! Split an input string
+      words = ''
+      call split_string(buffer, words, nwords)
 
-        select case (words(1)) ! take a keyword
+      select case (words(1)) ! take a keyword
 !------------------------------------------------------------------------------
-          case('dissociation')                       ! of select case (words(1)
+        case('dissociation')                       ! of select case (words(1)
 !------------------------------------------------------------------------------
-            dissociation_init%is_defined = .true.
+          dissociation_init%is_defined = .true.
 
-            if (parse_state /= parse_state_default) &
-              call error_message(file_name, line_number, buffer, &
-                         "invalid ending of the reaction section")
-            parse_state = parse_state_dissociation
-            if (nwords/=5) call error_message(file_name, line_number, buffer, &
-                               "dissociation key must have 4 parameters")
+          if (parse_state /= parse_state_default) &
+            call error_message(file_name, line_number, buffer, &
+                       "invalid ending of the reaction section")
+          parse_state = parse_state_dissociation
+          if (nwords/=5) call error_message(file_name, line_number, buffer, &
+                             "dissociation key must have 4 parameters")
 
-            read(words(2),'(A)') current_reactant_name
-            current_reactant_id = get_index(current_reactant_name, c_pars%ads_names )
-            if (current_reactant_id == 0) call error_message(file_name, line_number, buffer, &
-                                                  "inconsistent dissociation reactant definition")
+          read(words(2),'(A)') current_reactant_name
+          current_reactant_id = get_index(current_reactant_name, c_pars%ads_names )
+          if (current_reactant_id == 0) call error_message(file_name, line_number, buffer, &
+                                                "inconsistent dissociation reactant definition")
 
-            read(words(3),'(A)') current_product1_name
-            current_product1_id = get_index(current_product1_name, c_pars%ads_names )
-            if (current_product1_id == 0) call error_message(file_name, line_number, buffer, &
-                                                  "inconsistent dissociation product 1 definition")
+          read(words(3),'(A)') current_product1_name
+          current_product1_id = get_index(current_product1_name, c_pars%ads_names )
+          if (current_product1_id == 0) call error_message(file_name, line_number, buffer, &
+                                                "inconsistent dissociation product 1 definition")
 
-            read(words(4),'(A)') current_product2_name
-            current_product2_id = get_index(current_product2_name, c_pars%ads_names )
-            if (current_product2_id == 0) call error_message(file_name, line_number, buffer, &
-                                                  "inconsistent dissociation product 2 definition")
+          read(words(4),'(A)') current_product2_name
+          current_product2_id = get_index(current_product2_name, c_pars%ads_names )
+          if (current_product2_id == 0) call error_message(file_name, line_number, buffer, &
+                                                "inconsistent dissociation product 2 definition")
 
-            current_law_id = get_index(words(5), rct_law_names )
-            if (current_law_id == 0) call error_message(file_name, line_number, buffer, &
-                                                  "dissociation: unknown temperature law")
+          current_law_id = get_index(words(5), rct_law_names )
+          if (current_law_id == 0) call error_message(file_name, line_number, buffer, &
+                                                "dissociation: unknown temperature law")
 !            print*, 'reactant name and id: ', current_reactant_name, current_reactant_id
 !            print*, 'product1 name and id: ', current_product1_name, current_product1_id
 !            print*, 'product2 name and id: ', current_product2_name, current_product2_id
@@ -218,45 +218,42 @@ contains
 !            stop 111
 
 !-------------------------------------------------------------------------------
-          case ('terrace','step','corner')            ! of select case(words(1))
+        case ('terrace','step','corner')            ! of select case(words(1))
 !-------------------------------------------------------------------------------
 
 
-            select case (parse_state)
+          select case (parse_state)
 
-              case(parse_state_ignore)
-                ! ignore
-                ! print *, 'warning ignoring line', line_number, buffer
+            case(parse_state_ignore)
+              ! ignore
+              ! print *, 'warning ignoring line', line_number, buffer
 
-              case(dissociation_id)
+            case(dissociation_id)
 
-                n_dissociation_channels = n_dissociation_channels + 1
+              n_dissociation_channels = n_dissociation_channels + 1
 
-              case default
-                call error_message(file_name, line_number, buffer, "Dissociation: invalid site type statement")
+            case default
+              call error_message(file_name, line_number, buffer, "Dissociation: invalid site type statement")
 
-            end select
-
-!-------------------------------------------------------------------------------
-          case('')                                    ! of select case(words(1))
-!-------------------------------------------------------------------------------
-            if (buffer == '') then
-              parse_state = parse_state_default
-!              print*, 'blank line '
-!            else
-!              print*, 'comment: ', trim(buffer)
-            end if
+          end select
 
 !-------------------------------------------------------------------------------
-          case default                                ! of select case(words(1))
+        case('')
 !-------------------------------------------------------------------------------
-            if ( parse_state == parse_state_default .and. get_index(words(1),reaction_names) /= 0 ) &
-              parse_state = parse_state_ignore
+          if (buffer == '') then
+            parse_state = parse_state_default
+          end if
 
-            if (parse_state /= parse_state_ignore) &
-              call error_message(file_name, line_number, buffer, "Dissociation: unknown key")
+!-------------------------------------------------------------------------------
+        case default                                ! of select case(words(1))
+!-------------------------------------------------------------------------------
+          if ( parse_state == parse_state_default .and. get_index(words(1),reaction_names) /= 0 ) &
+            parse_state = parse_state_ignore
 
-        end select                                      ! select case(words(1))
+          if (parse_state /= parse_state_ignore) &
+            call error_message(file_name, line_number, buffer, "Dissociation: unknown key")
+
+      end select                                      ! select case(words(1))
 
     end do ! while ios=0
 

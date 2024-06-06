@@ -115,8 +115,11 @@ contains
 
         elseif (get_index(words(1),lat_site_names) /= 0) then
 
-          if (parse_state /= parse_state_adsorption) &
+          if (parse_state /= parse_state_adsorption) then
+            ! print *, 'parse_state: ', parse_stat=
             call error_message(file_name, line_number, buffer, "invalid site type statement")
+          end if
+
 
           i1 = get_index(words(1),lat_site_names)
           i2 = get_index(words(2),ads_site_names)
