@@ -118,8 +118,10 @@ module constants
             rct_law_names = &
                 [character(20)::'Arrhenius','extArrhenius']
   ! Law ids
-  integer, parameter :: Arrhenius_id   = 1
+  integer, parameter :: Arrhenius_id    = 1
   integer, parameter :: extArrhenius_id = 2
+  ! Maximum number of temperature law parameters
+  integer, parameter :: n_max_rct_pars = 3
 
 
   ! file units
