@@ -68,7 +68,7 @@ contains
     type(mc_lat)            , intent(in)    :: lat
     type(energy_parameters) , intent(in)    :: e_pars
 
-    integer :: i, ios, nwords, line_number, i1, i2, i3, i4, m
+    integer :: i, ios, nwords, line_number, i1, i2, i3, i4, m, j
 
     integer :: species, st1, st2, ast1, ast2, col_st1(2)
     logical :: e_defined1, e_defined2, r_defined, undefined_rate, undefined_energy
@@ -318,19 +318,17 @@ contains
                   rct_law_id = get_index(words(i), rct_law_names)
                   select case (rct_law_id)
                     case (Arrhenius_id)
-                      ! WARNING: the following test is not rigorous
-                      ! we should check that there are two numbers following word i
-                      if (nwords<i+2) call error_message(file_name, line_number, buffer,&
-                                                        "Arrhenius must have 2 parameters")
-                      read(words(i+1),*) rct_pars(1)
-                      read(words(i+2),*) rct_pars(2)
+                      do j=1,2
+                        if ( .not. read_num(words(i+j),rct_pars(j)) )&
+                          call error_message(file_name, line_number, buffer,&
+                                                  "Arrhenius must have 2 numerical parameters")
+                      end do
                     case (extArrhenius_id)
-                      ! to do: check that there are three numbers following i
-                      if (nwords<i+3) call error_message(file_name, line_number, buffer,&
-                                                  "extArrhenius must have 3 parameters")
-                      read(words(i+1),*) rct_pars(1)
-                      read(words(i+2),*) rct_pars(2)
-                      read(words(i+3),*) rct_pars(3)
+                      do j=1,3
+                        if ( .not. read_num(words(i+j),rct_pars(j)) )&
+                          call error_message(file_name, line_number, buffer,&
+                                                  "extArrhenius must have 3 numerical parameters")
+                      end do
                     case default
                       call error_message(file_name, line_number, buffer, "This should not happen! Check the code!")
                   end select
@@ -342,11 +340,11 @@ contains
                   rcic_law_id = get_index(words(i), rcic_law_names)
                   select case (rcic_law_id)
                     case (rcic_linear_id)
-                      ! to do: check that there are two numbers following i
-                      if (nwords<i+2) call error_message(file_name, line_number, buffer,&
-                                                        "linear interaction law must have 2 parameters")
-                      read(words(i+1),*) rcic_pars(1)
-                      read(words(i+2),*) rcic_pars(2)
+                      do j=1,2
+                        if ( .not. read_num(words(i+j),rcic_pars(j)) )&
+                          call error_message(file_name, line_number, buffer,&
+                                                  "linear interaction must have 2 numerical parameters")
+                      end do
                     case default
                       call error_message(file_name, line_number, buffer, "This should not happen! Check the code!")
                   end select
@@ -376,19 +374,27 @@ contains
             if (rcic_law_id == 0) &
               call error_message(file_name, line_number, buffer, "invalid interaction law")
 
-            ! Set rate constants for hopping channels
+            ! Set rate constants and rcic for hopping channels
             if (is_same_lst) then
               hopping_init%process_intra(current_species_id,i1,i2,i4 ) = &
                           rct_law(rct_law_id, c_pars%temperature, rct_pars)
+              hopping_init%rate_corr_pars_intra(current_species_id,i1,i2,i4)%id = rcic_law_id
+              hopping_init%rate_corr_pars_intra(current_species_id,i1,i2,i4)%pars = rcic_pars
               ! symmetrize
               hopping_init%process_intra(current_species_id,i1,i4,i2 ) = &
               hopping_init%process_intra(current_species_id,i1,i2,i4 )
+              hopping_init%rate_corr_pars_intra(current_species_id,i1,i4,i2)%id = rcic_law_id
+              hopping_init%rate_corr_pars_intra(current_species_id,i1,i4,i2)%pars = rcic_pars
             else
               hopping_init%process(current_species_id,i1,i2,i3,i4 ) = &
                           rct_law(rct_law_id, c_pars%temperature, rct_pars)
+              hopping_init%rate_corr_pars(current_species_id,i1,i2,i3,i4)%id = rcic_law_id
+              hopping_init%rate_corr_pars(current_species_id,i1,i2,i3,i4)%pars = rcic_pars
               ! symmetrize
               hopping_init%process(current_species_id,i3,i4,i1,i2 ) = &
               hopping_init%process(current_species_id,i1,i2,i3,i4 )
+              hopping_init%rate_corr_pars(current_species_id,i3,i4,i1,i2)%id = rcic_law_id
+              hopping_init%rate_corr_pars(current_species_id,i3,i4,i1,i2)%pars = rcic_pars
             end if
 
           endif ! words(1) == section_end
@@ -438,7 +444,15 @@ contains
             if (ast2 /= ast1) then
               check_str = '  '
               if (hopping_init%process_intra(species,st1,ast1,ast2) /= default_rate) check_str = check_mark
-              write(*,'(5X,A2,X,A11,A11,A4)') check_str, c_pars%ads_names(species), same_lst_mark, ads_site_names(ast2)
+              write(*,'(5X,A2,X,A11,A11,A4)',advance='NO') &
+                check_str, c_pars%ads_names(species), same_lst_mark, ads_site_names(ast2)
+              if (debug(1)) then
+                write(*,'(3X,E10.3,2X,A,5F10.3)') hopping_init%process_intra(species,st1,ast1,ast2),&
+                                   rcic_law_names(hopping_init%rate_corr_pars_intra(species,st1,ast1,ast2)%id),&
+                                                  hopping_init%rate_corr_pars_intra(species,st1,ast1,ast2)%pars
+              else
+                write(*,*) ''
+              end if
             end if
 
           end do
@@ -452,7 +466,15 @@ contains
               ast2 = lat%avail_ads_sites(species,st2)%list(i2)
               check_str = '  '
               if (hopping_init%process(species,st1,ast1,st2,ast2) /= default_rate) check_str = check_mark
-              write(*,'(5X,A2,X,A11,A11,A4)') check_str, c_pars%ads_names(species), lat_site_names(st2), ads_site_names(ast2)
+              write(*,'(5X,A2,X,A11,A11,A4)',advance='NO') &
+                check_str, c_pars%ads_names(species), lat_site_names(st2), ads_site_names(ast2)
+              if (debug(1)) then
+                write(*,'(3X,E10.3,2X,A,5F10.3)') hopping_init%process(species,st1,ast1,st2,ast2),&
+                                   rcic_law_names(hopping_init%rate_corr_pars(species,st1,ast1,st2,ast2)%id),&
+                                                  hopping_init%rate_corr_pars(species,st1,ast1,st2,ast2)%pars
+              else
+                write(*,*) ''
+              end if
             end do
 
           end do
@@ -550,12 +572,12 @@ contains
           ! Calculate energy of ads in new position
           energy_new = energy(ads, lat, e_pars)
 
-          if (debug(2)) then
-            print*, '-----------construct debug(2)'
-            print*, 'pos new 1 ', lat%ads_list(1)%row, lat%ads_list(1)%col
-            print*, 'pos new 2 ', lat%ads_list(2)%row, lat%ads_list(2)%col
-            print *, 'ads ', ads, 'm ', m,  'E_old = ', energy_old, 'E_new = ', energy_new
-          end if
+!          if (debug(2)) then
+!            print*, '-----------construct debug(2)'
+!            print*, 'pos new 1 ', lat%ads_list(1)%row, lat%ads_list(1)%col
+!            print*, 'pos new 2 ', lat%ads_list(2)%row, lat%ads_list(2)%col
+!            print *, 'ads ', ads, 'm ', m,  'E_old = ', energy_old, 'E_new = ', energy_new
+!          end if
 
           ! Apply detailed balance when
           ! energy in the old position < energy in the new position
@@ -621,12 +643,12 @@ contains
         ! Calculate energy of ads in new position
         energy_new = energy(ads, lat, e_pars)
 
-        if (debug(2)) then
-          print*, '-----------construct debug(2)'
-          print*, 'pos new 1 ', lat%ads_list(1)%row, lat%ads_list(1)%col
-          print*, 'pos new 2 ', lat%ads_list(2)%row, lat%ads_list(2)%col
-          print *, 'ads ', ads, 'm ', m,  'E_old = ', energy_old, 'E_new = ', energy_new
-        end if
+!        if (debug(2)) then
+!          print*, '-----------construct debug(2)'
+!          print*, 'pos new 1 ', lat%ads_list(1)%row, lat%ads_list(1)%col
+!          print*, 'pos new 2 ', lat%ads_list(2)%row, lat%ads_list(2)%col
+!          print *, 'ads ', ads, 'm ', m,  'E_old = ', energy_old, 'E_new = ', energy_new
+!        end if
 
         ! Apply detailed balance when
         ! energy in the old position < energy in the new position

@@ -477,11 +477,10 @@ contains
     integer :: row_2, col_2, lst_2
     integer :: n_channels
 
-!debug(1) = (ads == 10)
-!debug(1) = .false.
+!debug(2) = (ads == 10)
 
 ! debug printout header
-!if (debug(1)) then
+!if (debug(2)) then
 !  print *
 !  print '(a)'    ,' Debug printout from rates_dissociation _class subroutine construct'
 !  print '(a,i0)' ,' Print of rates as they are calculated.  ads =', ads
@@ -536,7 +535,7 @@ contains
                 ! WARNING: Decide later if we need the rate field
                 this%rate_info(ads)%list(n_channels)%rate  = this%channels(iprocs)%rate
 
-!if(debug(1))then
+!if(debug(2))then
 !  lst_name    = lat_site_names(lst)
 !  lst_p2_name = lat_site_names(lst_2)
 !  ast_r_name  = ads_site_names(lat%avail_ads_sites(id_r , lst  )%list(ast))

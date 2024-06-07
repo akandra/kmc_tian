@@ -47,8 +47,6 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
 
 !dja  integer :: j, k, n_chan  ! only for debug printout
   integer :: j, k  ! only for debug printout
-  ! initialize vector of conditions for debug trap
-  debug = .false.
 
   version_header = '! kmc_tian Release ' // version
 

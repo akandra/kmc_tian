@@ -19,9 +19,9 @@ module constants
 
   ! Version number taken from a preprocessor variable
   ! Linux
-  ! character(len=40), parameter :: version = __GIT_VERSION__
+  character(len=40), parameter :: version = __GIT_VERSION__
   ! Windows
-  character(len=40), parameter :: version =  "windows v1"
+  ! character(len=40), parameter :: version =  "windows v1"
 
   !-------- Site type info ---------!
 
@@ -149,6 +149,7 @@ module constants
 
 
   ! Global variables for debugging
+  !   1 prints out rct and rcic laws parameters
   logical :: debug(10)
 
 
