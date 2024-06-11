@@ -1,13 +1,23 @@
-module temperature_laws
+module rate_constant_laws
+
 !-----------------------------------------------------------------------------
-!             Temperature dependence law subroutines
+! Rate Constant Temperature (rct) and Interaction Correction (rcic) laws subroutines
 !-----------------------------------------------------------------------------
 
   use constants
 
   implicit none
 
+  type :: int_law_pars
+    integer                              :: id   ! law id
+    real(dp), dimension(n_max_rcic_pars) :: pars ! parameter list
+  end type
+
 contains
+
+!-----------------------------------------------------------------------------
+! Rate Constant Temperature (rct) laws
+!-----------------------------------------------------------------------------
 
 !-----------------------------------------------------------------------------
   real(dp) function rct_law(rct_law_id, temperature, parameters)
@@ -57,5 +67,41 @@ contains
 
   end function extArrhenius
 
-end module temperature_laws
+
+!-----------------------------------------------------------------------------
+! Rate Constant Interaction Correction (rcic) laws
+!-----------------------------------------------------------------------------
+
+!-----------------------------------------------------------------------------
+  real(dp) function rcic_law(rcic_info, V_A, V_B)
+!-----------------------------------------------------------------------------
+    type(int_law_pars), intent(in) :: rcic_info
+    real(dp), intent(in) :: V_A, V_B
+
+    select case (rcic_info%id)
+      case (rcic_linear_id)
+        rcic_law = rcic_linear(V_A, V_B, rcic_info%pars)
+      case default
+        stop " rcic_law function error: Should never occur"
+    end select
+
+  end function rcic_law
+
+!-----------------------------------------------------------------------------
+  real(dp) function rcic_linear(V_A, V_B, parameters)
+!-----------------------------------------------------------------------------
+    real(dp), intent(in) :: V_A, V_B
+    real(dp), dimension(:), intent(in) :: parameters
+    real(dp) :: a, b
+
+    a = parameters(1)
+    b = parameters(2)
+
+    rcic_linear = a*V_A + b*V_B
+
+  end function rcic_linear
+
+
+
+end module rate_constant_laws
 

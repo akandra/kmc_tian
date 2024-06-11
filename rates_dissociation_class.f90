@@ -17,7 +17,7 @@ module rates_dissociation_class
   use energy_mod
   use open_file
   use utilities
-  use temperature_laws
+  use rate_constant_laws
 
   implicit none
 

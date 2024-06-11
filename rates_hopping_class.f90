@@ -7,7 +7,7 @@ module rates_hopping_class
   use energy_mod
   use open_file
   use utilities
-  use temperature_laws
+  use rate_constant_laws
 
   implicit none
 
@@ -16,11 +16,6 @@ module rates_hopping_class
 
   type :: v_list_dp
     real(dp), dimension(:), allocatable :: list ! n_avail_ads_sites
-  end type
-
-  type :: int_law_pars
-    integer                              :: id   ! law id
-    real(dp), dimension(n_max_rcic_pars) :: pars ! parameter list
   end type
 
   type :: hopping_type
@@ -526,7 +521,7 @@ contains
     integer :: id, m, iads
     integer :: row_old, col_old, lst_old, ast_old
     integer :: row_new, col_new, lst_new, ast_new
-    real(dp) :: energy_old, energy_new
+    real(dp) :: energy_old, energy_new, int_energy_old, int_energy_new, rcic
 
     ! energy for particle ads in its old position
     energy_old = energy(ads, lat, e_pars)
@@ -579,7 +574,14 @@ contains
 !            print *, 'ads ', ads, 'm ', m,  'E_old = ', energy_old, 'E_new = ', energy_new
 !          end if
 
-          ! Apply detailed balance when
+          this%rates(ads,m)%list(iads) = function_calculating_the_correct_rate
+          ! Calculate interaction correction
+          int_energy_old = energy_old - e_pars%ads_energy(id, lst_old, ast_old)
+          int_energy_new = energy_new - e_pars%ads_energy(id, lst_new, ast_new)
+          rcic = exp(-beta*rcic_law(this%rate_corr_pars(id, lst_old, ast_old, lst_new, ast_new), &
+                                    int_energy_old, int_energy_new))
+
+          ! Apply detailed balance for the uphill hop, i.e., when
           ! energy in the old position < energy in the new position
           if (energy_old < energy_new) then
               this%rates(ads,m)%list(iads) = this%process(id, lst_old, ast_old, lst_new, ast_new)&
@@ -596,7 +598,7 @@ contains
 !                    print*, 'ads ', ads, 'm ', m, 'iads', iads, 'rate constant ', this%rates(ads,m)%list(iads)
 !                  end if
           else
-              this%rates(ads,m)%list(iads) = this%process(id, lst_old, ast_old, lst_new, ast_new)
+              this%rates(ads,m)%list(iads) = this%process(id, lst_old, ast_old, lst_new, ast_new)*rcic
 !                print*, id,lst_old, ast_old, lst_new, ast_new,this%process(id, lst_old, ast_old, lst_new, ast_new)
           end if
 
