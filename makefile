@@ -16,7 +16,7 @@ CFLAGS =
 
 # files
 SOURCE = open_file.f90 constants.f90 \
-	utilities.f90 temperature_laws.f90 \
+	utilities.f90 rate_constant_laws.f90 \
 	control_parameters_class.f90 \
 	energy_parameters_class.f90 \
 	mc_lat_class.f90 \

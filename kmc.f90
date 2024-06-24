@@ -18,7 +18,7 @@ character(len=max_string_length) file_name_base
 
 ! initialize vector of conditions for debug trap
 debug = .false.
-debug(1) = .true. !   prints out rct and rcic laws parameters
+debug(10) = .false. ! check energy correction consistency in rc calculations
 
 ! Print the banner
 print'(2A)', "kmc_tian. Release ",version
