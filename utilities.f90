@@ -103,6 +103,30 @@ contains
 
   end function read_num
 
+  logical function read_int(string, x)
+    implicit none
+
+    character(len=*), intent(in) :: string
+    integer, intent(out) :: x
+    integer :: error_code
+
+    read(string,'(i)',iostat=error_code) x
+    read_int = error_code == 0
+
+  end function read_int
+
+  logical function read_logical(string, x)
+    implicit none
+
+    character(len=*), intent(in) :: string
+    logical, intent(out) :: x
+    integer :: error_code
+
+    read(string,'(l)',iostat=error_code) x
+    read_logical = error_code == 0
+
+  end function read_logical
+
 !------------------------------------------------------------------------------
 !                 Progress bar of various flavors
 !------------------------------------------------------------------------------

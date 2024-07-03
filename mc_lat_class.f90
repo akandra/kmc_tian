@@ -509,6 +509,8 @@ contains
       n_site_types = n_max_lat_site_types
     elseif ( c_pars%step_period == 0) then
       n_site_types = 1
+    elseif ( c_pars%step_period < 0) then
+      stop "mc_lat_init: step period must be positive."
     else
       stop "mc_lat_init: step period between 1 and 5 not supported."
     end if

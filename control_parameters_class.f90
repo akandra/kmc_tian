@@ -28,14 +28,14 @@ module control_parameters_class
     integer  :: rdf_period            ! period for rdf_hist calculations
     real(dp) :: rdf_bin_size          ! size (in init cell) of the bin for rdf calculation
     integer  :: rdf_n_bins            ! number of bins for rdf_hist calculations
-    integer  :: show_progress         ! if to show progress bar
+    logical  :: show_progress         ! if to show progress bar
 
     ! MMC-specific parameters
 
     integer :: n_mmc_steps          ! number of mmc steps
-    integer :: hist_period          ! period for histogram  calculation
-    integer :: conf_save            ! key to save confs ( 0 means not)
-    integer :: running_avgs_save    ! key to save running averages ( 0 means not)
+    integer :: hist_period          ! how often to calculate a histogram
+    logical :: conf_save            ! key to save confs
+    logical :: running_avgs_save    ! key to save running averages
 
     ! MMC-GC specific parameters
 
@@ -48,7 +48,7 @@ module control_parameters_class
     integer  :: n_trajs                ! number of kMC trajectories
     integer, allocatable  :: n_bins(:) ! number of time intervals in kmc simulations
     real(dp) :: log_scale_t1           ! initial time for log binning
-    real(dp) :: power_scale_t1         ! initial time for log binning
+    real(dp) :: power_scale_t1         ! initial time for power binning
     real(dp), allocatable :: t_end(:)  ! kmc simulation times
     character(len=max_string_length) ::&
                    rate_file_name   ! name of the file with rate parameters
@@ -76,7 +76,7 @@ contains
     real(dp),allocatable :: coverages(:)
     integer :: default_int = huge(0)
 
-
+! TODO: produce proper definitions of defaults and strategy for testing the required keys
     control_parameters_init%algorithm        = ''
     control_parameters_init%n_rows           = -1
     control_parameters_init%n_cols           = -1
@@ -90,16 +90,16 @@ contains
     control_parameters_init%rdf_bin_size     = -1.0_dp
     control_parameters_init%rdf_n_bins       = -1
     control_parameters_init%rdf_period       = -1
-    control_parameters_init%show_progress    = 0
+    control_parameters_init%show_progress    = .false.
     ! MMC-specific parameters
     control_parameters_init%gc_period        =  0
     control_parameters_init%n_mmc_steps      = -1
     control_parameters_init%hist_period      = -1
-    control_parameters_init%conf_save        =  0
-    control_parameters_init%running_avgs_save=  0
+    control_parameters_init%conf_save        = .false.
+    control_parameters_init%running_avgs_save= .false.
     ! kMC-specific parameters
     control_parameters_init%start_traj       =  1
-    control_parameters_init%n_trajs          = -1
+    control_parameters_init%n_trajs          =  -1
     control_parameters_init%rate_file_name   = 'none'
     control_parameters_init%log_scale_t1     = -1.0_dp
     control_parameters_init%power_scale_t1   = -1.0_dp
@@ -133,12 +133,14 @@ contains
             select case (nwords)
 
               case (2)
-                read(words(2),*) control_parameters_init%n_rows
+                if ( .not. read_int(words(2), control_parameters_init%n_rows) )&
+                  stop err // "nlat parameter must be integer"
                 control_parameters_init%n_cols = control_parameters_init%n_rows
 
               case (3)
-                read(words(2),*) control_parameters_init%n_rows
-                read(words(3),*) control_parameters_init%n_cols
+                if ( .not. read_int(words(2), control_parameters_init%n_rows) .or. &
+                     .not. read_int(words(3), control_parameters_init%n_cols)     )&
+                  stop err // "nlat parameters must be integers"
 
               case default
                 stop err // "nlat must have 1 or 2 parameters."
@@ -148,7 +150,8 @@ contains
           case('step_period')
 
             if (nwords/=2) stop err // "step_period must have 1 parameter."
-            read(words(2),*) control_parameters_init%step_period
+            if ( .not. read_int(words(2), control_parameters_init%step_period) )&
+              stop err // "step_period must be integer"
 
           case('adsorbates')
 
@@ -163,12 +166,16 @@ contains
             if (nwords==1) stop err // "coverages must have at least 1 parameter."
             allocate(coverages(nwords - 1))
             do i=1,nwords-1
-              read(words(i+1),*) coverages(i)
+              if (.not. read_num(words(i+1), coverages(i)) ) &
+                stop err // "coverages must be numeric"
             end do
 
           case('temperature')
 
             if (nwords/=2) stop err // "temperature must have 1 parameter."
+            if ( .not. read_num(words(2), control_parameters_init%temperature) )&
+              stop err // "temperature must be a number"
+
             read(words(2),*) control_parameters_init%temperature
 
           case('energy')
@@ -181,71 +188,87 @@ contains
 
           case('rdf')
             if (nwords/=4) stop err // "rdf must have 3 parameters."
-            read(words(2),*) control_parameters_init%rdf_period
-            read(words(3),*) control_parameters_init%rdf_bin_size
-            read(words(4),*) control_parameters_init%rdf_n_bins
+            if ( .not. (read_int(words(2), control_parameters_init%rdf_period) .and. &
+                        read_num(words(3), control_parameters_init%rdf_bin_size) .and. &
+                        read_int(words(4), control_parameters_init%rdf_n_bins ) )) &
+              stop err // "rdf's period, bin size, and number of bins must be integer, real, and integer, respectively."
 
           case('show_progress')
             if (nwords/=2) stop err // "show_progress must have 1 parameter."
-            read(words(2),*) control_parameters_init%show_progress
+            if (.not. read_logical(words(2), control_parameters_init%show_progress) ) &
+              stop err // "show_progress must have type logical"
 
           case('gc_period')
             if (nwords/=2) stop err // "gc_period must have 1 parameter."
-            read(words(2),*) control_parameters_init%gc_period
+            if ( .not. read_int(words(2), control_parameters_init%gc_period) ) &
+              stop err // " gc_period must be integer"
 
           case('gc_chempots')
             if (nwords==1) stop err // "gc_chempot must have at least 1 parameter."
             allocate(control_parameters_init%chem_pots(nwords - 1))
             do i=1,nwords-1
-              read(words(i+1),*) control_parameters_init%chem_pots(i)
+              if ( .not. read_num(words(i+1), control_parameters_init%chem_pots(i)) )&
+                stop err // "gc_chempots must be numeric"
             end do
 
           case('mmc_save_period')
             if (nwords/=2) stop err // "save_period must have 1 parameter."
-            read(words(2),*) control_parameters_init%save_period
+            if ( .not. read_int(words(2), control_parameters_init%save_period) ) &
+              stop err // "mmc_save_period must be integer"
 
           case('mmc_nsteps')
             if (nwords/=2) stop err // "mmc_nsteps must have 1 parameter."
-            read(words(2),*) control_parameters_init%n_mmc_steps
+            if ( .not. read_int(words(2), control_parameters_init%n_mmc_steps) ) &
+              stop err // "mmc_nsteps must be integer"
 
           case('mmc_hist_period')
             if (nwords/=2) stop err // "mmc_hist_period must have 1 parameter."
-            read(words(2),*) control_parameters_init%hist_period
+            if ( .not. read_int(words(2), control_parameters_init%hist_period) )&
+              stop err // "mmc_hist_period must be integer"
 
           case('mmc_conf_save')
             if (nwords/=2) stop err // "mmc_conf_save must have 1 parameter."
-            read(words(2),*) control_parameters_init%conf_save
+            if ( .not. read_logical(words(2), control_parameters_init%conf_save) )&
+              stop err // "mmc_conf_save must have type logical"
 
           case('mmc_running_avgs_save')
             if (nwords/=2) stop err // "mmc_running_avgs_save must have 1 parameter."
-            read(words(2),*) control_parameters_init%running_avgs_save
+            if ( .not. read_logical(words(2), control_parameters_init%running_avgs_save) )&
+              stop err // "mmc_running_avgs_save must have type logical"
 
           case('kmc_ntrajs')
             if ( nwords/=2 .and. nwords/=3 ) stop err // "kmc_ntrajs_period must have 1 parameter."
-            read(words(2),*) control_parameters_init%n_trajs
-            if (nwords==3) read(words(3),*) control_parameters_init%start_traj
+            if ( .not. read_int(words(2), control_parameters_init%n_trajs) )&
+              stop err // "kmc_ntrajs must be integer."
+            if (nwords==3) then
+              if ( .not. read_int(words(3), control_parameters_init%start_traj) )&
+                stop err // "kmc starting trajectory must be integer"
+            endif
 
           case('kmc_time')
             if (nwords==1) stop err // "kmc_time must have at least 1 parameter."
             allocate(control_parameters_init%t_end(nwords - 1))
             do i=1,nwords-1
-              read(words(i+1),*) control_parameters_init%t_end(i)
+              if ( .not. read_num(words(i+1), control_parameters_init%t_end(i)) )&
+                stop err // "kmc_time must be numeric"
             end do
-
           case('kmc_nbins')
             if (nwords==1) stop err // "kmc_nbins must have at least 1 parameter."
             allocate(control_parameters_init%n_bins(nwords - 1))
             do i=1,nwords-1
-              read(words(i+1),*) control_parameters_init%n_bins(i)
+              if ( .not. read_int(words(i+1), control_parameters_init%n_bins(i)) )&
+                stop err // "kmc_nbins must be integer"
             end do
 
           case('kmc_log_bin')
             if (nwords /= 2) stop err // "kmc_log_bin must have 1 parameter."
-            read(words(2),*) control_parameters_init%log_scale_t1
+            if ( .not. read_num(words(2), control_parameters_init%log_scale_t1) )&
+              stop err // "kmc_log_bin must be numeric"
 
           case('kmc_power_bin')
             if (nwords /= 2) stop err // "kmc_power_bin must have 1 parameter."
-            read(words(2),*) control_parameters_init%power_scale_t1
+            if ( .not. read_num(words(2), control_parameters_init%power_scale_t1) )&
+              stop err // "kmc_power_bin must be numeric"
 
           case('kmc_rates')
             if (nwords/=2) stop err // "kmc_rates must have 1 parameter."
@@ -265,15 +288,32 @@ contains
 
     ! Check the input consistency
 
+    if (control_parameters_init%n_rows <= 0 .or. control_parameters_init%n_cols <= 0) then
+      print*, " n_rows: ", control_parameters_init%n_rows
+      print*, " n_cols: ", control_parameters_init%n_cols
+      stop err // "lattice size parameters must be positive"
+    end if
+
     if (size(coverages) /= size(control_parameters_init%ads_names))&
       stop err // "adsorbates and coverages are inconsistent"
     ! set the number of adsorbates
     control_parameters_init%n_species = size(coverages)
 
+    do i=1,control_parameters_init%n_species
+      if (coverages(i) < 0.0_dp ) stop err // " coverages have to be non-negative."
+    end do
+
     if (control_parameters_init%step_period > 0 &
         .and. mod(control_parameters_init%n_cols,&
                   control_parameters_init%step_period) /= 0)&
       stop err // "inconsistent number of columns (nlat's second value) and step_period."
+
+    if (control_parameters_init%temperature < 0) &
+      stop err // " negative temperatures are not supported."
+
+    if (control_parameters_init%rdf_bin_size <= 0.0_dp .or.  &
+        control_parameters_init%rdf_n_bins <= 0 ) &
+      stop err // " rdf's bin size and number of bins must be positive."
 
     allocate(control_parameters_init%n_ads(control_parameters_init%n_species))
     ! Calculate number of adsorbate particles
@@ -290,7 +330,7 @@ contains
       if (control_parameters_init%save_period == default_int )&
         stop err // "mmc_save_period is undefined."
       if (control_parameters_init%save_period < 0 )&
-        stop err // "mmc_save_period is negative."
+        stop err // "mmc_save_period must be non-negative."
 
       if (control_parameters_init%gc_period > 0) then
         ! TODO: implement gc for the mixture of species
@@ -302,7 +342,11 @@ contains
       end if
 
     case('bkl')
-      ! Check kmc_nbins and kmc_time
+
+      if (control_parameters_init%n_trajs <= 0)&
+        stop err // "kmc_ntrajs must be positive or can be missing."
+      if (control_parameters_init%start_traj <= 0)&
+        stop err // "kmc starting trajectory must be positive."
 
       if ( .not.allocated(control_parameters_init%n_bins) ) stop err // "kmc_nbins is undefined."
       if ( .not.allocated(control_parameters_init%t_end)  ) stop err // "kmc_time is undefined."
@@ -311,13 +355,16 @@ contains
         stop err // "kmc_bins and kmc_time are inconsistent."
 
       do i=1,size(control_parameters_init%n_bins)
-        if (control_parameters_init%n_bins(i) == 0 ) control_parameters_init%n_bins(i) = 1
-        if (control_parameters_init%n_bins(i) < 0 ) stop err // "kmc_nbins is negative."
+        ! if (control_parameters_init%n_bins(i) == 0 ) control_parameters_init%n_bins(i) = 1
+        if (control_parameters_init%n_bins(i) <= 0 ) stop err // "kmc_nbins must be positive."
       end do
 
       do i=1,size(control_parameters_init%t_end)
-        if (control_parameters_init%t_end(i) <= 0 ) stop err // "kmc_time is not positive."
+        if (control_parameters_init%t_end(i) <= 0 ) stop err // "kmc_time must be positive."
       end do
+
+      if (control_parameters_init%rate_file_name == 'none')&
+        stop err // "kmc_rates file name is not defined"
 
     end select
 

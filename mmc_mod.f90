@@ -38,13 +38,21 @@ subroutine metropolis(lat, c_pars, e_pars)
   ! lst-specific coverage in ML
   integer,  dimension(c_pars%n_species,n_max_lat_site_types) :: lst_pops
   ! replica-specific coverage in ML
-  integer,  dimension(c_pars%n_species,lat%n_cols/c_pars%step_period) :: replica_pops
+  integer,  dimension(:,:), allocatable :: replica_pops
   ! vector of zigzag-related coverage in ML
   integer :: ns(4), zigzag(2,2,2,2)
+
+  if (c_pars%step_period > 0) then
+    allocate(replica_pops(c_pars%n_species,lat%n_cols/c_pars%step_period))
+    replica_pops = 0
+  end if
+
 
 !  real(dp), dimension(c_pars%rdf_n_bins) :: dr2
 !  real(dp), dimension(c_pars%n_species) :: coverage
 !  real(dp) :: unit_cell_area
+
+  version_header = '! kmc_tian Release ' // version
 
   n_sites = lat%n_rows*lat%n_cols
   cov_factor = 1.0_dp/(n_sites*c_pars%save_period)
@@ -60,12 +68,9 @@ subroutine metropolis(lat, c_pars, e_pars)
 !  end do
 
 
-  ! Output formats
-  write(n_ads_fmt,'(i10)') lat%n_ads_tot()
-  n_ads_fmt = '('//trim(adjustl(n_ads_fmt))//'i8)'
+  ! Output formats for rdf
   write(rdf_fmt,'(i10)') c_pars%rdf_n_bins
   rdf_fmt = '('//trim(adjustl(rdf_fmt))//'i8)'
-  version_header = '! kmc_tian Release ' // version
 
   ! write initial state of the lattice to a file
   call open_for_write(outcfg_unit,trim(c_pars%file_name_base)//'.confs')
@@ -86,10 +91,9 @@ subroutine metropolis(lat, c_pars, e_pars)
   write(outeng_unit,*) 0, total_energy(lat,e_pars), lat%n_ads
 
   ! open file for saving running averages
-  if (c_pars%running_avgs_save > 0) call open_for_write(outrav_unit,trim(c_pars%file_name_base)//'.rav')
+  if (c_pars%running_avgs_save) call open_for_write(outrav_unit,trim(c_pars%file_name_base)//'.rav')
   ! Initialize accumulators
   lst_pops = 0
-  replica_pops = 0
   zigzag = 0
 
   ! open file for saving cluster size histogram
@@ -253,7 +257,7 @@ subroutine metropolis(lat, c_pars, e_pars)
     end if ! gc_period
 
     ! Accumulate running averages
-    if (c_pars%running_avgs_save > 0) then
+    if (c_pars%running_avgs_save) then
 
       do i=1, lat%n_ads_tot()
 
@@ -262,7 +266,8 @@ subroutine metropolis(lat, c_pars, e_pars)
         species = lat%ads_list(i)%id
         i_lst   = lat%lst(row,col)
         lst_pops(species,i_lst) = lst_pops(species,i_lst) + 1
-        replica_pops(species, (col-1)/c_pars%step_period + 1) = replica_pops(species, (col-1)/c_pars%step_period + 1) + 1
+        if (c_pars%step_period > 0) replica_pops(species, (col-1)/c_pars%step_period + 1)= &
+                                    replica_pops(species, (col-1)/c_pars%step_period + 1) + 1
 
         ! counting zigzags
         if (i_lst == corner_site) then ! an adsorbate at the corner
@@ -289,7 +294,7 @@ subroutine metropolis(lat, c_pars, e_pars)
     end if
 
     ! Calculate the cluster size histogramm
-    if (c_pars%hist_period > 0 .and. mod(istep, c_pars%hist_period) == 0) then
+    if (c_pars%hist_period > 0  .and. mod(istep, c_pars%hist_period) == 0) then
       hist_counter = hist_counter + 1
 
 !      do species=1,c_pars%n_species
@@ -322,23 +327,30 @@ subroutine metropolis(lat, c_pars, e_pars)
       write(outeng_unit,*) istep, total_energy(lat,e_pars), lat%n_ads
 
       ! Save configuration
-      if (c_pars%conf_save > 0 ) then
+      if (c_pars%conf_save) then
         write(outcfg_unit,'(A10,i0)') "mmc_step ",istep
         write(outcfg_unit,'(100i10)') lat%n_ads
         call lat%print_ads(outcfg_unit)
       end if
 
       ! Save running averages
-      if (c_pars%running_avgs_save > 0) then
-        write(outrav_unit,'(i0,1000f15.8)') istep, cov_factor*lst_pops, cov_factor*zigzag, cov_factor*replica_pops
+      if (c_pars%running_avgs_save) then
+        write(outrav_unit,'(i0,1000f15.8)', advance='no') istep, cov_factor*lst_pops, cov_factor*zigzag
+        if (c_pars%step_period > 0) then
+          write(outrav_unit,'(f15.8)') cov_factor*replica_pops
+          replica_pops = 0
+        end if
         lst_pops = 0
-        replica_pops = 0
         zigzag = 0
       end if
 
       ! Save cluster size histogram
-      if (c_pars%hist_period > 0) then
+      ! block output if there's no adsorbates
+      ! WARNING: reconsider when HK algorithm will be on again
+      if (c_pars%hist_period > 0 .and. lat%n_ads_tot() > 0 ) then
         write(outhst_unit,*) 'counts ', hist_counter
+        write(n_ads_fmt,'(i10)') lat%n_ads_tot()
+        n_ads_fmt = '('//trim(adjustl(n_ads_fmt))//'i8)'
         do species=1,c_pars%n_species
           write(outhst_unit,*) species
           write(outhst_unit,n_ads_fmt) hist(species,:)
@@ -373,9 +385,14 @@ subroutine metropolis(lat, c_pars, e_pars)
 
   close(outcfg_unit)
   close(outeng_unit)
-  if (c_pars%running_avgs_save > 0) close(outrav_unit)
+  if (c_pars%running_avgs_save) close(outrav_unit)
   if (c_pars%hist_period > 0) close(outhst_unit)
   if (c_pars%rdf_period  > 0) close(outrdf_unit)
+
+  if (c_pars%step_period > 0) then
+    deallocate(replica_pops)
+  end if
+
 
   print*
   print*,"MMC done. Goodbye."
