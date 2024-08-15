@@ -108,7 +108,7 @@ subroutine metropolis(lat, c_pars, e_pars)
   rdf_counter = 0
   rdf_hist = 0
 
-  if (c_pars%show_progress > 0) then
+  if (c_pars%show_progress) then
     write(*,'(20X,A)') "M.M.C. Code's progress report:"
     call progress_bar(0)
   end if
@@ -321,7 +321,7 @@ subroutine metropolis(lat, c_pars, e_pars)
     end if
 
     if (mod(istep, c_pars%save_period) == 0) then
-      if (c_pars%show_progress > 0) call progress_bar(100*istep/c_pars%n_mmc_steps)
+      if (c_pars%show_progress) call progress_bar(100*istep/c_pars%n_mmc_steps)
 
       ! Save energy
       write(outeng_unit,*) istep, total_energy(lat,e_pars), lat%n_ads
@@ -376,8 +376,9 @@ subroutine metropolis(lat, c_pars, e_pars)
 
   end do ! over mmc steps
 
+
   ! Save the last configuration
-  if (mod(c_pars%n_mmc_steps, c_pars%save_period) /= 0) then
+  if ( (mod(c_pars%n_mmc_steps, c_pars%save_period) /= 0) .or. (.not. c_pars%conf_save) ) then
     write(outcfg_unit,'(A10,i0)') "mmc_step ",c_pars%n_mmc_steps
     write(outcfg_unit,'(100i10)') lat%n_ads
     call lat%print_ads(outcfg_unit)
