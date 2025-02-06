@@ -187,11 +187,11 @@ subroutine metropolis(lat, c_pars, e_pars)
         lat%ads_list(new_n_ads)%id  = species
         lat%ads_list(new_n_ads)%row = row
         lat%ads_list(new_n_ads)%col = col
-        n_ads_sites = size( lat%avail_ads_sites( lat%lst(row,col), species )%list )
+        n_ads_sites = size( lat%avail_ads_sites( species, lat%lst(row,col) )%list )
         if ( n_ads_sites == 1 ) then
-          lat%ads_list(new_n_ads)%ast = lat%avail_ads_sites( lat%lst(row,col), species )%list(1)
+          lat%ads_list(new_n_ads)%ast = lat%avail_ads_sites( species, lat%lst(row,col) )%list(1)
         else
-          lat%ads_list(new_n_ads)%ast = lat%avail_ads_sites( lat%lst(row,col), species )%list( irand(n_ads_sites) )
+          lat%ads_list(new_n_ads)%ast = lat%avail_ads_sites( species, lat%lst(row,col) )%list( irand(n_ads_sites) )
         end if
 
         ! energy change due to the added adsorbate minus chemical potential

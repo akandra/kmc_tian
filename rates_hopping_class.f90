@@ -422,9 +422,9 @@ contains
 
   write(*,'(A)') '  Hopping Rates Report.'
   write(*,'(A)') '  --------------------------'
-  do species=1,c_pars%n_species
-  do st1       = 1, n_max_lat_site_types
 
+  do species = 1,c_pars%n_species
+  do st1 = 1,size(lat%avail_ads_sites(species,:))
     col_st1 = get_indices(st1,lat%lst(1,:))
     if (col_st1(1) > 0) then
 
@@ -487,8 +487,8 @@ contains
   ! Replace default rates with zeros to escape negative rates
 
     do species=1,c_pars%n_species
-    do st1=1, n_max_lat_site_types
-    do st2=1, n_max_lat_site_types
+    do st1=1,size(lat%avail_ads_sites(species,:))
+    do st2=1,size(lat%avail_ads_sites(species,:))
     do i1=1,size(lat%avail_ads_sites(species,st1)%list)
     do i2=1,size(lat%avail_ads_sites(species,st2)%list)
 
