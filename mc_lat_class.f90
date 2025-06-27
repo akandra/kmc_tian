@@ -91,7 +91,7 @@ contains
     ! Adsorption sites on the unit hex cell
     !  T---------B1---------.           1 top       (T)
     !   \  .              .  .          2 fcc       (F)
-    !    \     F         .    .         3 hcp       (H)
+    !    \     S         .    .         3 hcp       (H)
     !     \        .   .       .        4 bridge 1  (B1)
     !      B3        B2         .       5 bridge 2  (B2)
     !       \       .     .      .      6 bridge 3  (B3)

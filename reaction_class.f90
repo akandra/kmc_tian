@@ -431,7 +431,7 @@ contains
     ! determine the type of reaction
     do reaction_id=1,n_reaction_types
       if (u < this%acc_rate(reaction_id)) exit
-!      if (debug(1)) print*,reaction_id, this%acc_rate(reaction_id), u
+      if (debug(1)) print*,reaction_id, this%acc_rate(reaction_id), u
     end do
 
 !if (debug(1)) then
@@ -461,13 +461,13 @@ contains
               ast_new = lat%avail_ads_sites(id_r,lst_new)%list(iads)
               temp_dp = temp_dp + this%hopping%rates(ads,m_nn)%list(iads)
               if (u < temp_dp) then
-!                if (debug(1)) then
-!                  print*
-!                  print*, 'ads ', ads, 'm_nn ', m_nn, 'iads', iads
-!                  do i=1, size(this%hopping%rates(ads,:))
-!                    print*, 'rate ', this%hopping%rates(ads,i)%list(iads)
-!                  end do
-!                end if
+                if (debug(1)) then
+                  print*
+                  print*, 'ads ', ads, 'm_nn ', m_nn, 'iads', iads
+                  do i=1, size(this%hopping%rates(ads,:))
+                    print*, 'rate ', this%hopping%rates(ads,i)%list(iads)
+                  end do
+                end if
                 exit extloop
               end if
             end do

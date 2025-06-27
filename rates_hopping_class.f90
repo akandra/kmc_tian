@@ -287,6 +287,7 @@ contains
               undefined_energy = .true.
             end if
 
+
             ! ---------------------------------------------------------
             ! we have a valid rate record. Process it
             ! ---------------------------------------------------------
@@ -307,6 +308,7 @@ contains
               rct_law_id  = 0
               rcic_law_id = 0
 
+!!! WARNING! Correct errors in parsing!
               do i=5,nwords
                 ! check  for rct law on this line
                 if (get_index(words(i), rct_law_names) /= 0) then
@@ -361,7 +363,6 @@ contains
                                    "no interaction law is specified")
 
             end if ! (nwords==4)
-
 
             ! Check if rct and rcic laws are properly set
             if (rct_law_id == 0) &
@@ -567,6 +568,15 @@ contains
           ! Calculate energy of ads in new position
           energy_new = energy(ads, lat, e_pars)
 
+          if (debug(10)) then
+            write(*,*) ''
+            write(*,'(A,I5,A,I5)') "ads_id", id, " ads_no", iads
+            write(*,'(A,I5,I5,A,I5,I5)') "from", lst_old, ast_old, " to", lst_new, ast_new
+            write(*,'(A,F8.3,A,F8.3)') "E0_i=", e_pars%ads_energy(id, lst_old, ast_old),&
+                                       " E0_f=", e_pars%ads_energy(id, lst_new, ast_new)
+            write(*,'(A,F8.3,A,F8.3)') "E_i =", energy_old, " E_f =", energy_new
+          end if
+
           ! Calculate interaction correction
           int_energy_old = energy_old - e_pars%ads_energy(id, lst_old, ast_old)
           int_energy_new = energy_new - e_pars%ads_energy(id, lst_new, ast_new)
@@ -590,11 +600,6 @@ contains
           end if
 
           if (debug(10)) then
-            write(*,*) ''
-            write(*,'(A,I5,A,I5)') "ads_id", id, " ads_no", iads
-            write(*,'(A,F8.3,A,F8.3)') "E0_i=", e_pars%ads_energy(id, lst_old, ast_old),&
-                                       " E0_f=", e_pars%ads_energy(id, lst_new, ast_new)
-            write(*,'(A,F8.3,A,F8.3)') "E_i =", energy_old, " E_f =", energy_new
             write(*,'(A,F8.3)') "delta_eps =", delta_eps
             write(*,'(A,ES10.3)') "uncorrected rate =", this%process(id, lst_old, ast_old, lst_new, ast_new)
             write(*,'(A,F8.3)') "correction energy =",&
@@ -603,7 +608,6 @@ contains
                       ' *', int_energy_old, ' + ', this%rate_corr_pars(id, lst_old, ast_old, lst_new, ast_new)%pars(2),&
                       ' *', int_energy_new
             write(*,'(A,F8.3)') "V_TS=", int_energy_ts
-
           end if
 
         end do ! iads

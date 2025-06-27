@@ -128,8 +128,9 @@ contains
 !            print*, 'id       =', current_species_id
 !            print*, c_pars%ads_names
 
+! Quick and dirty fix for desorption for 332
 !------------------------------------------------------------------------------
-          case ('terrace','step','corner')              ! select case(words(1))
+          case ('terrace','step','corner','ts2','tc1')              ! select case(words(1))
 !------------------------------------------------------------------------------
 
 

@@ -81,6 +81,12 @@ contains
     select case (rcic_info%id)
       case (rcic_linear_id)
         rcic_law = rcic_linear(V_A, V_B, rcic_info%pars)
+      case (0)
+        ! when the process is not defined in rates file
+        rcic_law = 0
+        if (debug(10)) then
+          write(*,*) " rcic_law function: frustrated hop"
+        end if
       case default
         stop " rcic_law function error: Should never occur"
     end select
