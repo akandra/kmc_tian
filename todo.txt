@@ -1,0 +1,14 @@
+2025-06-27 :
+    add additional run info in the output banner
+
+2025-06-27 control_parameters_class.f90:
+    add a new key stopping the run after specified number of steps
+
+2025-06-27 control_parameters_class.f90:
+    do error messaging with function error_message from utilities
+    in particular, check nlat positive and remove respective redundant consistency check
+
+2025-06-27 control_parameters_class.f90:
+    unify reading of control and energy parameters by introducing
+    function read_value(string, expected type, expected_property, output)
+

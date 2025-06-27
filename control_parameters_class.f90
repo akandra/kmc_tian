@@ -311,9 +311,11 @@ contains
     if (control_parameters_init%temperature < 0) &
       stop err // " negative temperatures are not supported."
 
-    if (control_parameters_init%rdf_bin_size <= 0.0_dp .or.  &
-        control_parameters_init%rdf_n_bins <= 0 ) &
-      stop err // " rdf's bin size and number of bins must be positive."
+    if (control_parameters_init%rdf_period /= -1) then
+      if (control_parameters_init%rdf_bin_size <= 0.0_dp .or.  &
+          control_parameters_init%rdf_n_bins <= 0 ) &
+        stop err // " rdf's bin size and number of bins must be positive."
+    end if
 
     allocate(control_parameters_init%n_ads(control_parameters_init%n_species))
     ! Calculate number of adsorbate particles
