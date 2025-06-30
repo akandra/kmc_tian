@@ -413,7 +413,11 @@ contains
       stop 997
 
     else
-      write(*, '(A)') ' hopping: passed check that energies are defined for all rates'
+      if (hopping_init%is_defined) then
+        write(*, '(A)') ' hopping: passed check that energies are defined for all rates'
+      else
+        write(*, '(A)') ' no hopping'
+      end if
 
     end if
 
@@ -421,69 +425,69 @@ contains
   ! Hopping rates report
   ! ----------------------------------------------------------------------------
 
-  write(*,'(A)') '  Hopping Rates Report.'
-  write(*,'(A)') '  --------------------------'
+  if  (hopping_init%is_defined) then
 
-  do species = 1,c_pars%n_species
-  do st1 = 1,size(lat%avail_ads_sites(species,:))
-    col_st1 = get_indices(st1,lat%lst(1,:))
-    if (col_st1(1) > 0) then
+    write(*,'(A)') '  Hopping Rates Report.'
+    write(*,'(A)') '  --------------------------'
 
-      do i1=1,size(lat%avail_ads_sites(species,st1)%list)
-        ast1 = lat%avail_ads_sites(species,st1)%list(i1)
+    do species = 1,c_pars%n_species
+    do st1 = 1,size(lat%avail_ads_sites(species,:))
+      col_st1 = get_indices(st1,lat%lst(1,:))
+      if (col_st1(1) > 0) then
 
-          write(*,'(2X,A11,A11,A4)') c_pars%ads_names(species),lat_site_names(st1),ads_site_names(ast1)
+        do i1=1,size(lat%avail_ads_sites(species,st1)%list)
+          ast1 = lat%avail_ads_sites(species,st1)%list(i1)
 
-          ! Intra-site hops
-          do i2=1,size(lat%avail_ads_sites(species,st1)%list)
-            ast2 = lat%avail_ads_sites(species,st1)%list(i2)
-            if (ast2 /= ast1) then
-              check_str = '  '
-              if (hopping_init%process_intra(species,st1,ast1,ast2) /= default_rate) check_str = check_mark
-              write(*,'(5X,A2,X,A11,A11,A4)',advance='NO') &
-                check_str, c_pars%ads_names(species), same_lst_mark, ads_site_names(ast2)
-              if (debug(1)) then
-                write(*,'(3X,E10.3,2X,A,5F10.3)') hopping_init%process_intra(species,st1,ast1,ast2),&
-                                   rcic_law_names(hopping_init%rate_corr_pars_intra(species,st1,ast1,ast2)%id),&
-                                                  hopping_init%rate_corr_pars_intra(species,st1,ast1,ast2)%pars
-              else
-                write(*,*) ''
+            write(*,'(2X,A11,A11,A4)') c_pars%ads_names(species),lat_site_names(st1),ads_site_names(ast1)
+
+            ! Intra-site hops
+            do i2=1,size(lat%avail_ads_sites(species,st1)%list)
+              ast2 = lat%avail_ads_sites(species,st1)%list(i2)
+              if (ast2 /= ast1) then
+                check_str = '  '
+                if (hopping_init%process_intra(species,st1,ast1,ast2) /= default_rate) check_str = check_mark
+                write(*,'(5X,A2,X,A11,A11,A4)',advance='NO') &
+                  check_str, c_pars%ads_names(species), same_lst_mark, ads_site_names(ast2)
+                if (debug(1)) then
+                  write(*,'(3X,E10.3,2X,A,5F10.3)') hopping_init%process_intra(species,st1,ast1,ast2),&
+                                     rcic_law_names(hopping_init%rate_corr_pars_intra(species,st1,ast1,ast2)%id),&
+                                                    hopping_init%rate_corr_pars_intra(species,st1,ast1,ast2)%pars
+                else
+                  write(*,*) ''
+                end if
               end if
-            end if
 
-          end do
-
-          ! Inter-site hops
-          do m = -1,1
-
-            st2 = lat%lst(1, modulo(col_st1(1) + m - 1, lat%n_cols) + 1)
-
-            do i2=1,size(lat%avail_ads_sites(species,st2)%list)
-              ast2 = lat%avail_ads_sites(species,st2)%list(i2)
-              check_str = '  '
-              if (hopping_init%process(species,st1,ast1,st2,ast2) /= default_rate) check_str = check_mark
-              write(*,'(5X,A2,X,A11,A11,A4)',advance='NO') &
-                check_str, c_pars%ads_names(species), lat_site_names(st2), ads_site_names(ast2)
-              if (debug(1)) then
-                write(*,'(3X,E10.3,2X,A,5F10.3)') hopping_init%process(species,st1,ast1,st2,ast2),&
-                                   rcic_law_names(hopping_init%rate_corr_pars(species,st1,ast1,st2,ast2)%id),&
-                                                  hopping_init%rate_corr_pars(species,st1,ast1,st2,ast2)%pars
-              else
-                write(*,*) ''
-              end if
             end do
 
-          end do
-          write(*,*) ''
+            ! Inter-site hops
+            do m = -1,1
 
-      end do
+              st2 = lat%lst(1, modulo(col_st1(1) + m - 1, lat%n_cols) + 1)
 
-    end if
+              do i2=1,size(lat%avail_ads_sites(species,st2)%list)
+                ast2 = lat%avail_ads_sites(species,st2)%list(i2)
+                check_str = '  '
+                if (hopping_init%process(species,st1,ast1,st2,ast2) /= default_rate) check_str = check_mark
+                write(*,'(5X,A2,X,A11,A11,A4)',advance='NO') &
+                  check_str, c_pars%ads_names(species), lat_site_names(st2), ads_site_names(ast2)
+                if (debug(1)) then
+                  write(*,'(3X,E10.3,2X,A,5F10.3)') hopping_init%process(species,st1,ast1,st2,ast2),&
+                                     rcic_law_names(hopping_init%rate_corr_pars(species,st1,ast1,st2,ast2)%id),&
+                                                    hopping_init%rate_corr_pars(species,st1,ast1,st2,ast2)%pars
+                else
+                  write(*,*) ''
+                end if
+              end do
 
-  end do
-  end do
+            end do
+            write(*,*) ''
 
+        end do
 
+      end if
+
+    end do
+    end do
 
   ! Replace default rates with zeros to escape negative rates
 
@@ -507,6 +511,9 @@ contains
     end do
     end do
     end do
+
+  end if
+
 
   end function hopping_init
 

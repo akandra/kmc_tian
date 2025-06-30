@@ -1,6 +1,6 @@
 module constants
 
-  use, intrinsic :: iso_fortran_env
+  use, intrinsic:: iso_fortran_env
 
   implicit none
   public

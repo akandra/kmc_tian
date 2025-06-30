@@ -1,3 +1,17 @@
+2025-06-30 constants.f90:
+    put default_rate and other constants into the constants.f90 module
+
+2025-06-30 constants.f90:
+    find out if it is necessary to have lst's of type A explicitly defined
+
+2025-06-30 checks_mod.f90:
+    figure out what function check_nn_new_list does:
+      presumably, it is checking double counting of nn after the hope.
+
+2025-06-30 :
+    make a code work with gfortran
+        - use iso_fortran_env is not working
+
 2025-06-27 :
     add additional run info in the output banner
 

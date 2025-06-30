@@ -70,8 +70,8 @@ prepare_debug:
 prepare_release:
 	mkdir -p $(RDIR)
 
-remaked: clean_debug debug
-remaker: clean_release release
+rebuild_debug: clean_debug debug
+rebuild: clean_release release
 
 clean: clean_debug clean_release
 clean_debug:

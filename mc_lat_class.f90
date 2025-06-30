@@ -103,7 +103,7 @@ contains
     lat%lat_vec_1 = [ cos(0.0_dp),    -sin(0.0_dp)   ]
     lat%lat_vec_2 = [ cos(pi/3.0_dp), -sin(pi/3.0_dp)]
 
-    ! Shell-wise number of neighbors for hex lattice with B-type steps
+    ! Shell-wise number of neighbors for hex lattice with A- and B-type steps
     lat%n_nn(terrace_site,:) = [6,6,6]
     lat%n_nn(   step_site,:) = [5,5,7]
     lat%n_nn( corner_site,:) = [4,4,6]

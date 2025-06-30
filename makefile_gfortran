@@ -12,7 +12,7 @@ FPPFLAGS = -cpp -D__GIT_VERSION__=\"$(GIT_VERSION)\"
 FC = gfortran
 
 # compiler flags
-CFLAGS =
+CFLAGS = -std=f2003 -Wpedantic 
 
 # files
 SOURCE = open_file.f90 constants.f90 \
