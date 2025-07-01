@@ -298,9 +298,15 @@ contains
                 rct_pars    = rct_pars_glob
                 rcic_law_id = rcic_law_id_glob
                 rcic_pars   = rcic_pars_glob
+              elseif ( .not. rct_law_defined .and. .not. rcic_law_defined ) then
+                  call error_message(file_name, line_number, buffer, &
+                                 "temperature and interaction laws are not defined")
+              elseif (.not. rct_law_defined) then
+                  call error_message(file_name, line_number, buffer, &
+                                 "temperature law is not defined")
               else
-                call error_message(file_name, line_number, buffer, &
-                                 "temperature and/or interaction laws are not defined")
+                  call error_message(file_name, line_number, buffer, &
+                                 "interaction law is not defined")
               end if
 
             else
@@ -308,7 +314,6 @@ contains
               rct_law_id  = 0
               rcic_law_id = 0
 
-!!! WARNING! Correct errors in parsing!
               do i=5,nwords
                 ! check  for rct law on this line
                 if (get_index(words(i), rct_law_names) /= 0) then
@@ -329,8 +334,8 @@ contains
                     case default
                       call error_message(file_name, line_number, buffer, "This should not happen! Check the code!")
                   end select
-                end if
 
+                end if
 
                 ! check if we have an rcic law on this line
                 if (get_index(words(i), rcic_law_names) /= 0) then
@@ -350,9 +355,14 @@ contains
               end do ! i=5,nwords
 
               ! if rct_law  or rcic_law are not defined on this line, set to global defaults
-              if (rct_law_id  == 0)  rct_law_id =  rct_law_id_glob
-              if (rcic_law_id == 0) rcic_law_id = rcic_law_id_glob
-
+              if (rct_law_id == 0) then
+                rct_law_id = rct_law_id_glob
+                rct_pars   = rct_pars_glob
+              end if
+              if (rcic_law_id == 0) then
+                rcic_law_id = rcic_law_id_glob
+                rcic_pars   = rcic_pars_glob
+              end if
 
               ! check for valid temperature and interaction laws
               if (rct_law_id == 0) &

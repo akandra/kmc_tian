@@ -1,3 +1,6 @@
+2025-07-01 rates_hopping_class.f90:
+    simplify the parsing of local rct and rcic law ids and parameters
+
 2025-06-30 constants.f90:
     put default_rate and other constants into the constants.f90 module
 
