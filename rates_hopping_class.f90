@@ -603,9 +603,9 @@ contains
           ! Get barrier correction
           delta_eps = int_energy_ts - int_energy_old
           ! Add a correction if the unperturbed hop is uphill
-          if ( e_pars%ads_energy(id, lst_new, ast_new) > e_pars%ads_energy(id, lst_old, ast_old) )&
-            delta_eps = delta_eps + &
-                e_pars%ads_energy(id, lst_new, ast_new) - e_pars%ads_energy(id, lst_old, ast_old)
+          !if ( e_pars%ads_energy(id, lst_new, ast_new) > e_pars%ads_energy(id, lst_old, ast_old) )&
+          !  delta_eps = delta_eps + &
+          !      e_pars%ads_energy(id, lst_new, ast_new) - e_pars%ads_energy(id, lst_old, ast_old)
 
           ! Apply barrier correction for a perturbed hop
           if (energy_old < energy_new) then ! uphill

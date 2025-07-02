@@ -141,8 +141,8 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
     ! write initial state of the lattice into a file
     call open_for_write(outcfg_unit,trim(c_pars%file_name_base)//'_'//trim(buffer)//'.confs')
     write(outcfg_unit,'(A)') trim(version_header)
-    write(outcfg_unit,'(A10,A10,A15)') "# rows","# cols","step_period"
-    write(outcfg_unit,'(3i10)') lat%n_rows, lat%n_cols, c_pars%step_period
+    write(outcfg_unit,'(A20,A20,A20)') "# rows(|| to steps)","# cols","step_period"
+    write(outcfg_unit,'(3i20)') lat%n_rows, lat%n_cols, c_pars%step_period
     write(outcfg_unit,'(100A10)') adjustr(c_pars%ads_names)
     write(outcfg_unit,'(A6,1pe12.3)') "time ",0.0_dp
     write(outcfg_unit,'(100i10)') lat%n_ads
@@ -217,7 +217,7 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
 
       ! propagate the time
       delta_t = -log(ran1())/r%acc_rate(n_reaction_types)   ! when does a reaction occur?
-!      write(*,*) 'Total rate: ', r%acc_rate(n_reaction_types), 'time step: ', delta_t
+      ! write(*,*) 'Total rate: ', r%acc_rate(n_reaction_types), 'time step: ', delta_t
 
       time = time + delta_t
 
