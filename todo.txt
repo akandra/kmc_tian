@@ -1,3 +1,8 @@
+do not forget to correct pptx diagrams for barrier corrections!
+and proceed with desorption!
+
+2025-07-03 :
+    save the final state independent of the time binning
 2025-07-01 rates_hopping_class.f90:
     simplify the parsing of local rct and rcic law ids and parameters
 

@@ -600,21 +600,16 @@ contains
           int_energy_ts  = rcic_law(this%rate_corr_pars(id, lst_old, ast_old, lst_new, ast_new), &
                                     int_energy_old, int_energy_new)
 
-          ! Get barrier correction
+          ! Barrier correction due to the perturbation
           delta_eps = int_energy_ts - int_energy_old
-          ! Add a correction if the unperturbed hop is uphill
-          !if ( e_pars%ads_energy(id, lst_new, ast_new) > e_pars%ads_energy(id, lst_old, ast_old) )&
-          !  delta_eps = delta_eps + &
-          !      e_pars%ads_energy(id, lst_new, ast_new) - e_pars%ads_energy(id, lst_old, ast_old)
 
-          ! Apply barrier correction for a perturbed hop
-          if (energy_old < energy_new) then ! uphill
-              this%rates(ads,m)%list(iads) = this%process(id, lst_old, ast_old, lst_new, ast_new)&
-                  *exp( -beta*(delta_eps + energy_new - energy_old) )
-          else ! downhill
-              this%rates(ads,m)%list(iads) = this%process(id, lst_old, ast_old, lst_new, ast_new)&
-                  *exp( -beta*delta_eps )
-          end if
+          ! Add barrier correction if the unperturbed process is uphill
+          if ( e_pars%ads_energy(id, lst_new, ast_new) > e_pars%ads_energy(id, lst_old, ast_old) )&
+            delta_eps = delta_eps + &
+                e_pars%ads_energy(id, lst_new, ast_new) - e_pars%ads_energy(id, lst_old, ast_old)
+
+          this%rates(ads,m)%list(iads) = &
+            this%process(id, lst_old, ast_old, lst_new, ast_new)*exp( -beta*delta_eps )
 
           if (debug(10)) then
             write(*,'(A,F8.3)') "delta_eps =", delta_eps
