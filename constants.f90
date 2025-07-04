@@ -106,7 +106,7 @@ module constants
   character(len=2), parameter :: check_mark = '->'
 
   !-------- Section end keyword
-  character(len=10), parameter :: section_end = ''
+  character(len=10), parameter :: section_end = 'end'
 
 
   !-------- Temperature dependences info ---------!

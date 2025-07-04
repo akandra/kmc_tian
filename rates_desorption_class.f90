@@ -87,17 +87,19 @@ contains
     line_number = 0
     undefined_energy = .false.
 
-
+    !---------------------------------------------------------------------------
+    ! loop over all lines of rate input file
+    !---------------------------------------------------------------------------
 
     do while (ios == 0)
 
       read(inp_unit, '(A)', iostat=ios) buffer
-      line_number = line_number + 1
-        ! ios < 0: end of record condition encountered or endfile condition detected
-        ! ios > 0: an error is detected
-        ! ios = 0  otherwise
 
-      if (ios /= 0) exit
+      line_number = line_number + 1
+      ! ios = 0: valid record read
+      ! ios < 0: end of record condition encountered or end of file condition detected
+      ! ios > 0: an error is detected
+      !if (ios < 0) buffer = section_end  ! treat end of file as the section end
 
         ! Split an input string
         words = ''

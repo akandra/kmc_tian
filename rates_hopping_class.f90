@@ -146,7 +146,6 @@ contains
     line_number = 0
     undefined_energy = .false.
 
-
     !---------------------------------------------------------------------------
     ! loop over all lines of rate input file
     !---------------------------------------------------------------------------
@@ -159,14 +158,14 @@ contains
       ! ios = 0: valid record read
       ! ios < 0: end of record condition encountered or end of file condition detected
       ! ios > 0: an error is detected
-      if (ios < 0) buffer=''  ! treat end of file like blank line
+      !if (ios < 0) buffer = section_end  ! treat end of file as the section end
 
       ! Split an input string
       words = ''
       call split_string(buffer, words, nwords)
 
-      ! skip comments but preserve blank lines (signify end)
-      if (nwords == 0 .and. buffer /= '') cycle
+      ! skip comments
+      if (nwords == 0) cycle
 
       select case (parse_state)
 
