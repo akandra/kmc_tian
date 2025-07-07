@@ -82,7 +82,11 @@ module constants
   integer, parameter :: n_reaction_types = 5
   ! List of reaction types
   character(len=20), dimension(n_reaction_types), parameter :: &
-            reaction_names = [character(20)::'hopping','desorption','dissociation','association','bimolecular']
+            reaction_names = [character(20)::'hopping',
+                                             'desorption',
+                                             'dissociation',
+                                             'association',
+                                             'bimolecular']
   ! Reaction ids
   integer, parameter :: hopping_id      = 1
   integer, parameter :: desorption_id   = 2
@@ -106,6 +110,8 @@ module constants
   character(len=2), parameter :: check_mark = '->'
 
   !-------- Section end keyword
+  ! Don't use '' as section_end
+  ! it will confuse the code in its current state
   character(len=10), parameter :: section_end = 'end'
 
 

@@ -80,7 +80,7 @@ contains
     integer               :: parse_state
     integer, parameter    :: parse_state_ignore   = -1
     integer, parameter    :: parse_state_default  =  0
-    integer, parameter    :: parse_state_hopping  =  1
+    integer, parameter    :: parse_state_hopping  =  hopping_id
 
     logical :: rct_law_defined  = .false.
     logical :: rcic_law_defined = .false.
@@ -174,13 +174,15 @@ contains
           !    word 'hopping' to mark beginning of a hopping section
           !    ignore anything else until hopping section begins
 
-          if (words(1) == 'hopping') then
+          if (words(1) == reaction_names[hopping_id]) then
+
             hopping_init%is_defined = .true.
             parse_state = parse_state_hopping
-            rct_law_defined  = .false.  ! reset necessary to allow multiple hopping sections
-            rcic_law_defined = .false.  ! reset necessary to allow multiple hopping sections
-            rct_law_id_glob  = 0        ! reset necessary to allow multiple hopping sections
-            rcic_law_id_glob = 0        ! reset necessary to allow multiple hopping sections
+            ! reset necessary to allow multiple hopping sections
+            rct_law_defined  = .false.
+            rcic_law_defined = .false.
+            rct_law_id_glob  = 0
+            rcic_law_id_glob = 0
 
             if (nwords == 2) then
               read(words(2),'(A)') current_species_name
@@ -192,7 +194,7 @@ contains
                          "hopping key must have 1 parameter -- species")
             end if !nwords == 2
 
-          end if !words(1)=='hopping'
+          end if ! words(1)
 
 
         case(parse_state_hopping)
@@ -280,7 +282,7 @@ contains
             if( e_pars%ads_energy(current_species_id, i1, i2) == e_pars%undefined_energy .or. &
                 e_pars%ads_energy(current_species_id, i3, i4) == e_pars%undefined_energy ) then
               call error_message(file_name, line_number, buffer, &
-                               "rate defined for site with undefined adsorption energy", &
+                               "rate defined for a site with undefined adsorption energy", &
                                stop=.false., warning=.false.)
 
               undefined_energy = .true.
