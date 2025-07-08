@@ -46,7 +46,7 @@ contains
     type(mc_lat)            , intent(in)    :: lat
     type(energy_parameters) , intent(in)    :: e_pars
 
-    integer :: ios, nwords, line_number, i1, i2
+    integer :: ios, nwords, line_number, i, j, i1, i2
 
     integer :: species, st1, ast1
     logical :: e_defined1, r_defined, undefined_rate, undefined_energy
@@ -58,6 +58,8 @@ contains
     character(len=10)     :: current_species_name
     integer               :: current_species_id
     integer               :: current_law_id
+    integer               :: rct_law_id, rct_law_id_glob
+    integer               :: rcic_law_id, rcic_law_id_glob
 
     integer               :: parse_state
     integer, parameter    :: parse_state_ignore     = -1
@@ -83,7 +85,7 @@ contains
     desorption_init%rates    = 0.0_dp
 
     allocate(desorption_init%rate_corr_pars( c_pars%n_species,&
-                                 n_max_lat_site_types, n_max_ads_sites)
+                                 n_max_lat_site_types, n_max_ads_sites ))
 
     desorption_init%rate_corr_pars = int_law_pars(default_int, default_rate)
 
@@ -125,7 +127,7 @@ contains
           !    word 'desorption' to mark beginning of a desorption section
           !    ignore anything else until desorption section begins
 
-          if (words(1) == reaction_names[desorption_id]) then
+          if (words(1) == reaction_names(desorption_id)) then
 
             desorption_init%is_defined = .true.
             parse_state = parse_state_desorption
@@ -421,7 +423,7 @@ contains
 
     integer :: id
     integer :: row, col, lst, ast
-    real(dp):: int_energy
+    real(dp):: int_energy, int_energy_ts, delta_eps
 
     row = lat%ads_list(ads)%row
     col = lat%ads_list(ads)%col
@@ -431,7 +433,7 @@ contains
 
     ! Calculate interaction correction
     int_energy    = energy(ads,lat,e_pars) - e_pars%ads_energy(id, lst, ast)
-    int_energy_ts = rcic_law(this%rate_corr_pars(id, lst, ast), int_energy, 0.0)
+    int_energy_ts = rcic_law(this%rate_corr_pars(id, lst, ast), int_energy, 0.0_dp)
 
     ! Barrier correction due to the perturbation
     delta_eps = int_energy_ts - int_energy

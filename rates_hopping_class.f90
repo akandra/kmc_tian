@@ -66,7 +66,8 @@ contains
     integer :: i, ios, nwords, line_number, i1, i2, i3, i4, m, j
 
     integer :: species, st1, st2, ast1, ast2, col_st1(2)
-    logical :: e_defined1, e_defined2, r_defined, undefined_rate, undefined_energy
+!    logical :: e_defined1, e_defined2, r_defined, undefined_rate, undefined_energy
+    logical :: undefined_energy
 
     character(len=max_string_length)                :: buffer
     character(len=max_string_length)                :: words(100)
@@ -95,7 +96,7 @@ contains
 
     character(len=2) :: check_str
     logical :: is_same_lst
-    character(len=100) :: status_str
+    !character(len=100) :: status_str
 
 
     ! determine maximum number of available ads. sites
@@ -174,7 +175,7 @@ contains
           !    word 'hopping' to mark beginning of a hopping section
           !    ignore anything else until hopping section begins
 
-          if (words(1) == reaction_names[hopping_id]) then
+          if (words(1) == reaction_names(hopping_id)) then
 
             hopping_init%is_defined = .true.
             parse_state = parse_state_hopping

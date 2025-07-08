@@ -238,14 +238,17 @@ contains
             end select
 
 !-------------------------------------------------------------------------------
-          case('')                                    ! of select case(words(1))
+          case(section_end)                                    ! of select case(words(1))
 !-------------------------------------------------------------------------------
-            if (buffer == '') then
-              parse_state = parse_state_default
+            parse_state = parse_state_default
 !              print*, 'blank line '
 !            else
 !              print*, 'comment: ', trim(buffer)
-            end if
+
+!-------------------------------------------------------------------------------
+        case('')
+!-------------------------------------------------------------------------------
+          ! Ignore blank lines and comments
 
 !-------------------------------------------------------------------------------
           case default                                ! of select case(words(1))
@@ -423,14 +426,16 @@ contains
             end select
 
 !-------------------------------------------------------------------------------
-          case('')                                    ! of select case(words(1))
+          case(section_end)                                    ! of select case(words(1))
 !-------------------------------------------------------------------------------
-            if (buffer == '') then
-              parse_state = parse_state_default
+            parse_state = parse_state_default
 !              print*, 'blank line '
 !            else
 !              print*, 'comment: ', trim(buffer)
-            end if
+!-------------------------------------------------------------------------------
+        case('')
+!-------------------------------------------------------------------------------
+          ! Ignore blank lines and comments
 
 !-------------------------------------------------------------------------------
           case default                                ! of select case(words(1))

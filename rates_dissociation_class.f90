@@ -238,11 +238,14 @@ contains
           end select
 
 !-------------------------------------------------------------------------------
+        case(section_end)
+!-------------------------------------------------------------------------------
+          parse_state = parse_state_default
+
+!-------------------------------------------------------------------------------
         case('')
 !-------------------------------------------------------------------------------
-          if (buffer == '') then
-            parse_state = parse_state_default
-          end if
+          ! Ignore blank lines and comments
 
 !-------------------------------------------------------------------------------
         case default                                ! of select case(words(1))
@@ -251,7 +254,7 @@ contains
             parse_state = parse_state_ignore
 
           if (parse_state /= parse_state_ignore) &
-            call error_message(file_name, line_number, buffer, "Dissociation: unknown key")
+            call error_message(file_name, line_number, buffer, "Dissociation 1st passage: unknown key")
 
       end select                                      ! select case(words(1))
 
@@ -416,14 +419,16 @@ contains
             end select
 
 !-------------------------------------------------------------------------------
-          case('')                                    ! of select case(words(1))
+          case(section_end)                                    ! of select case(words(1))
 !-------------------------------------------------------------------------------
-            if (buffer == '') then
-              parse_state = parse_state_default
+            parse_state = parse_state_default
 !              print*, 'blank line '
 !            else
 !              print*, 'comment: ', trim(buffer)
-            end if
+!-------------------------------------------------------------------------------
+        case('')
+!-------------------------------------------------------------------------------
+          ! Ignore blank lines and comments
 
 !-------------------------------------------------------------------------------
           case default                                ! of select case(words(1))
@@ -432,7 +437,7 @@ contains
               parse_state = parse_state_ignore
 
             if (parse_state /= parse_state_ignore) &
-              call error_message(file_name, line_number, buffer, "Dissociation: unknown key")
+              call error_message(file_name, line_number, buffer, "Dissociation 2nd passage: unknown key")
 
         end select                                       ! select case(words(1))
 
