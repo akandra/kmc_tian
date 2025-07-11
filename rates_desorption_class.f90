@@ -323,7 +323,7 @@ contains
             if (rcic_law_id == 0) &
               call error_message(file_name, line_number, buffer, "invalid interaction law")
 
-          ! Set rate constants and rcic for hopping channels
+          ! Set rate constants and rcic for desorption channels
             desorption_init%process(current_species_id,i1,i2 ) = &
                         rct_law(rct_law_id, c_pars%temperature, rct_pars)
 

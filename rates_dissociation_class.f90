@@ -49,6 +49,7 @@ module rates_dissociation_class
     integer  :: p2_lst    ! product 2 lattice site type
     integer  :: p2_ast    ! product 2 adsorbate site type
     real(dp) :: rate      ! dissociation rate
+    type(int_law_pars) :: rcic
   end type
 
 
@@ -102,7 +103,7 @@ contains
     type(mc_lat)            , intent(in)    :: lat
     type(energy_parameters) , intent(in)    :: e_pars
 
-    integer :: i, ios, nwords, line_number, i1, i2, i3, i4, i5, i6, m
+    integer :: i, j, ios, nwords, line_number, i1, i2, i3, i4, i5, i6, m
 
     logical :: undefined_energy
 
@@ -113,14 +114,18 @@ contains
     character(len=10)     :: current_reactant_name, current_product1_name, current_product2_name
     integer               :: current_reactant_id, current_product1_id, current_product2_id
     integer               :: current_law_id
+    integer               :: rct_law_id, rct_law_id_glob
+    integer               :: rcic_law_id, rcic_law_id_glob
 
     integer               :: parse_state
-    integer, parameter    :: parse_state_ignore  = -1
     integer, parameter    :: parse_state_default =  0
     integer, parameter    :: parse_state_dissociation =  dissociation_id
 
+    logical :: rct_law_defined  = .false.
+    logical :: rcic_law_defined = .false.
 
-    real(dp), dimension(3):: pars = 0.0_dp
+    real(dp), dimension(n_max_rct_pars )::  rct_pars,  rct_pars_glob
+    real(dp), dimension(n_max_rcic_pars):: rcic_pars, rcic_pars_glob
 
     integer,  parameter   :: default_int = 0
     real(dp), parameter   :: default_rate  = -1.0_dp
@@ -160,7 +165,6 @@ contains
 !-------------------------------------------------------------------------------
 !   First pass of processing the .reaction file:
 !     * define the number of dissociation reactions
-!     * check for parsing errors
 !-------------------------------------------------------------------------------
     ios = 0
     parse_state = parse_state_default
@@ -180,81 +184,35 @@ contains
       words = ''
       call split_string(buffer, words, nwords)
 
-      select case (words(1)) ! take a keyword
-!------------------------------------------------------------------------------
-        case('dissociation')                       ! of select case (words(1)
-!------------------------------------------------------------------------------
-          dissociation_init%is_defined = .true.
+      ! skip comments
+      if (nwords == 0) cycle
 
-          if (parse_state /= parse_state_default) &
-            call error_message(file_name, line_number, buffer, &
-                       "invalid ending of the reaction section")
-          parse_state = parse_state_dissociation
-          if (nwords/=5) call error_message(file_name, line_number, buffer, &
-                             "dissociation key must have 4 parameters")
+      select case (parse_state)
 
-          read(words(2),'(A)') current_reactant_name
-          current_reactant_id = get_index(current_reactant_name, c_pars%ads_names )
-          if (current_reactant_id == 0) call error_message(file_name, line_number, buffer, &
-                                                "inconsistent dissociation reactant definition")
+        case(parse_state_default)
+          ! in parse state default:
+          !    word 'dissociation' to mark beginning of a dissociation section
+          !    ignore anything else until dissociation section begins
 
-          read(words(3),'(A)') current_product1_name
-          current_product1_id = get_index(current_product1_name, c_pars%ads_names )
-          if (current_product1_id == 0) call error_message(file_name, line_number, buffer, &
-                                                "inconsistent dissociation product 1 definition")
+          if (words(1) == reaction_names(dissociation_id)) then
 
-          read(words(4),'(A)') current_product2_name
-          current_product2_id = get_index(current_product2_name, c_pars%ads_names )
-          if (current_product2_id == 0) call error_message(file_name, line_number, buffer, &
-                                                "inconsistent dissociation product 2 definition")
+            parse_state = parse_state_dissociation
 
-          current_law_id = get_index(words(5), rct_law_names )
-          if (current_law_id == 0) call error_message(file_name, line_number, buffer, &
-                                                "dissociation: unknown temperature law")
-!            print*, 'reactant name and id: ', current_reactant_name, current_reactant_id
-!            print*, 'product1 name and id: ', current_product1_name, current_product1_id
-!            print*, 'product2 name and id: ', current_product2_name, current_product2_id
-!            print*, c_pars%ads_names
-!            stop 111
+          end if  ! words(1)
 
-!-------------------------------------------------------------------------------
-        case ('terrace','step','corner')            ! of select case(words(1))
-!-------------------------------------------------------------------------------
+        case(parse_state_dissociation)
 
+          if (words(1) == section_end) then
+            parse_state = parse_state_default
+          ! don't count lines defining rct and rcic
+          elseif (words(1) =='temperature_law' .or. &
+                  words(1) =='interaction_law') then
+            cycle
 
-          select case (parse_state)
+          else
+            n_dissociation_channels = n_dissociation_channels + 1
 
-            case(parse_state_ignore)
-              ! ignore
-              ! print *, 'warning ignoring line', line_number, buffer
-
-            case(dissociation_id)
-
-              n_dissociation_channels = n_dissociation_channels + 1
-
-            case default
-              call error_message(file_name, line_number, buffer, "Dissociation: invalid site type statement")
-
-          end select
-
-!-------------------------------------------------------------------------------
-        case(section_end)
-!-------------------------------------------------------------------------------
-          parse_state = parse_state_default
-
-!-------------------------------------------------------------------------------
-        case('')
-!-------------------------------------------------------------------------------
-          ! Ignore blank lines and comments
-
-!-------------------------------------------------------------------------------
-        case default                                ! of select case(words(1))
-!-------------------------------------------------------------------------------
-          if ( parse_state == parse_state_default .and. get_index(words(1),reaction_names) /= 0 ) &
-            parse_state = parse_state_ignore
-
-          if (parse_state /= parse_state_ignore) &
-            call error_message(file_name, line_number, buffer, "Dissociation 1st passage: unknown key")
+          endif ! words(1) == section_end
 
       end select                                      ! select case(words(1))
 
@@ -264,7 +222,6 @@ contains
 
     allocate(dissociation_init%channels(n_dissociation_channels))
     dissociation_init%n_processes = n_dissociation_channels
-
 
 !-------------------------------------------------------------------------------
 !   Second pass of processing the .reaction file:
@@ -285,161 +242,265 @@ contains
         ! ios > 0: an error is detected
         ! ios = 0  otherwise
 
-      if (ios /= 0) exit
+      ! Split an input string
+      words = ''
+      call split_string(buffer, words, nwords)
 
-        ! Split an input string
-        words = ''
-        call split_string(buffer, words, nwords)
+      ! skip comments
+      if (nwords == 0) cycle
 
-        select case (words(1)) ! take a keyword
-!-------------------------------------------------------------------------------
-          case('dissociation')                        ! of select case (words(1)
-!-------------------------------------------------------------------------------
-            dissociation_init%is_defined = .true.
+      select case (parse_state)
+
+        case(parse_state_default)
+          ! in parse state default:
+          !    word 'dissociation' to mark beginning of a dissociation section
+          !    ignore anything else until dissociation section begins
+
+          if (words(1) == reaction_names(dissociation_id)) then
+
             parse_state = parse_state_dissociation
+            dissociation_init%is_defined = .true.
+            ! reset necessary to allow multiple dissociaton sections
+            rct_law_defined  = .false.
+            rcic_law_defined = .false.
+            rct_law_id_glob  = 0
+            rcic_law_id_glob = 0
 
-            read(words(2),'(A)') current_reactant_name
-            current_reactant_id = get_index(current_reactant_name, c_pars%ads_names )
+            if (nwords == 4) then
+              read(words(2),'(A)') current_reactant_name
+              current_reactant_id = get_index(current_reactant_name, c_pars%ads_names )
 
-            read(words(3),'(A)') current_product1_name
-            current_product1_id = get_index(current_product1_name, c_pars%ads_names )
+              read(words(3),'(A)') current_product1_name
+              current_product1_id = get_index(current_product1_name, c_pars%ads_names )
 
-            read(words(4),'(A)') current_product2_name
-            current_product2_id = get_index(current_product2_name, c_pars%ads_names )
-
-            current_law_id = get_index(words(5), rct_law_names )
-
-!            ! debugging printout
-!            print*, 'reactant name and id: ', current_reactant_name, current_reactant_id
-!            print*, 'product1 name and id: ', current_product1_name, current_product1_id
-!            print*, 'product2 name and id: ', current_product2_name, current_product2_id
-!            print*, c_pars%ads_names
-!            stop 111
-
-!-------------------------------------------------------------------------------
-          case ('terrace','step','corner')            ! of select case(words(1))
-!-------------------------------------------------------------------------------
+              read(words(4),'(A)') current_product2_name
+              current_product2_id = get_index(current_product2_name, c_pars%ads_names )
 
 
-            select case (parse_state)
+              if (current_reactant_id == 0 .or. &
+                  current_product1_id == 0 .or. &
+                  current_product2_id == 0) call error_message(file_name, line_number, buffer, &
+                                   "unknown species in dissociation section definition")
+            else
+              call error_message(file_name, line_number, buffer, &
+                         "dissociation key must have 3 parameter -- reactant product_1 product_2")
+            end if !nwords == 4
 
-              case(parse_state_ignore)
-                ! ignore
-                ! print *, 'warning ignoring line', line_number, buffer
+          end if  ! words(1)
 
-              case(dissociation_id)
+        case(parse_state_dissociation)
+          ! process:
+          !    temperature law records,
+          !    interaction law records,
+          !    'from-to-to' records,
+          !    section end
 
-                dissociation_counter = dissociation_counter + 1
 
-                i1 = get_index(words(1),lat_site_names)
-                i2 = get_index(words(2),ads_site_names)
-                i3 = get_index(words(3),lat_site_names)
-                i4 = get_index(words(4),ads_site_names)
-                i5 = get_index(words(5),lat_site_names)
-                i6 = get_index(words(6),ads_site_names)
+          if (words(1) == section_end) then
+            parse_state = parse_state_default
 
-                if ( i1==0 .or. i2==0 .or. i3==0 .or. i4==0 .or. i5==0 .or. i6==0) &
+          elseif (words(1) =='temperature_law') then
+            rct_law_id_glob = get_index(words(2), rct_law_names)
+            if (rct_law_id_glob == 0) then
+              call error_message(file_name, line_number, buffer,&
+                                 "invalid temperature law statement")
+            else
+              rct_law_defined = .true.
+              select case (rct_law_id_glob)
+                case (Arrhenius_id)
+                  if (nwords/=4) call error_message(file_name, line_number, buffer,&
+                                                    "Arrhenius must have 2 parameters")
+                  read(words(3),*) rct_pars_glob(1)
+                  read(words(4),*) rct_pars_glob(2)
+                case (extArrhenius_id)
+                  if (nwords/=5) call error_message(file_name, line_number, buffer,&
+                                                    "extArrhenius must have 3 parameters")
+                  read(words(3),*) rct_pars_glob(1)
+                  read(words(4),*) rct_pars_glob(2)
+                  read(words(5),*) rct_pars_glob(3)
+              end select
+            endif
+
+          elseif (words(1) =='interaction_law') then
+            rcic_law_id_glob = get_index(words(2), rcic_law_names)
+            if (rcic_law_id_glob == 0) then
+              call error_message(file_name, line_number, buffer,&
+                                 "invalid interaction law statement")
+            else
+              rcic_law_defined = .true.
+              select case (rcic_law_id_glob)
+                case (rcic_linear_id)
+                  if (nwords/=4) call error_message(file_name, line_number, buffer,&
+                                                    "linear interaction law must have 2 parameters")
+                  read(words(3),*) rcic_pars_glob(1)
+                  read(words(4),*) rcic_pars_glob(2)
+              end select
+            endif
+
+          else
+            ! ---------------------------------------------------------
+            ! check if we have a valid from-to-to rate record
+            ! ---------------------------------------------------------
+            if (nwords < 6) &
+              call error_message(file_name, line_number, buffer, &
+                                 "invalid 'from' rate record in the dissociation section")
+            i1 = get_index(words(1),lat_site_names)
+            i2 = get_index(words(2),ads_site_names)
+            i3 = get_index(words(3),lat_site_names)
+            i4 = get_index(words(4),ads_site_names)
+            i5 = get_index(words(5),lat_site_names)
+            i6 = get_index(words(6),ads_site_names)
+
+            ! check for invalid site name (invalid lst or ast in either from or to site)
+            if ( i1==0 .or. i2==0 .or. i3==0 .or. i4==0 .or. i5==0 .or. i6==0) &
+              call error_message(file_name, line_number, buffer, &
+                         "wrong site name in the dissociation section")
+
+            ! ---------------------------------------------------------
+            ! check for duplicate entry
+            ! ---------------------------------------------------------
+            dissociation_counter = dissociation_counter + 1
+
+            do i=1,dissociation_counter - 1
+              if ( dissociation_init%channels(i)%r      == current_reactant_id .and. &
+                   dissociation_init%channels(i)%r_lst  == i1                  .and. &
+                   dissociation_init%channels(i)%r_ast  == i2                  .and. &
+                   dissociation_init%channels(i)%p1     == current_product1_id .and. &
+                   dissociation_init%channels(i)%p1_lst == i3                  .and. &
+                   dissociation_init%channels(i)%p1_ast == i4                  .and. &
+                   dissociation_init%channels(i)%p2     == current_product2_id .and. &
+                   dissociation_init%channels(i)%p2_lst == i5                  .and. &
+                   dissociation_init%channels(i)%p2_ast == i6                      ) then
+                call error_message(file_name, line_number, buffer, "duplicated entry", stop = .false.)
+                duplicate_error = .true.
+              end if
+            end do
+            if (duplicate_error) stop 993
+
+            ! check if energy is defined for reactant's and for products' site_type and ads_site
+            if( e_pars%ads_energy(current_reactant_id, i1, i2) == e_pars%undefined_energy .or. &
+                e_pars%ads_energy(current_product1_id, i3, i4) == e_pars%undefined_energy .or. &
+                e_pars%ads_energy(current_product2_id, i5, i6) == e_pars%undefined_energy ) then
+
+                call error_message(file_name, line_number, buffer, &
+                                   "rate defined for site with undefined adsorption energy", &
+                                   stop=.false., warning=.false.)
+
+                undefined_energy = .true.
+            end if
+
+            ! ---------------------------------------------------------
+            ! we have a valid rate record. Process it
+            ! ---------------------------------------------------------
+            ! if record only has 'from-to-to' site information then set the law ids and pars to global default values
+            if (nwords == 6) then
+              if (rct_law_defined .and. rcic_law_defined) then
+                rct_law_id  = rct_law_id_glob
+                rct_pars    = rct_pars_glob
+                rcic_law_id = rcic_law_id_glob
+                rcic_pars   = rcic_pars_glob
+              elseif ( .not. rct_law_defined .and. .not. rcic_law_defined ) then
                   call error_message(file_name, line_number, buffer, &
-                             "wrong site name in the dissociation section")
+                                 "temperature and interaction laws are not defined")
+              elseif (.not. rct_law_defined) then
+                  call error_message(file_name, line_number, buffer, &
+                                 "temperature law is not defined")
+              else
+                  call error_message(file_name, line_number, buffer, &
+                                 "interaction law is not defined")
+              end if
 
+            else
+              ! set rct_law_id and rcic_law_id to 0 to indicate no law on this line found yet
+              rct_law_id  = 0
+              rcic_law_id = 0
 
-                do i=1,dissociation_counter - 1
-                  if ( dissociation_init%channels(i)%r      == current_reactant_id .and. &
-                       dissociation_init%channels(i)%r_lst  == i1                  .and. &
-                       dissociation_init%channels(i)%r_ast  == i2                  .and. &
-                       dissociation_init%channels(i)%p1     == current_product1_id .and. &
-                       dissociation_init%channels(i)%p1_lst == i3                  .and. &
-                       dissociation_init%channels(i)%p1_ast == i4                  .and. &
-                       dissociation_init%channels(i)%p2     == current_product2_id .and. &
-                       dissociation_init%channels(i)%p2_lst == i5                  .and. &
-                       dissociation_init%channels(i)%p2_ast == i6                      ) then
-                    call error_message(file_name, line_number, buffer, "duplicated entry", stop = .false.)
-                    duplicate_error = .true.
-                  end if
-                end do
-                if (duplicate_error) stop 993
+              do i=7,nwords
+                ! check  for rct law on this line
+                if (get_index(words(i), rct_law_names) /= 0) then
+                  rct_law_id = get_index(words(i), rct_law_names)
+                  select case (rct_law_id)
+                    case (Arrhenius_id)
+                      do j=1,2
+                        if ( .not. read_num(words(i+j),rct_pars(j)) )&
+                          call error_message(file_name, line_number, buffer,&
+                                                  "Arrhenius must have 2 numerical parameters")
+                      end do
+                    case (extArrhenius_id)
+                      do j=1,3
+                        if ( .not. read_num(words(i+j),rct_pars(j)) )&
+                          call error_message(file_name, line_number, buffer,&
+                                                  "extArrhenius must have 3 numerical parameters")
+                      end do
+                    case default
+                      call error_message(file_name, line_number, buffer, "This should not happen! Check the code!")
+                  end select
 
-                ! check if energy is defined for reactant's and for products' site_type and ads_site
-                if( e_pars%ads_energy(current_reactant_id, i1, i2) == e_pars%undefined_energy .or. &
-                    e_pars%ads_energy(current_product1_id, i3, i4) == e_pars%undefined_energy .or. &
-                    e_pars%ads_energy(current_product2_id, i5, i6) == e_pars%undefined_energy ) then
-
-                    call error_message(file_name, line_number, buffer, &
-                                       "rate defined for site with undefined adsorption energy", &
-                                       stop=.false., warning=.false.)
-
-                    undefined_energy = .true.
                 end if
 
-                dissociation_init%channels(dissociation_counter)%r      = current_reactant_id
-                dissociation_init%channels(dissociation_counter)%r_lst  = i1
-                dissociation_init%channels(dissociation_counter)%r_ast  = i2
-                dissociation_init%channels(dissociation_counter)%p1     = current_product1_id
-                dissociation_init%channels(dissociation_counter)%p1_lst = i3
-                dissociation_init%channels(dissociation_counter)%p1_ast = i4
-                dissociation_init%channels(dissociation_counter)%p2     = current_product2_id
-                dissociation_init%channels(dissociation_counter)%p2_lst = i5
-                dissociation_init%channels(dissociation_counter)%p2_ast = i6
+                ! check if we have an rcic law on this line
+                if (get_index(words(i), rcic_law_names) /= 0) then
+                  rcic_law_id = get_index(words(i), rcic_law_names)
+                  select case (rcic_law_id)
+                    case (rcic_linear_id)
+                      do j=1,2
+                        if ( .not. read_num(words(i+j),rcic_pars(j)) )&
+                          call error_message(file_name, line_number, buffer,&
+                                                  "linear interaction must have 2 numerical parameters")
+                      end do
+                    case default
+                      call error_message(file_name, line_number, buffer, "This should not happen! Check the code!")
+                  end select
+                end if
 
-                select case (current_law_id)
+              end do ! i=7,nwords
 
-                  case (Arrhenius_id)
-                    if (nwords/=8) call error_message(file_name, line_number, buffer,&
-                                              "Arrhenius must have 2 parameters")
-                    read(words(7),*) pars(1)
-                    read(words(8),*) pars(2)
-                    dissociation_init%channels(dissociation_counter)%rate = arrhenius(c_pars%temperature, pars(1:2))
+              ! if rct_law  or rcic_law are not defined on this line, set to global defaults
+              if (rct_law_id == 0) then
+                rct_law_id = rct_law_id_glob
+                rct_pars   = rct_pars_glob
+              end if
+              if (rcic_law_id == 0) then
+                rcic_law_id = rcic_law_id_glob
+                rcic_pars   = rcic_pars_glob
+              end if
 
-                  case (extArrhenius_id)
-                    if (nwords/=9) call error_message(file_name, line_number, buffer,&
-                                              "extArrhenius must have 3 parameters")
-                    read(words(7),*) pars(1)
-                    read(words(8),*) pars(2)
-                    read(words(9),*) pars(3)
-                    dissociation_init%channels(dissociation_counter)%rate = extArrhenius(c_pars%temperature, pars(1:3))
+              ! check for valid temperature and interaction laws
+              if (rct_law_id == 0) &
+                call error_message(file_name, line_number, buffer, &
+                                  "no temperature law is specified")
+              if (rcic_law_id == 0) &
+                call error_message(file_name, line_number, buffer, &
+                                   "no interaction law is specified")
 
-                  case default
-                    call error_message(file_name, line_number, buffer, "Dissociation: this should not happen! Check the code!")
+            end if ! (nwords==6)
 
-                end select
+            ! Check if rct and rcic laws are properly set
+            if (rct_law_id == 0) &
+              call error_message(file_name, line_number, buffer, "invalid temperature law")
+            if (rcic_law_id == 0) &
+              call error_message(file_name, line_number, buffer, "invalid interaction law")
 
-!                 ! Debugging printout
-!                 print*, 'reaction: ', reaction_names(parse_state),&
-!                        ' for species:', current_reactant_name, current_product1_name, current_product2_name
-!                 print*, 'law: ', rct_law_names(current_law_id),&
-!                        ' from:', lat_site_names(i1),ads_site_names(i2),&
-!                        ' to:'  , lat_site_names(i3),ads_site_names(i4),&
-!                        ' and '  , lat_site_names(i5),ads_site_names(i6)
-!                print'(A,3f16.3)', 'with pars: ', pars
-!                stop 112
+            ! Set rate constants and rcic for dissociation channels
+            dissociation_init%channels(dissociation_counter)%r      = current_reactant_id
+            dissociation_init%channels(dissociation_counter)%r_lst  = i1
+            dissociation_init%channels(dissociation_counter)%r_ast  = i2
+            dissociation_init%channels(dissociation_counter)%p1     = current_product1_id
+            dissociation_init%channels(dissociation_counter)%p1_lst = i3
+            dissociation_init%channels(dissociation_counter)%p1_ast = i4
+            dissociation_init%channels(dissociation_counter)%p2     = current_product2_id
+            dissociation_init%channels(dissociation_counter)%p2_lst = i5
+            dissociation_init%channels(dissociation_counter)%p2_ast = i6
 
-              case default
-                call error_message(file_name, line_number, buffer, "Dissociation: invalid site type statement")
+            dissociation_init%channels(dissociation_counter)%rate = &
+                          rct_law(rct_law_id, c_pars%temperature, rct_pars)
 
-            end select
+            dissociation_init%channels(dissociation_counter)%rcic%id   = rcic_law_id
+            dissociation_init%channels(dissociation_counter)%rcic%pars = rcic_pars
 
-!-------------------------------------------------------------------------------
-          case(section_end)                                    ! of select case(words(1))
-!-------------------------------------------------------------------------------
-            parse_state = parse_state_default
-!              print*, 'blank line '
-!            else
-!              print*, 'comment: ', trim(buffer)
-!-------------------------------------------------------------------------------
-        case('')
-!-------------------------------------------------------------------------------
-          ! Ignore blank lines and comments
+          endif ! words(1) == section_end
 
-!-------------------------------------------------------------------------------
-          case default                                ! of select case(words(1))
-!-------------------------------------------------------------------------------
-            if ( parse_state == parse_state_default .and. get_index(words(1),reaction_names) /= 0 ) &
-              parse_state = parse_state_ignore
-
-            if (parse_state /= parse_state_ignore) &
-              call error_message(file_name, line_number, buffer, "Dissociation 2nd passage: unknown key")
-
-        end select                                       ! select case(words(1))
+      end select
 
     end do ! while ios=0
 
@@ -461,8 +522,6 @@ contains
     end if
 
   end function dissociation_init
-
-
 
 
 !-------------------------------------------------------------------------------
