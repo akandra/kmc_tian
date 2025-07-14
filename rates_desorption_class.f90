@@ -57,7 +57,6 @@ contains
 
     character(len=10)     :: current_species_name
     integer               :: current_species_id
-    integer               :: current_law_id
     integer               :: rct_law_id, rct_law_id_glob
     integer               :: rcic_law_id, rcic_law_id_glob
 

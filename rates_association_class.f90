@@ -54,6 +54,7 @@ module rates_association_class
     integer  :: p1_lst    ! product 1 lattice site type
     integer  :: p1_ast    ! product 1 adsorbate site type
     real(dp) :: rate      ! association rate
+    type(int_law_pars) :: rcic
   end type
 
 
@@ -115,16 +116,19 @@ contains
 
     character(len=10)     :: r1_name, r2_name, p1_name
     integer               :: r1_id,   r2_id,   p1_id
-    integer               :: law_id
+    integer               :: rct_law_id, rct_law_id_glob
+    integer               :: rcic_law_id, rcic_law_id_glob
 
     integer               :: parse_state
-    integer, parameter    :: parse_state_ignore  = -1
     integer, parameter    :: parse_state_default =  0
     integer, parameter    :: parse_state_association =  association_id
     integer, parameter    :: n_association_species = 3
 
+    logical :: rct_law_defined  = .false.
+    logical :: rcic_law_defined = .false.
 
-    real(dp), dimension(3):: pars = 0.0_dp
+    real(dp), dimension(n_max_rct_pars )::  rct_pars,  rct_pars_glob
+    real(dp), dimension(n_max_rcic_pars):: rcic_pars, rcic_pars_glob
 
     integer,  parameter   :: default_int = 0
     real(dp), parameter   :: default_rate  = -1.0_dp
@@ -181,85 +185,41 @@ contains
         ! ios > 0: an error is detected
         ! ios = 0  otherwise
 
-      if (ios /= 0) exit
-
         ! Split an input string
         words = ''
         call split_string(buffer, words, nwords)
 
-        select case (words(1)) ! take a keyword
-!------------------------------------------------------------------------------
-          case('association')                       ! of select case (words(1)
-!------------------------------------------------------------------------------
-            association_init%is_defined = .true.
+      ! skip comments
+      if (nwords == 0) cycle
 
-            if (parse_state /= parse_state_default) &
-              call error_message(file_name, line_number, buffer, &
-                         "invalid ending of the reaction section")
+      select case (parse_state)
+
+        case(parse_state_default)
+          ! in parse state default:
+          !    word 'association' to mark beginning of a association section
+          !    ignore anything else until association section begins
+
+          if (words(1) == reaction_names(association_id)) then
+
             parse_state = parse_state_association
-            if ( nwords/=5) call error_message(file_name, line_number, buffer, &
-                               "association key must have 4 parameters")
 
-            read(words(2),'(A)') r1_name
-            r1_id = get_index(r1_name, c_pars%ads_names )
-            if (r1_id == 0) call error_message(file_name, line_number, buffer, &
-                                         "inconsistent association reactant 1 definition")
+          end if  ! words(1)
 
-            read(words(3),'(A)') r2_name
-            r2_id = get_index(r2_name, c_pars%ads_names )
-            if (r2_id == 0) call error_message(file_name, line_number, buffer, &
-                                         "inconsistent association reactant 2 definition")
+        case(parse_state_association)
 
-            read(words(4),'(A)') p1_name
-            p1_id = get_index(p1_name, c_pars%ads_names )
-            if (p1_id == 0) call error_message(file_name, line_number, buffer, &
-                                         "inconsistent association product 1 definition")
-
-            law_id = get_index(words(nwords), rct_law_names )
-            if (law_id == 0) call error_message(file_name, line_number, buffer, &
-                                                  "association: unknown temperature law")
-!-------------------------------------------------------------------------------
-          case ('terrace','step','corner')            ! of select case(words(1))
-!-------------------------------------------------------------------------------
-
-            select case (parse_state)
-
-              case(parse_state_ignore)
-                ! ignore
-                ! print *, 'warning ignoring line', line_number, buffer
-
-              case(association_id)
-
-                n_association_channels = n_association_channels + 1
-
-              case default
-                call error_message(file_name, line_number, buffer, "association: invalid site type statement")
-
-            end select
-
-!-------------------------------------------------------------------------------
-          case(section_end)                                    ! of select case(words(1))
-!-------------------------------------------------------------------------------
+          if (words(1) == section_end) then
             parse_state = parse_state_default
-!              print*, 'blank line '
-!            else
-!              print*, 'comment: ', trim(buffer)
+          ! don't count lines defining rct and rcic
+          elseif (words(1) =='temperature_law' .or. &
+                  words(1) =='interaction_law') then
+            cycle
 
-!-------------------------------------------------------------------------------
-        case('')
-!-------------------------------------------------------------------------------
-          ! Ignore blank lines and comments
+          else
+            n_association_channels = n_association_channels + 1
 
-!-------------------------------------------------------------------------------
-          case default                                ! of select case(words(1))
-!-------------------------------------------------------------------------------
-            if ( parse_state == parse_state_default .and. get_index(words(1),reaction_names) /= 0 ) &
-              parse_state = parse_state_ignore
+          endif ! words(1) == section_end
 
-            if (parse_state /= parse_state_ignore) &
-              call error_message(file_name, line_number, buffer, "association: unknown key")
-
-        end select                                      ! select case(words(1))
+      end select                                      ! select case(words(1))
 
     end do ! while ios=0
 
@@ -267,7 +227,7 @@ contains
 
     allocate(association_init%channels(n_association_channels))
     association_init%n_processes = n_association_channels
-    association_init%channels = association_def(0,0,0,0,0,0,0,0,0,0.0_dp)
+    association_init%channels = association_def(0,0,0,0,0,0,0,0,0,0.0_dp,int_law_pars(0,0.0_dp))
 
 !-------------------------------------------------------------------------------
 !   Second pass of processing the .reaction file:
@@ -288,165 +248,265 @@ contains
         ! ios > 0: an error is detected
         ! ios = 0  otherwise
 
-      if (ios /= 0) exit
-
         ! Split an input string
         words = ''
         call split_string(buffer, words, nwords)
 
-        select case (words(1)) ! take a keyword
-!-------------------------------------------------------------------------------
-          case('association')                        ! of select case (words(1)
-!-------------------------------------------------------------------------------
-            association_init%is_defined = .true.
+      select case (parse_state)
+
+        case(parse_state_default)
+          ! in parse state default:
+          !    word 'association' to mark beginning of a association section
+          !    ignore anything else until association section begins
+
+          if (words(1) == reaction_names(association_id)) then
+
             parse_state = parse_state_association
+            association_init%is_defined = .true.
+            ! reset necessary to allow multiple associaton sections
+            rct_law_defined  = .false.
+            rcic_law_defined = .false.
+            rct_law_id_glob  = 0
+            rcic_law_id_glob = 0
 
-            read(words(2),'(A)') r1_name
-            r1_id = get_index(r1_name, c_pars%ads_names )
+            if (nwords == n_association_species + 1) then
 
-            read(words(3),'(A)') r2_name
-            r2_id = get_index(r2_name, c_pars%ads_names )
+              read(words(2),'(A)') r1_name
+              r1_id = get_index(r1_name, c_pars%ads_names )
 
-            read(words(4),'(A)') p1_name
-            p1_id = get_index(p1_name, c_pars%ads_names )
+              read(words(3),'(A)') r2_name
+              r2_id = get_index(r2_name, c_pars%ads_names )
 
-            law_id = get_index(words(nwords), rct_law_names )
+              read(words(4),'(A)') p1_name
+              p1_id = get_index(p1_name, c_pars%ads_names )
 
-!            ! debugging printout
-!            print*, 'reactant1 name and id: ', r1_name, r1_id
-!            print*, 'reactant2 name and id: ', r2_name, r2_id
-!            print*, 'product1  name and id: ', p1_name, p1_id
-!            print*, c_pars%ads_names
-!            stop 111
 
-!-------------------------------------------------------------------------------
-          case ('terrace','step','corner')            ! of select case(words(1))
-!-------------------------------------------------------------------------------
-
-            select case (parse_state)
-
-              case(parse_state_ignore)
-                ! ignore
-                ! print *, 'warning ignoring line', line_number, buffer
-
-              case(association_id)
-
-                association_counter = association_counter + 1
-
-                do i=1,n_association_species
-                  lst(i) = get_index(words(2*i-1),lat_site_names)
-                  ast(i) = get_index(words(2*i  ),ads_site_names)
-                end do
-
-                if ( any(lst(1:n_association_species)==0) ) &
+              if (r1_id == 0 .or. r2_id == 0 .or. p1_id == 0) &
                   call error_message(file_name, line_number, buffer, &
-                             "wrong lattice site name in the association section")
-                if ( any(ast(1:n_association_species)==0) ) &
-                  call error_message(file_name, line_number, buffer, &
-                             "wrong adsorption site name in the association section")
+                            "unknown species in association section definition")
+            else
+              call error_message(file_name, line_number, buffer, &
+                         "association key must have 3 parameter -- reactant_1 reactant_2 product")
+            end if !nwords == n_association_species + 1
 
-                do i=1,association_counter-1
-                  if ( association_init%channels(i)%r1     == r1_id  .and. &
-                       association_init%channels(i)%r1_lst == lst(1) .and. &
-                       association_init%channels(i)%r1_ast == ast(1) .and. &
-                       association_init%channels(i)%r2     == r2_id  .and. &
-                       association_init%channels(i)%r2_lst == lst(2) .and. &
-                       association_init%channels(i)%r2_ast == ast(2) .and. &
-                       association_init%channels(i)%p1     == p1_id  .and. &
-                       association_init%channels(i)%p1_lst == lst(3) .and. &
-                       association_init%channels(i)%p1_ast == ast(3)       ) then
-                    call error_message(file_name, line_number, buffer, &
-                                       "duplicated entry", stop = .false.)
-                      duplicate_error = .true.
-                  end if
-                end do
+          end if  ! words(1)
 
-                if ( lst(1) /= lst(3) ) then
-                  call error_message(file_name, line_number, buffer, &
-                      "r1 and p1 lattice site type have to be the same", stop = .false.)
-                  r1p1_error = .true.
-                end if
+        case(parse_state_association)
+          ! process:
+          !    temperature law records,
+          !    interaction law records,
+          !    'from-from-to' records,
+          !    section end
 
-                ! check if energy is defined for reactant's and for products' lat_site_type and ads_site
-                if( e_pars%ads_energy(r1_id, lst(1), ast(1)) == e_pars%undefined_energy .or. &
-                    e_pars%ads_energy(r2_id, lst(2), ast(2)) == e_pars%undefined_energy .or. &
-                    e_pars%ads_energy(p1_id, lst(3), ast(3)) == e_pars%undefined_energy ) then
 
-                  call error_message(file_name, line_number, buffer, &
-                                       "rate defined for site with undefined adsorption energy", &
-                                       stop=.false., warning=.false.)
-                    undefined_energy = .true.
-                end if
-
-                association_init%channels(association_counter)%r1      = r1_id
-                association_init%channels(association_counter)%r1_lst  = lst(1)
-                association_init%channels(association_counter)%r1_ast  = ast(1)
-                association_init%channels(association_counter)%r2      = r2_id
-                association_init%channels(association_counter)%r2_lst  = lst(2)
-                association_init%channels(association_counter)%r2_ast  = ast(2)
-                association_init%channels(association_counter)%p1      = p1_id
-                association_init%channels(association_counter)%p1_lst  = lst(3)
-                association_init%channels(association_counter)%p1_ast  = ast(3)
-
-                select case (law_id)
-
-                  case (Arrhenius_id)
-                    if (nwords/=8) call error_message(file_name, line_number, buffer,&
-                                              "Arrhenius must have 2 parameters")
-                    read(words(7),*) pars(1)
-                    read(words(8),*) pars(2)
-                    association_init%channels(association_counter)%rate = arrhenius(c_pars%temperature, pars(1:2))
-
-                  case (extArrhenius_id)
-                    if (nwords/=9) call error_message(file_name, line_number, buffer,&
-                                              "extArrhenius must have 3 parameters")
-                    read(words(7),*) pars(1)
-                    read(words(8),*) pars(2)
-                    read(words(9),*) pars(3)
-                    association_init%channels(association_counter)%rate = extArrhenius(c_pars%temperature, pars(1:3))
-
-                  case default
-                    call error_message(file_name, line_number, buffer, "association: this should not happen! Check the code!")
-
-                end select
-
-                 ! Debugging printout
-!                 print*, 'reaction: ', reaction_names(parse_state),&
-!                        ' for species:', r1_name, r2_name, p1_name
-!                 print*, 'law: ', rct_law_names(law_id),&
-!                        ' from:', lat_site_names(lst(1)),ads_site_names(ast(1)),&
-!                        ' and:'  , lat_site_names(lst(2)),ads_site_names(ast(2)),&
-!                        ' to: '  ,lat_site_names(lst(3)),ads_site_names(ast(3))
-!                print'(A,3f16.3)', 'with pars: ', pars
-!                pause
-
-              case default
-                call error_message(file_name, line_number, buffer, "association: invalid site type statement")
-
-            end select
-
-!-------------------------------------------------------------------------------
-          case(section_end)                                    ! of select case(words(1))
-!-------------------------------------------------------------------------------
+          if (words(1) == section_end) then
             parse_state = parse_state_default
-!              print*, 'blank line '
-!            else
-!              print*, 'comment: ', trim(buffer)
-!-------------------------------------------------------------------------------
-        case('')
-!-------------------------------------------------------------------------------
-          ! Ignore blank lines and comments
 
-!-------------------------------------------------------------------------------
-          case default                                ! of select case(words(1))
-!-------------------------------------------------------------------------------
-            if ( parse_state == parse_state_default .and. get_index(words(1),reaction_names) /= 0 ) &
-              parse_state = parse_state_ignore
+          elseif (words(1) =='temperature_law') then
+            rct_law_id_glob = get_index(words(2), rct_law_names)
+            if (rct_law_id_glob == 0) then
+              call error_message(file_name, line_number, buffer,&
+                                 "invalid temperature law statement")
+            else
+              rct_law_defined = .true.
+              select case (rct_law_id_glob)
+                case (Arrhenius_id)
+                  if (nwords/=4) call error_message(file_name, line_number, buffer,&
+                                                    "Arrhenius must have 2 parameters")
+                  read(words(3),*) rct_pars_glob(1)
+                  read(words(4),*) rct_pars_glob(2)
+                case (extArrhenius_id)
+                  if (nwords/=5) call error_message(file_name, line_number, buffer,&
+                                                    "extArrhenius must have 3 parameters")
+                  read(words(3),*) rct_pars_glob(1)
+                  read(words(4),*) rct_pars_glob(2)
+                  read(words(5),*) rct_pars_glob(3)
+              end select
+            endif
 
-            if (parse_state /= parse_state_ignore) &
-              call error_message(file_name, line_number, buffer, "association: unknown key")
+          elseif (words(1) =='interaction_law') then
+            rcic_law_id_glob = get_index(words(2), rcic_law_names)
+            if (rcic_law_id_glob == 0) then
+              call error_message(file_name, line_number, buffer,&
+                                 "invalid interaction law statement")
+            else
+              rcic_law_defined = .true.
+              select case (rcic_law_id_glob)
+                case (rcic_linear_id)
+                  if (nwords/=4) call error_message(file_name, line_number, buffer,&
+                                                    "linear interaction law must have 2 parameters")
+                  read(words(3),*) rcic_pars_glob(1)
+                  read(words(4),*) rcic_pars_glob(2)
+              end select
+            endif
 
-        end select                                       ! select case(words(1))
+          else
+            ! ---------------------------------------------------------
+            ! check if we have a valid from-from-to rate record
+            ! ---------------------------------------------------------
+            if (nwords < 2*n_association_species) &
+              call error_message(file_name, line_number, buffer, &
+                                 "invalid 'from' rate record in the association section")
+
+            association_counter = association_counter + 1
+
+            do i=1,n_association_species
+              lst(i) = get_index(words(2*i-1),lat_site_names)
+              ast(i) = get_index(words(2*i  ),ads_site_names)
+            end do
+
+            if ( any(lst(1:n_association_species)==0) ) &
+              call error_message(file_name, line_number, buffer, &
+                         "wrong lattice site name in the association section")
+            if ( any(ast(1:n_association_species)==0) ) &
+              call error_message(file_name, line_number, buffer, &
+                         "wrong adsorption site name in the association section")
+
+            do i=1,association_counter-1
+              if ( association_init%channels(i)%r1     == r1_id  .and. &
+                   association_init%channels(i)%r1_lst == lst(1) .and. &
+                   association_init%channels(i)%r1_ast == ast(1) .and. &
+                   association_init%channels(i)%r2     == r2_id  .and. &
+                   association_init%channels(i)%r2_lst == lst(2) .and. &
+                   association_init%channels(i)%r2_ast == ast(2) .and. &
+                   association_init%channels(i)%p1     == p1_id  .and. &
+                   association_init%channels(i)%p1_lst == lst(3) .and. &
+                   association_init%channels(i)%p1_ast == ast(3)       ) then
+                call error_message(file_name, line_number, buffer, &
+                                   "duplicated entry", stop = .false.)
+                  duplicate_error = .true.
+              end if
+            end do
+
+            if ( lst(1) /= lst(3) ) then
+              call error_message(file_name, line_number, buffer, &
+                  "r1 and p1 lattice site type have to be the same", stop = .false.)
+              r1p1_error = .true.
+            end if
+
+            ! check if energy is defined for reactant's and for products' lat_site_type and ads_site
+            if( e_pars%ads_energy(r1_id, lst(1), ast(1)) == e_pars%undefined_energy .or. &
+                e_pars%ads_energy(r2_id, lst(2), ast(2)) == e_pars%undefined_energy .or. &
+                e_pars%ads_energy(p1_id, lst(3), ast(3)) == e_pars%undefined_energy ) then
+
+              call error_message(file_name, line_number, buffer, &
+                                   "rate defined for site with undefined adsorption energy", &
+                                   stop=.false., warning=.false.)
+                undefined_energy = .true.
+            end if
+
+            ! ---------------------------------------------------------
+            ! we have a valid rate record. Process it
+            ! ---------------------------------------------------------
+            ! if record only has 'from-from-to' site information then set the law ids and pars to global default values
+            if (nwords == 2*n_association_species) then
+              if (rct_law_defined .and. rcic_law_defined) then
+                rct_law_id  = rct_law_id_glob
+                rct_pars    = rct_pars_glob
+                rcic_law_id = rcic_law_id_glob
+                rcic_pars   = rcic_pars_glob
+              elseif ( .not. rct_law_defined .and. .not. rcic_law_defined ) then
+                  call error_message(file_name, line_number, buffer, &
+                                 "temperature and interaction laws are not defined")
+              elseif (.not. rct_law_defined) then
+                  call error_message(file_name, line_number, buffer, &
+                                 "temperature law is not defined")
+              else
+                  call error_message(file_name, line_number, buffer, &
+                                 "interaction law is not defined")
+              end if
+
+            else
+              ! set rct_law_id and rcic_law_id to 0 to indicate no law on this line found yet
+              rct_law_id  = 0
+              rcic_law_id = 0
+
+              do i=2*n_association_species+1,nwords
+                ! check  for rct law on this line
+                if (get_index(words(i), rct_law_names) /= 0) then
+                  rct_law_id = get_index(words(i), rct_law_names)
+                  select case (rct_law_id)
+                    case (Arrhenius_id)
+                      do j=1,2
+                        if ( .not. read_num(words(i+j),rct_pars(j)) )&
+                          call error_message(file_name, line_number, buffer,&
+                                                  "Arrhenius must have 2 numerical parameters")
+                      end do
+                    case (extArrhenius_id)
+                      do j=1,3
+                        if ( .not. read_num(words(i+j),rct_pars(j)) )&
+                          call error_message(file_name, line_number, buffer,&
+                                                  "extArrhenius must have 3 numerical parameters")
+                      end do
+                    case default
+                      call error_message(file_name, line_number, buffer, "This should not happen! Check the code!")
+                  end select
+
+                end if
+
+                ! check if we have an rcic law on this line
+                if (get_index(words(i), rcic_law_names) /= 0) then
+                  rcic_law_id = get_index(words(i), rcic_law_names)
+                  select case (rcic_law_id)
+                    case (rcic_linear_id)
+                      do j=1,2
+                        if ( .not. read_num(words(i+j),rcic_pars(j)) )&
+                          call error_message(file_name, line_number, buffer,&
+                                                  "linear interaction must have 2 numerical parameters")
+                      end do
+                    case default
+                      call error_message(file_name, line_number, buffer, "This should not happen! Check the code!")
+                  end select
+                end if
+
+              end do ! i=2*n_association_species+1,nwords
+
+              ! if rct_law  or rcic_law are not defined on this line, set to global defaults
+              if (rct_law_id == 0) then
+                rct_law_id = rct_law_id_glob
+                rct_pars   = rct_pars_glob
+              end if
+              if (rcic_law_id == 0) then
+                rcic_law_id = rcic_law_id_glob
+                rcic_pars   = rcic_pars_glob
+              end if
+
+              ! check for valid temperature and interaction laws
+              if (rct_law_id == 0) &
+                call error_message(file_name, line_number, buffer, &
+                                  "no temperature law is specified")
+              if (rcic_law_id == 0) &
+                call error_message(file_name, line_number, buffer, &
+                                   "no interaction law is specified")
+
+            end if ! (nwords==2*n_association_species)
+
+            ! Check if rct and rcic laws are properly set
+            if (rct_law_id == 0) &
+              call error_message(file_name, line_number, buffer, "invalid temperature law")
+            if (rcic_law_id == 0) &
+              call error_message(file_name, line_number, buffer, "invalid interaction law")
+
+            ! Set rate constants and rcic for dissociation channels
+            association_init%channels(association_counter)%r1      = r1_id
+            association_init%channels(association_counter)%r1_lst  = lst(1)
+            association_init%channels(association_counter)%r1_ast  = ast(1)
+            association_init%channels(association_counter)%r2      = r2_id
+            association_init%channels(association_counter)%r2_lst  = lst(2)
+            association_init%channels(association_counter)%r2_ast  = ast(2)
+            association_init%channels(association_counter)%p1      = p1_id
+            association_init%channels(association_counter)%p1_lst  = lst(3)
+            association_init%channels(association_counter)%p1_ast  = ast(3)
+
+            association_init%channels(association_counter)%rate = &
+                          rct_law(rct_law_id, c_pars%temperature, rct_pars)
+
+            association_init%channels(association_counter)%rcic%id   = rcic_law_id
+            association_init%channels(association_counter)%rcic%pars = rcic_pars
+
+          endif ! words(1) == section_end
+
+      end select
 
     end do ! while ios=0
 

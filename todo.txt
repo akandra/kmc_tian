@@ -1,15 +1,16 @@
 do not forget to correct pptx diagrams for barrier corrections!
-we are at the beginning of parsing code in:
-  rates_desorption_class.f90 and rate_hopping_classs.f90
 
-2025-07=04 :
+2025-07-14 :
+    compile a list of error codes for stop
+
+2025-07-04 :
     consider to unify parsing the reaction parameters from rates file
 
-2025-07=04 :
+2025-07-04 :
     temperature_law: make the its global declaration optional
     if defined for each process in the rate file
 
-2025-07=04 :
+2025-07-04 :
     deal with '!dja' comments all over the code
 2025-07-03 :
     save the final state independent of the time binning

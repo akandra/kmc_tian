@@ -113,13 +113,13 @@ contains
 
     character(len=10)     :: current_reactant_name, current_product1_name, current_product2_name
     integer               :: current_reactant_id, current_product1_id, current_product2_id
-    integer               :: current_law_id
     integer               :: rct_law_id, rct_law_id_glob
     integer               :: rcic_law_id, rcic_law_id_glob
 
     integer               :: parse_state
     integer, parameter    :: parse_state_default =  0
     integer, parameter    :: parse_state_dissociation =  dissociation_id
+    integer, parameter    :: n_dissociation_species = 3
 
     logical :: rct_law_defined  = .false.
     logical :: rcic_law_defined = .false.
@@ -154,7 +154,7 @@ contains
       allocate( dissociation_init%rate_info(i)%list( max_avail_ads_sites * &
                                                      max_avail_ads_sites * &
                                                      lat%n_max_nn) )
-      dissociation_init%rate_info(i)%list = rate_info_dissociation( 0, 0, 0.0_dp )
+      dissociation_init%rate_info(i)%list = rate_info_dissociation( default_int, default_int, default_rate )
     end do
 
     !  read rate definitions from the input file
@@ -222,6 +222,7 @@ contains
 
     allocate(dissociation_init%channels(n_dissociation_channels))
     dissociation_init%n_processes = n_dissociation_channels
+    dissociation_init%channels = dissociation_def(0,0,0,0,0,0,0,0,0,0.0_dp,int_law_pars(0,0.0_dp))
 
 !-------------------------------------------------------------------------------
 !   Second pass of processing the .reaction file:
@@ -266,7 +267,7 @@ contains
             rct_law_id_glob  = 0
             rcic_law_id_glob = 0
 
-            if (nwords == 4) then
+            if (nwords == n_dissociation_species + 1) then
               read(words(2),'(A)') current_reactant_name
               current_reactant_id = get_index(current_reactant_name, c_pars%ads_names )
 
@@ -284,7 +285,7 @@ contains
             else
               call error_message(file_name, line_number, buffer, &
                          "dissociation key must have 3 parameter -- reactant product_1 product_2")
-            end if !nwords == 4
+            end if !nwords == n_dissociation_species + 1
 
           end if  ! words(1)
 
@@ -341,7 +342,7 @@ contains
             ! ---------------------------------------------------------
             ! check if we have a valid from-to-to rate record
             ! ---------------------------------------------------------
-            if (nwords < 6) &
+            if (nwords < 2*n_dissociation_species) &
               call error_message(file_name, line_number, buffer, &
                                  "invalid 'from' rate record in the dissociation section")
             i1 = get_index(words(1),lat_site_names)
@@ -375,7 +376,6 @@ contains
                 duplicate_error = .true.
               end if
             end do
-            if (duplicate_error) stop 993
 
             ! check if energy is defined for reactant's and for products' site_type and ads_site
             if( e_pars%ads_energy(current_reactant_id, i1, i2) == e_pars%undefined_energy .or. &
@@ -393,7 +393,7 @@ contains
             ! we have a valid rate record. Process it
             ! ---------------------------------------------------------
             ! if record only has 'from-to-to' site information then set the law ids and pars to global default values
-            if (nwords == 6) then
+            if (nwords == 2*n_dissociation_species) then
               if (rct_law_defined .and. rcic_law_defined) then
                 rct_law_id  = rct_law_id_glob
                 rct_pars    = rct_pars_glob
@@ -415,7 +415,7 @@ contains
               rct_law_id  = 0
               rcic_law_id = 0
 
-              do i=7,nwords
+              do i=2*n_dissociation_species+1,nwords
                 ! check  for rct law on this line
                 if (get_index(words(i), rct_law_names) /= 0) then
                   rct_law_id = get_index(words(i), rct_law_names)
@@ -453,7 +453,7 @@ contains
                   end select
                 end if
 
-              end do ! i=7,nwords
+              end do ! i=2*n_dissociation_species+1,nwords
 
               ! if rct_law  or rcic_law are not defined on this line, set to global defaults
               if (rct_law_id == 0) then
@@ -473,7 +473,7 @@ contains
                 call error_message(file_name, line_number, buffer, &
                                    "no interaction law is specified")
 
-            end if ! (nwords==6)
+            end if ! (nwords==2*n_dissociation_species)
 
             ! Check if rct and rcic laws are properly set
             if (rct_law_id == 0) &
@@ -506,6 +506,7 @@ contains
 
     close(inp_unit)
 
+    if (duplicate_error) stop 993
 
     if (undefined_energy) then
       write(*, '(A)') ' Dissociation: error, rates defined for sites with undefined energies'
