@@ -252,6 +252,9 @@ contains
         words = ''
         call split_string(buffer, words, nwords)
 
+      ! skip comments
+      if (nwords == 0) cycle
+
       select case (parse_state)
 
         case(parse_state_default)
@@ -534,19 +537,19 @@ contains
 !-------------------------------------------------------------------------------
 !  subroutine construct
 !-------------------------------------------------------------------------------
-!dja  subroutine construct(this, ads, lat, e_pars, beta)
-  subroutine construct(this, ads, lat)
+  subroutine construct(this, ads, lat, e_pars, beta)
 
     class(association_type), intent(inout) :: this
     integer, intent(in) :: ads
     class(mc_lat), intent(inout) :: lat
-!dja    class(energy_parameters), intent(in) :: e_pars
-!dja    real(dp), intent(in) :: beta
+    class(energy_parameters), intent(in) :: e_pars
+    real(dp), intent(in) :: beta
 
     integer :: m, iprocs
     integer :: id_r1, row_r1, col_r1, lst_r1, ast_r1
     integer :: id_r2, row_r2, col_r2, lst_r2, ast_r2, ads_r2
     integer :: channel
+    real(dp):: int_energy, int_energy_ts, delta_eps
 
     ! Consider ads as reactant 1
     row_r1 = lat%ads_list(ads)%row
@@ -584,6 +587,15 @@ contains
 
             channel = channel + 1
 
+            ! Calculate interaction correction
+            ! WARNING! here we assume that the correction does not depend on products
+            !          consider to introduce it later
+            int_energy    = energy(ads,lat,e_pars)    - e_pars%ads_energy(id_r1, lst_r1, ast_r1)&
+                          + energy(ads_r2,lat,e_pars) - e_pars%ads_energy(id_r2, lst_r2, ast_r2)
+            int_energy_ts = rcic_law(this%channels(iprocs)%rcic, int_energy, 0.0_dp)
+            ! Barrier correction due to the perturbation
+            delta_eps = int_energy_ts - int_energy
+
 !            ! Get the information on product 1
 !            id_p1  = this%channels(iprocs)%p1
 !            lst_p1 = this%channels(iprocs)%p1_lst
@@ -592,7 +604,8 @@ contains
             this%rate_info(ads)%list(channel)%proc   = iprocs
             this%rate_info(ads)%list(channel)%m      = m
             ! WARNING: Decide later if we need the rate field
-            this%rate_info(ads)%list(channel)%rate  = this%channels(iprocs)%rate
+            this%rate_info(ads)%list(channel)%rate  = this%channels(iprocs)%rate&
+                                                    *exp( -beta*delta_eps)
 
           end if
 

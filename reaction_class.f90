@@ -186,8 +186,7 @@ contains
     if (this%dissociation%is_defined) then
 
       do ads = 1, this%n_ads_total
-!dja    call this%dissociation%construct(ads, lat, e_pars, this%beta)
-        call this%dissociation%construct(ads, lat)
+        call this%dissociation%construct(ads, lat, e_pars, this%beta)
       end do
 
     end if
@@ -196,8 +195,7 @@ contains
     if (this%association%is_defined) then
 
       do ads = 1, this%n_ads_total
-!dja    call this%association%construct(ads, lat, e_pars, this%beta)
-        call this%association%construct(ads, lat)
+        call this%association%construct(ads, lat, e_pars, this%beta)
       end do
 
     end if
@@ -206,8 +204,7 @@ contains
     if (this%bimolecular%is_defined) then
 
       do ads = 1, this%n_ads_total
-!dja    call this%bimolecular%construct(ads, lat, e_pars, this%beta)
-        call this%bimolecular%construct(ads, lat)
+        call this%bimolecular%construct(ads, lat, e_pars, this%beta)
       end do
 
     end if
@@ -362,14 +359,11 @@ contains
     ! Desorption
     if (this%desorption%is_defined)   call this%desorption%construct(ads, lat, e_pars, this%beta)
     ! Dissociation
-!djaif (this%dissociation%is_defined) call this%dissociation%construct(ads, lat, e_pars, this%beta)
-    if (this%dissociation%is_defined) call this%dissociation%construct(ads, lat)
+    if (this%dissociation%is_defined) call this%dissociation%construct(ads, lat, e_pars, this%beta)
     ! Association
-!djaif (this%association%is_defined)  call this%association%construct(ads, lat, e_pars, this%beta)
-    if (this%association%is_defined)  call this%association%construct(ads, lat)
+    if (this%association%is_defined)  call this%association%construct(ads, lat, e_pars, this%beta)
     ! Bimolecular
-!djaif (this%bimolecular%is_defined)  call this%bimolecular%construct(ads, lat, e_pars, this%beta)
-    if (this%bimolecular%is_defined)  call this%bimolecular%construct(ads, lat)
+    if (this%bimolecular%is_defined)  call this%bimolecular%construct(ads, lat, e_pars, this%beta)
 
   end subroutine construct_1
 

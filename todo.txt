@@ -1,5 +1,11 @@
 do not forget to correct pptx diagrams for barrier corrections!
 
+2025-07-15 :
+    add the interaction energy for products into rcic in the following reaction classes:
+      - association
+      - dissociation
+      - bimolecular
+
 2025-07-14 :
     compile a list of error codes for stop
 

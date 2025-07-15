@@ -528,19 +528,19 @@ contains
 !-------------------------------------------------------------------------------
 !  subroutine construct
 !-------------------------------------------------------------------------------
-!dja  subroutine construct(this, ads, lat, e_pars, beta)
-  subroutine construct(this, ads, lat)
+  subroutine construct(this, ads, lat, e_pars, beta)
 
     class(dissociation_type), intent(inout) :: this
     integer, intent(in) :: ads
     class(mc_lat), intent(inout) :: lat
-!dja    class(energy_parameters), intent(in) :: e_pars
-!dja    real(dp), intent(in) :: beta
+    class(energy_parameters), intent(in) :: e_pars
+    real(dp), intent(in) :: beta
 
     integer :: id_r, id_p1, id_p2, m, iprocs, i_ast_p1, i_ast_p2
     integer :: row, col, lst, ast
     integer :: row_2, col_2, lst_2
     integer :: n_channels
+    real(dp):: int_energy, int_energy_ts, delta_eps
 
 !debug(2) = (ads == 10)
 
@@ -585,6 +585,14 @@ contains
             id_p1   = this%channels(iprocs)%p1
             id_p2   = this%channels(iprocs)%p2
 
+            ! Calculate interaction correction
+            ! WARNING! here we assume that the correction does not depend on products
+            !          consider to introduce it later
+            int_energy    = energy(ads,lat,e_pars) - e_pars%ads_energy(id_r, lst, ast)
+            int_energy_ts = rcic_law(this%channels(iprocs)%rcic, int_energy, 0.0_dp)
+            ! Barrier correction due to the perturbation
+            delta_eps = int_energy_ts - int_energy
+
             ! Determine all the values of the adsorption sites for products p1 and p2
             ! that match an entry in the process structure.
             ! If the rate for this entry is >0, add channel to the list
@@ -597,8 +605,8 @@ contains
                 n_channels=n_channels + 1
                 this%rate_info(ads)%list(n_channels)%proc  = iprocs
                 this%rate_info(ads)%list(n_channels)%m     = m
-                ! WARNING: Decide later if we need the rate field
-                this%rate_info(ads)%list(n_channels)%rate  = this%channels(iprocs)%rate
+                this%rate_info(ads)%list(n_channels)%rate  = this%channels(iprocs)%rate&
+                                                           *exp( -beta*delta_eps)
 
 !if(debug(2))then
 !  lst_name    = lat_site_names(lst)
