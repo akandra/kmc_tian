@@ -252,6 +252,7 @@ contains
               if ( .not. read_num(words(i+1), control_parameters_init%t_end(i)) )&
                 stop err // "kmc_time must be numeric"
             end do
+
           case('kmc_nbins')
             if (nwords==1) stop err // "kmc_nbins must have at least 1 parameter."
             allocate(control_parameters_init%n_bins(nwords - 1))

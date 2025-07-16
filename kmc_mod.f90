@@ -137,27 +137,27 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
     ! write trajectory files
     !-----------------------------------------------------------------
     ! Prepare string with traj number for using in filenames
-    write(buffer,'(i6.6)') itraj
+    write(buffer,'(i9.9)') itraj
     ! write initial state of the lattice into a file
     call open_for_write(outcfg_unit,trim(c_pars%file_name_base)//'_'//trim(buffer)//'.confs')
     write(outcfg_unit,'(A)') trim(version_header)
     write(outcfg_unit,'(A20,A20,A20)') "# rows(|| to steps)","# cols","step_period"
     write(outcfg_unit,'(3i20)') lat%n_rows, lat%n_cols, c_pars%step_period
     write(outcfg_unit,'(100A10)') adjustr(c_pars%ads_names)
-    write(outcfg_unit,'(A6,1pe12.3)') "time ",0.0_dp
+    write(outcfg_unit,'(A6,1pe19.10)') "time ",0.0_dp
     write(outcfg_unit,'(100i10)') lat%n_ads
     call lat%print_ads(outcfg_unit)
 
     ! write initial total energy of the system
     call open_for_write(outeng_unit,trim(c_pars%file_name_base)//'_'//trim(buffer)//'.en')
     write(outeng_unit,'(2A12)') 'time(s)', ' energy(eV)'
-    write(outeng_unit,'(1pe12.3,1pe12.3)') 0.0_dp, total_energy(lat,e_pars)
+    write(outeng_unit,'(1pe19.10,1pe19.10)') 0.0_dp, total_energy(lat,e_pars)
 
     ! open file for saving reaction counts
     call open_for_write(outcnt_unit,trim(c_pars%file_name_base)//'_'//trim(buffer)//'.counts')
     write(outcnt_unit,'(A12,100A20)') 'time(s)', &
     ((' '//trim(c_pars%ads_names(j))//'_'//trim(reaction_names(k)), k=1,n_reaction_types), j=1,c_pars%n_species)
-    write(outcnt_unit,'(1pe12.3,100i20)') 0.0_dp, r%counter
+    write(outcnt_unit,'(1pe19.10,100i20)') 0.0_dp, r%counter
 
     ! open file for saving cluster size histogram
     call open_for_write(outhst_unit,trim(c_pars%file_name_base)//'_'//trim(buffer)//'.hist')
@@ -178,7 +178,7 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
       write(n_ads_fmt,'(i10)') r%n_ads_total
       n_ads_fmt = '('//trim(adjustl(n_ads_fmt))//'i8)'
       ! Save cluster size histogram
-      write(outhst_unit,'(A6,1pe12.3)') "time ",0.0_dp
+      write(outhst_unit,'(A6,1pe19.10)') "time ",0.0_dp
       do species=1,c_pars%n_species
         write(outhst_unit,*) species
         write(outhst_unit,n_ads_fmt) (hist(species,i), i=1,lat%n_ads(species))
@@ -199,8 +199,8 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
 
     else
       ! No output when no adsorbates
-      write(outhst_unit,'(A6,1pe12.3)') "time ",0.0_dp
-      write(outrdf_unit,'(A6,1pe12.3)') "time ",0.0_dp
+      write(outhst_unit,'(A6,1pe19.10)') "time ",0.0_dp
+      write(outrdf_unit,'(A6,1pe19.10)') "time ",0.0_dp
 
     end if
 
@@ -217,7 +217,7 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
 
       ! propagate the time
       delta_t = -log(ran1())/r%acc_rate(n_reaction_types)   ! when does a reaction occur?
-      ! write(*,*) 'Total rate: ', r%acc_rate(n_reaction_types), 'time step: ', delta_t
+      !write(*,*) 'Total rate: ', r%acc_rate(n_reaction_types), 'time step: ', delta_t
 
       time = time + delta_t
 
@@ -262,7 +262,7 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
             'current trajectory',&
             int(100*time/end_of_time),&
             '   total',&
-            ! total =  % completed trajs + contribution form current trajctory
+            ! total =  % completed trajs + contribution form current trajectory
             100*(itraj-c_pars%start_traj)/c_pars%n_trajs + int(100.*time/(end_of_time*c_pars%n_trajs)))
 
           if (r%n_ads_total>0) then
@@ -297,15 +297,15 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
           end if
 
           ! configuration
-          write(outcfg_unit,'(A6,1pe12.3)') "time ", time_bin
+          write(outcfg_unit,'(A6,1pe19.10)') "time ", time_bin
           write(outcfg_unit,'(100i10)') lat%n_ads
           call lat%print_ads(outcfg_unit)
 
           ! energy
-          write(outeng_unit,'(1pe12.3,1pe12.3)') time_bin, total_energy(lat,e_pars)
+          write(outeng_unit,'(1pe19.10,1pe19.10)') time_bin, total_energy(lat,e_pars)
 
           ! reaction counts
-          write(outcnt_unit,'(1pe12.3,100i20)') time_bin, r%counter
+          write(outcnt_unit,'(1pe19.10,100i20)') time_bin, r%counter
           ! Reset reaction counters
 !          r%counter = 0
 
@@ -316,7 +316,7 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
             write(n_ads_fmt,'(i10)') r%n_ads_total
             n_ads_fmt = '('//trim(adjustl(n_ads_fmt))//'i8)'
             ! Save cluster size histogram
-            write(outhst_unit,'(A6,1pe12.3)') "time ",time_bin
+            write(outhst_unit,'(A6,1pe19.10)') "time ",time_bin
             do species=1,c_pars%n_species
               write(outhst_unit,*) species
               write(outhst_unit,n_ads_fmt) (hist(species,i), i=1,lat%n_ads(species))
@@ -324,7 +324,7 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
 
             ! rdf
             if (c_pars%rdf_period > 0) then
-              write(outrdf_unit,'(A6,1pe12.3)') "time ",time_bin
+              write(outrdf_unit,'(A6,1pe19.10)') "time ",time_bin
               do species1=1,c_pars%n_species
               do species2=1,c_pars%n_species
                 write(outrdf_unit,*) species1, species2
@@ -336,8 +336,8 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
           else
 
             ! No histogram output when no adsorbates
-            write(outhst_unit,'(A6,1pe12.3)') "time ",time_bin
-            write(outrdf_unit,'(A6,1pe12.3)') "time ",time_bin
+            write(outhst_unit,'(A6,1pe19.10)') "time ",time_bin
+            write(outrdf_unit,'(A6,1pe19.10)') "time ",time_bin
 
           end if
 
