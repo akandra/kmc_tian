@@ -150,6 +150,9 @@ module constants
   real(dp), parameter :: Kelvin2eV        = kB
 
 
+  ! Stopping trigger name
+  character(len=20) :: stopping_trigger_name = 'essential'
+
   ! Global variables for debugging
   !   1 prints out rct and rcic laws parameters
   logical :: debug(10)

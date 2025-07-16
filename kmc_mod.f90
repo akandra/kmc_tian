@@ -352,23 +352,16 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
       ! do reaction based on a random number
       call r%do_reaction(ran1(), lat, e_pars)
 
-      ! End the trajectory if there's no processes left
+      ! end trajectory if the essential species is not present
+
+
+      ! end trajectory if there's no processes left
       if (r%acc_rate(n_reaction_types) == 0.0_dp) then
         print*
         print *, 'nothing to do, since total rate is zero: exiting kMC loop'
 !        print*
         exit
       end if
-
-! WARNING - This is a hack, crude crude hack
-      ! End the trajectory if there's no species called B anymore
-!      if (lat%n_ads(2) == 0) then
-!        print*
-!        print *, 'species ', c_pars%ads_names(2), ' extinct: exiting kMC loop'
-!        print *, 'if ', c_pars%ads_names(2), ' is not B, complain to UN'
-!        print*
-!        exit
-!      end if
 
       kmc_nsteps = kmc_nsteps + 1
 
