@@ -110,7 +110,7 @@ contains
             call error_message(file_name, line_number, buffer, &
                        "invalid ending of the adsorption/interaction section")
           parse_state = parse_state_adsorption
-          if (nwords/=2 .or. nwords/=3) call error_message(file_name, line_number, buffer, &
+          if (nwords/=2 .and. nwords/=3) call error_message(file_name, line_number, buffer, &
                              "adsorption key must have 1 or 2 parameters")
 
           read(words(2),'(A)') current_species_name

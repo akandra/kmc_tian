@@ -1,5 +1,9 @@
 do not forget to correct pptx diagrams for barrier corrections!
 
+2025-07-17 rates_hopping_class.f90:
+    it looks like compiler has problems with allocatable of allocatables.
+    Check that. See the Warning  in do_reaction subroutine
+
 2025-07-15 :
     add the interaction energy for products into rcic in the following reaction classes:
       - association

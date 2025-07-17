@@ -52,7 +52,6 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
 
   ! Create a rate structure
   r = reaction_init(c_pars, lat, e_pars)
-
 !------------------------------------------------------------------------------
 !  debug printing
 !------------------------------------------------------------------------------
@@ -352,8 +351,13 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
       ! do reaction based on a random number
       call r%do_reaction(ran1(), lat, e_pars)
 
-      ! end trajectory if the essential species is not present
-
+      ! end trajectory if all essential species are gone
+      if (.not. any(e_pars%stopping_trigger)) then
+        print*
+        print *, 'all ' // trim(stopping_trigger_name) // ' species have left the surface: exiting kMC loop'
+!        print*
+        exit
+      end if
 
       ! end trajectory if there's no processes left
       if (r%acc_rate(n_reaction_types) == 0.0_dp) then

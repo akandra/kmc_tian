@@ -416,7 +416,7 @@ contains
 ! Debug printing
 !debug(1) = (this%counter(reaction_id,1) == 9 .or. this%counter(reaction_id,1) == 8)
 !debug(2) = (this%counter(reaction_id,1) == 8)
-!debug(1) = .true.
+debug(1) = .true.
 
     ! ------- Select the process
 
@@ -428,13 +428,14 @@ contains
       if (debug(1)) print*,reaction_id, this%acc_rate(reaction_id), u
     end do
 
-!if (debug(1)) then
-!  print*
-!  print*,'do reaction debugging printout:'
-!  print *, 'Before ', trim(reaction_names(reaction_id)),' #',this%counter(reaction_id,1)+1, ':'
-!  call lat%print_ocs
-!  call lat%print_ads
-!end if
+if (debug(1)) then
+  print*
+  print*,'do reaction debugging printout:'
+  print *, 'Before ', trim(reaction_names(reaction_id)),' #',this%counter(reaction_id,1)+1, ':'
+  call lat%print_ocs
+  call lat%print_ads
+end if
+
     select case (reaction_id)
 
       case(hopping_id)
@@ -559,7 +560,14 @@ contains
           ! Update the adsorbate number in the lattice
           lat%occupations(lat%ads_list(ads)%row, lat%ads_list(ads)%col) = ads
           ! Update the rates arrays
-          this%hopping%rates(ads,:)        = this%hopping%rates(this%n_ads_total,:)
+
+          ! Warning: the line below produced segmentation fault, so we have to use do loop
+          !this%hopping%rates(ads,1:lat%n_max_nn+1)        = this%hopping%rates(this%n_ads_total,1:lat%n_max_nn+1)
+          ! It would be good to find the reason.
+
+          do i=1,lat%n_max_nn+1
+            this%hopping%rates(ads,i) = this%hopping%rates(this%n_ads_total,i)
+          end do
           this%desorption%rates(ads)       = this%desorption%rates(this%n_ads_total)
           this%dissociation%rate_info(ads) = this%dissociation%rate_info(this%n_ads_total)
           this%association%rate_info(ads)  = this%association%rate_info(this%n_ads_total)
@@ -789,14 +797,14 @@ contains
     deallocate(rate_update_q)
 
 ! Debug printing
-!if (debug(1)) then
-!  print*
-!  print*, 'After ', trim(reaction_names(reaction_id)),' #',this%counter(reaction_id,1), ':'
-!  call lat%print_ocs
-!  call lat%print_ads
-!  print*, 'reactant 1:', ads
-!!  !if (reaction_id==bimolecular_id) pause
-!end if
+if (debug(1)) then
+  print*
+  print*, 'After ', trim(reaction_names(reaction_id)),' #',this%counter(reaction_id,1), ':'
+  call lat%print_ocs
+  call lat%print_ads
+  print*, 'reactant 1:', ads
+!  !if (reaction_id==bimolecular_id) pause
+end if
 
 
   end subroutine do_reaction
