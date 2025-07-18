@@ -45,10 +45,10 @@ module mc_lat_class
     ! List and number of additional nn directions to scan after reaction
     integer, dimension(:,:,:), allocatable :: nn_new
     integer, dimension(:,:),   allocatable :: n_nn_new
-    ! number of adsorbates per species
-    integer, dimension(:), allocatable :: n_ads
-    ! initial and current adsorbates lists
-    type(adsorbate), dimension(:), allocatable  :: ads_list
+    ! number of adsorbates per species, current and penultimate
+    integer, dimension(:), allocatable :: n_ads, n_ads_penultimate
+    ! initial and current adsorbates lists, current and penultimate
+    type(adsorbate), dimension(:), allocatable  :: ads_list, ads_list_penultimate
     ! Available adsorbtion sites list (n_species x n_max_lat_site_types x (n_avail_ads_sites))
     type(v_list), dimension(:,:), allocatable :: avail_ads_sites
     integer :: n_ini_confs  ! Number of available confs in the start-conf file
@@ -486,11 +486,14 @@ contains
     ! Allocate arrays
     allocate(lat%occupations(c_pars%n_rows,c_pars%n_cols))
     allocate(lat%lst(        c_pars%n_rows,c_pars%n_cols))
-    allocate(lat%n_ads(c_pars%n_species))
+    allocate(lat%n_ads(            c_pars%n_species),&
+             lat%n_ads_penultimate(c_pars%n_species))
     ! Warning: the allocation assumes 1 ads. per unit cell
-    allocate(lat%ads_list(    c_pars%n_rows*c_pars%n_cols))
+    allocate(lat%ads_list(            c_pars%n_rows*c_pars%n_cols),&
+             lat%ads_list_penultimate(c_pars%n_rows*c_pars%n_cols))
     ! Initialize arrays
-    lat%ads_list     = adsorbate(0,0,0,0)
+    lat%ads_list             = adsorbate(0,0,0,0)
+    lat%ads_list_penultimate = adsorbate(0,0,0,0)
 
 
     ! Define where steps, corners, and other sites are

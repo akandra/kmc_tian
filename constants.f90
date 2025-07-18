@@ -151,7 +151,7 @@ module constants
 
 
   ! Stopping trigger name
-  character(len=20) :: stopping_trigger_name = 'essential'
+  character(len=20) :: essential_name = 'essential'
 
   ! Global variables for debugging
   !   1 prints out rct and rcic laws parameters

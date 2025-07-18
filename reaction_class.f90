@@ -416,7 +416,7 @@ contains
 ! Debug printing
 !debug(1) = (this%counter(reaction_id,1) == 9 .or. this%counter(reaction_id,1) == 8)
 !debug(2) = (this%counter(reaction_id,1) == 8)
-debug(1) = .true.
+!debug(1) = .true.
 
     ! ------- Select the process
 

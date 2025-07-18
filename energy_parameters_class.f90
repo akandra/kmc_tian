@@ -25,8 +25,8 @@ module energy_parameters_class
     logical, dimension(:,:,:,:,:,:,:),allocatable :: int_energy_skip
 
     logical :: is_interaction
-    ! Trajectory interruption trigger (n_species)
-    logical, dimension(:), allocatable :: stopping_trigger
+    ! Species importance key (n_species)
+    logical, dimension(:), allocatable :: is_essential
 
     ! Default value for undefined energy
     real(dp) :: undefined_energy
@@ -72,7 +72,7 @@ contains
                                                     i,n_max_lat_site_types,n_max_ads_sites,n_shells))
     allocate(energy_parameters_init%int_energy_skip(i,n_max_lat_site_types,n_max_ads_sites,&
                                                     i,n_max_lat_site_types,n_max_ads_sites,n_shells))
-    allocate(energy_parameters_init%stopping_trigger(i))
+    allocate(energy_parameters_init%is_essential(i))
 
     energy_parameters_init%undefined_energy = huge(0.0_dp)
     energy_parameters_init%ads_energy = energy_parameters_init%undefined_energy
@@ -80,7 +80,7 @@ contains
     energy_parameters_init%int_energy_pars = energy_parameters_init%undefined_energy
     energy_parameters_init%int_energy_skip = .true.
     energy_parameters_init%is_interaction  = .false.
-    energy_parameters_init%stopping_trigger= .false.
+    energy_parameters_init%is_essential    = .false.
 
     !  read energy definitions from the input file
     file_name = control_pars%energy_file_name
@@ -118,8 +118,8 @@ contains
           if (current_species_id == 0) call error_message(file_name, line_number, buffer, &
                                                 "inconsistent adsorbate definition")
           if (nwords > 2) then
-            if (trim(words(3)) == trim(stopping_trigger_name)) then
-              energy_parameters_init%stopping_trigger(current_species_id) = .true.
+            if (trim(words(3)) == trim(essential_name)) then
+              energy_parameters_init%is_essential(current_species_id) = .true.
             else
               call error_message(file_name, line_number, buffer, &
                                                 "adsorption: unknown stopping trigger name")

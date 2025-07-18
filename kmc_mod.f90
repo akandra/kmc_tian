@@ -45,6 +45,9 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
 
   integer, dimension(c_pars%n_species,c_pars%n_species,c_pars%rdf_n_bins) :: rdf_hist
 
+  integer :: n_ads_total_penultimate
+  logical :: stopping_trigger
+
 !dja  integer :: j, k, n_chan  ! only for debug printout
   integer :: j, k  ! only for debug printout
 
@@ -106,7 +109,8 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
     call lat%conf_init(c_pars, itraj )
     ! Adjust the respective records in reaction variable
     r%n_ads_total = lat%n_ads_tot()
-
+    ! Initialize stopping trigger
+    stopping_trigger = .false.
     ! Initialize reaction counter
     r%counter = 0
     !-------- Construct rates arrays
@@ -154,7 +158,7 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
 
     ! open file for saving reaction counts
     call open_for_write(outcnt_unit,trim(c_pars%file_name_base)//'_'//trim(buffer)//'.counts')
-    write(outcnt_unit,'(A12,100A20)') 'time(s)', &
+    write(outcnt_unit,'(A19,100A20)') 'time(s)', &
     ((' '//trim(c_pars%ads_names(j))//'_'//trim(reaction_names(k)), k=1,n_reaction_types), j=1,c_pars%n_species)
     write(outcnt_unit,'(1pe19.10,100i20)') 0.0_dp, r%counter
 
@@ -348,15 +352,27 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
 
       time_segment_old = time_segment_new
 
+      ! save penultimate state
+      lat%n_ads_penultimate    = lat%n_ads
+      lat%ads_list_penultimate = lat%ads_list
+
       ! do reaction based on a random number
       call r%do_reaction(ran1(), lat, e_pars)
 
       ! end trajectory if all essential species are gone
-      if (.not. any(e_pars%stopping_trigger)) then
-        print*
-        print *, 'all ' // trim(stopping_trigger_name) // ' species have left the surface: exiting kMC loop'
-!        print*
-        exit
+      if (any(e_pars%is_essential)) then
+
+        stopping_trigger = .true.
+        do i=1,c_pars%n_species
+          if (e_pars%is_essential(i) .and. lat%n_ads(i) /= 0) stopping_trigger = .false.
+        end do
+
+        if (stopping_trigger) then
+            print*
+            print *, 'all ' // trim(essential_name) // ' species have left the surface: exiting kMC loop'
+            exit
+        end if
+
       end if
 
       ! end trajectory if there's no processes left
@@ -371,6 +387,21 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
 
     end do time_loop
 !-------------------------------------------------------------
+
+    ! writing out the penultimate state
+
+    ! configuration
+    write(outcfg_unit,'(A17,1pe19.10)') "time_penultimate ", time
+    write(outcfg_unit,'(100i10)') lat%n_ads_penultimate
+
+    n_ads_total_penultimate = 0
+    do i=1,size(lat%n_ads_penultimate)
+      n_ads_total_penultimate = n_ads_total_penultimate + lat%n_ads_penultimate(i)
+    end do
+
+    do i=1,n_ads_total_penultimate
+      write(outcfg_unit,'(5i10)') i, lat%ads_list_penultimate(i)
+    end do
 
 
     close(outcfg_unit)
