@@ -17,8 +17,8 @@ module energy_parameters_class
     ! Interaction energy law id (n_species x n_site_type x n_adsorption_sites x n_species x n_site_type x n_adsorption_sites)
     integer, dimension(:,:,:,:,:,:), allocatable :: int_energy_law_id
 
-    ! Interaction energy (n_species x n_site_type x n_adsorption_sites x n_species x n_site_type x n_adsorption_sites x n_shells )
-    real(dp), dimension(:,:,:,:,:,:,:),allocatable :: int_energy_pars
+    ! Interaction energy (n_species x n_site_type x n_adsorption_sites x n_species x n_site_type x n_adsorption_sites x n_shells x max_n_neighbors )
+    real(dp), dimension(:,:,:,:,:,:,:,:),allocatable :: int_energy_pars
 
     ! Interaction energy mask (n_species x n_species x n_shells)
     ! .true. means to skip interaction
@@ -69,7 +69,7 @@ contains
     allocate(energy_parameters_init%int_energy_law_id(i,n_max_lat_site_types,n_max_ads_sites,&
                                                       i,n_max_lat_site_types,n_max_ads_sites))
     allocate(energy_parameters_init%int_energy_pars(i,n_max_lat_site_types,n_max_ads_sites,&
-                                                    i,n_max_lat_site_types,n_max_ads_sites,n_shells))
+                                                    i,n_max_lat_site_types,n_max_ads_sites,n_shells,max_n_neighbors))
     allocate(energy_parameters_init%int_energy_skip(i,n_max_lat_site_types,n_max_ads_sites,&
                                                     i,n_max_lat_site_types,n_max_ads_sites,n_shells))
     allocate(energy_parameters_init%is_essential(i))
@@ -173,37 +173,42 @@ contains
           if (parse_state /= parse_state_interaction) &
             call error_message(file_name, line_number, buffer, &
                       "invalid interaction law statement")
-          if (nwords/=7+n_shells) call error_message(file_name, line_number, buffer, &
-                            "interaction law key must have (7 + n_shells) parameters")
+          if (nwords < 7+n_shells) then
+            call error_message(file_name, line_number, buffer, &
+                            "interaction law key must have (7 + n_shells) or more parameters")
+          else
 
-          i_law  = get_index(words(1),int_law_names)
-          i1  = get_index(words(2),control_pars%ads_names)
-          i1s = get_index(words(3),lat_site_names)
-          i1a = get_index(words(4),ads_site_names)
-          i2  = get_index(words(5),control_pars%ads_names)
-          i2s = get_index(words(6),lat_site_names)
-          i2a = get_index(words(7),ads_site_names)
+            i_law  = get_index(words(1),int_law_names)
+            i1  = get_index(words(2),control_pars%ads_names)
+            i1s = get_index(words(3),lat_site_names)
+            i1a = get_index(words(4),ads_site_names)
+            i2  = get_index(words(5),control_pars%ads_names)
+            i2s = get_index(words(6),lat_site_names)
+            i2a = get_index(words(7),ads_site_names)
 
-          if ( i1==0 .or. i2==0 ) call error_message(file_name, line_number, buffer, &
-                            "unknown species name in the interaction law")
-          if ( i1s==0 .or. i2s==0 ) &
-              call error_message(file_name, line_number, buffer, &
-                           "unknown lattice site type in the interaction section")
-          if ( i1a==0 .or. i2a==0 ) &
-              call error_message(file_name, line_number, buffer, &
-                           "unknown adsorption site type in the interaction section")
-          if (energy_parameters_init%int_energy_law_id(i1,i1s,i1a,i2,i2s,i2a) /= default_int)&
-              call error_message(file_name, line_number, buffer, "duplicated entry in the interaction section")
-          energy_parameters_init%int_energy_law_id(i1,i1s,i1a,i2,i2s,i2a) = i_law
-          energy_parameters_init%int_energy_law_id(i2,i2s,i2a,i1,i1s,i1a) = i_law
-          do i=1, n_shells
-            if (read_num(words(7+i),energy_parameters_init%int_energy_pars(i1,i1s,i1a,i2,i2s,i2a,i)))&
-              energy_parameters_init%int_energy_skip(i1,i1s,i1a,i2,i2s,i2a,i) = .false.
-            energy_parameters_init%int_energy_pars(i2,i2s,i2a,i1,i1s,i1a,i) = &
-                                energy_parameters_init%int_energy_pars(i1,i1s,i1a,i2,i2s,i2a,i)
-            energy_parameters_init%int_energy_skip(i2,i2s,i2a,i1,i1s,i1a,i) = &
-                                energy_parameters_init%int_energy_skip(i1,i1s,i1a,i2,i2s,i2a,i)
-          end do
+            if ( i1==0 .or. i2==0 ) call error_message(file_name, line_number, buffer, &
+                              "unknown species name in the interaction law")
+            if ( i1s==0 .or. i2s==0 ) &
+                call error_message(file_name, line_number, buffer, &
+                             "unknown lattice site type in the interaction section")
+            if ( i1a==0 .or. i2a==0 ) &
+                call error_message(file_name, line_number, buffer, &
+                             "unknown adsorption site type in the interaction section")
+            if (energy_parameters_init%int_energy_law_id(i1,i1s,i1a,i2,i2s,i2a) /= default_int)&
+                call error_message(file_name, line_number, buffer, "duplicated entry in the interaction section")
+            energy_parameters_init%int_energy_law_id(i1,i1s,i1a,i2,i2s,i2a) = i_law
+            energy_parameters_init%int_energy_law_id(i2,i2s,i2a,i1,i1s,i1a) = i_law
+
+            do i=1, n_shells
+
+              if (read_num(words(7+i),energy_parameters_init%int_energy_pars(i1,i1s,i1a,i2,i2s,i2a,i)))&
+                energy_parameters_init%int_energy_skip(i1,i1s,i1a,i2,i2s,i2a,i) = .false.
+              energy_parameters_init%int_energy_pars(i2,i2s,i2a,i1,i1s,i1a,i) = &
+                                  energy_parameters_init%int_energy_pars(i1,i1s,i1a,i2,i2s,i2a,i)
+              energy_parameters_init%int_energy_skip(i2,i2s,i2a,i1,i1s,i1a,i) = &
+                                  energy_parameters_init%int_energy_skip(i1,i1s,i1a,i2,i2s,i2a,i)
+
+            end do
 !            print*, 'int. law: ', energy_parameters_init%int_energy_law_id(i1,i2),&
 !                    ' for species 1:', i1,&
 !                    ' and species 2:', i2

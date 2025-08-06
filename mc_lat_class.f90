@@ -118,7 +118,7 @@ contains
     lat%n_nn(   tc1A_site,:) = [6,6,6]
     lat%n_nn(   tc2A_site,:) = [6,6,6]
 
-    lat%n_max_nn = 7
+    lat%n_max_nn = max_n_neighbors
 
     allocate(lat%shell_list(n_max_lat_site_types, n_shells, maxval(lat%n_nn), 2))
 

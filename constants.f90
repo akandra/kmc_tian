@@ -64,6 +64,11 @@ module constants
   integer, parameter :: br2_id = 5
   integer, parameter :: br3_id = 6
 
+  !-------- Neighbors info ---------!
+
+  ! Maximum number of members in a neighbor shell
+  integer, parameter :: max_n_neighbors = 7
+
   !-------- Interaction energy laws ---------!
 
   ! List of interaction laws

@@ -1,5 +1,14 @@
 do not forget to correct pptx diagrams for barrier corrections!
 
+2025-07-31 :
+    consider using several rate and energy files in the same simulation
+
+2025-07-31 :
+    put 'end' as a section marker for energy files
+
+2025-07-31 :
+    consider writing penultimate info into all output files in sake of consistency
+    
 2025-07-18 :
     improve keeping the penultimate configuration for the output by using the penultimate index
     instead of direct copying the content of ads_list and n_ads
