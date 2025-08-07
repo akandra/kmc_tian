@@ -127,6 +127,39 @@ contains
 
   end function read_logical
 
+  integer function read_par(string, x)
+  !1: 1.0
+  !2: {1.0
+  !3: {
+  !4:  1.0}
+  !5: {
+  !6: -, *, .
+  !0: anything else
+    implicit none
+
+    character(len=*), intent(in) :: string
+    real(dp), intent(out) :: x
+    integer :: str_len, error_code
+
+    str_len = size(trim(string))
+    read(string,*,iostat=error_code) x
+
+    if (error_code == 0) then
+      read_par = 1
+    elseif (string(1) == '{') then
+      read(string(2:),*,iostat=error_code) x
+      if (error_code == 0) read_par = 2
+    elseif (string(str_len) == '}') then
+      read(string(:str_len-1),*,iostat=error_code) x
+      if (error_code == 0) read_par = 3
+    elseif ( any(trim(string) == ['-','*', '.']) )
+      read_par = 4
+    else
+      read_par = 0
+    endif
+
+  end function read_par
+
 !------------------------------------------------------------------------------
 !                 Progress bar of various flavors
 !------------------------------------------------------------------------------

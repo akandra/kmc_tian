@@ -63,6 +63,9 @@ contains
 
     logical :: first_warning = .true.
     integer,  parameter:: default_int = 0
+    integer :: shell, nn
+    logical :: in_curly_braces
+    real(dp) :: temp_dp
 
     i = control_pars%n_species
     allocate(energy_parameters_init%ads_energy(i,n_max_lat_site_types,n_max_ads_sites))
@@ -199,15 +202,88 @@ contains
             energy_parameters_init%int_energy_law_id(i1,i1s,i1a,i2,i2s,i2a) = i_law
             energy_parameters_init%int_energy_law_id(i2,i2s,i2a,i1,i1s,i1a) = i_law
 
+            in_curly_braces = .false.
+            shell = 1
+            nn = 1
+            do i=8,nwords
+
+              select case read_par(words(7+i), temp_dp)
+
+                ! error
+                case 0:
+                  call error_message(file_name, line_number, buffer, &
+                               "malformed interaction parameter line")
+
+                ! number
+                case 1:
+                  if (in_curly_braces) then
+                    energy_parameters_init%int_energy_pars(i1,i1s,i1a,i2,i2s,i2a,shell,nn) = temp_dp
+                    nn = nn + 1
+                  else
+                    energy_parameters_init%int_energy_skip(i1,i1s,i1a,i2,i2s,i2a,shell) = .false.
+                    energy_parameters_init%int_energy_pars(i1,i1s,i1a,i2,i2s,i2a,shell,:) = temp_dp
+                    shell = shell + 1
+                  end if
+
+                ! '{'
+                case 2:
+                  in_curly_braces = .true.
+                  nn = 1
+                  energy_parameters_init%int_energy_skip(i1,i1s,i1a,i2,i2s,i2a,shell) = .false.
+                  energy_parameters_init%int_energy_pars(i1,i1s,i1a,i2,i2s,i2a,shell,nn) = temp_dp
+                  shell = shell + 1
+
+
+              end select
+
+
+            end do
+
+
+
+
+
+
+            nn_counter = 1
+            in_curly_braces = .false.
             do i=1, n_shells
+            do nn=1,max_n_neighbors
 
-              if (read_num(words(7+i),energy_parameters_init%int_energy_pars(i1,i1s,i1a,i2,i2s,i2a,i)))&
-                energy_parameters_init%int_energy_skip(i1,i1s,i1a,i2,i2s,i2a,i) = .false.
-              energy_parameters_init%int_energy_pars(i2,i2s,i2a,i1,i1s,i1a,i) = &
-                                  energy_parameters_init%int_energy_pars(i1,i1s,i1a,i2,i2s,i2a,i)
-              energy_parameters_init%int_energy_skip(i2,i2s,i2a,i1,i1s,i1a,i) = &
-                                  energy_parameters_init%int_energy_skip(i1,i1s,i1a,i2,i2s,i2a,i)
+              select case read_par(words(7+nn_counter), temp_dp)
 
+                case 0:
+                  call error_message(file_name, line_number, buffer, &
+                               "malformed interaction parameter line")
+
+                case 1:
+                  if (in_curly_braces) then
+                    energy_parameters_init%int_energy_pars(i1,i1s,i1a,i2,i2s,i2a,i,) = temp_dp
+                  else
+                    energy_parameters_init%int_energy_skip(i1,i1s,i1a,i2,i2s,i2a,i) = .false.
+                    energy_parameters_init%int_energy_pars(i1,i1s,i1a,i2,i2s,i2a,i,:) = temp_dp
+                  end if
+                  nn_counter = nn_counter + 1
+
+                case 2:
+                  energy_parameters_init%int_energy_skip(i1,i1s,i1a,i2,i2s,i2a,i) = .false.
+                  energy_parameters_init%int_energy_pars(i1,i1s,i1a,i2,i2s,i2a,i,1) = temp_dp
+                  in_curly_braces = .true.
+
+              end select
+
+
+
+                  energy_parameters_init%int_energy_pars(i2,i2s,i2a,i1,i1s,i1a,i,:) = &
+                                    energy_parameters_init%int_energy_pars(i1,i1s,i1a,i2,i2s,i2a,i,:)
+                  energy_parameters_init%int_energy_skip(i2,i2s,i2a,i1,i1s,i1a,i) = &
+                                    energy_parameters_init%int_energy_skip(i1,i1s,i1a,i2,i2s,i2a,i)
+
+
+              else
+
+
+
+            end do
             end do
 !            print*, 'int. law: ', energy_parameters_init%int_energy_law_id(i1,i2),&
 !                    ' for species 1:', i1,&
