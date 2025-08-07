@@ -1,4 +1,4 @@
-cmake_minimum_required (VERSION 4.00)
+cmake_minimum_required (VERSION 3.1)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)	# produce a json file with compiler options
 

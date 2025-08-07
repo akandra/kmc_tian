@@ -1,2 +1,5 @@
 release/
 debug/
+build_MinGW_debug
+build_make_debug
+
