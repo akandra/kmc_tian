@@ -63,7 +63,56 @@ contains
 
   end function lower_case
 
-  subroutine split_string ( line, words, nw, comment_character )
+  subroutine get_token( line, tokens, n_tokens, comment_character, open_bracket, close_bracket )
+
+    character(*), intent(in)  :: line
+    character(*), intent(out) :: tokens(:)
+    integer,      intent(out) :: n_tokens
+    character, optional       :: comment_character
+    character, optional       :: open_bracket, close_bracket
+
+    character(len(tokens)) :: buf( size(tokens) ), buf1( size(tokens) )
+    character :: cc, ob, cb
+    integer :: i,j, ios, token_len
+
+    if (present(comment_character)) then
+      cc = comment_character
+    else
+      cc = '!'
+    end if
+
+    if (present(open_bracket)) then
+      ob = open_bracket
+    else
+      ob = '{'
+    end if
+
+    if (present(close_bracket)) then
+      cb = close_bracket
+    else
+      cb = '}'
+    end if
+
+    n_tokens = 0 ; tokens(:) = ""
+    do i = 1, size(tokens)
+        read( line, *, iostat=ios ) buf( 1 : i )
+        if ( ios /= 0 ) exit
+        if ( buf(i)(1:1) == cc ) exit
+        if ( buf(i)(1:1) == ob ) then
+          do j=1, size(tokens)
+            read( line, *, iostat=ios ) buf1( 1 : j )
+            token_len = size(buf1(j))
+            if ( buf1(j)(token_len:token_len) == cb ) exit
+            if ( ios /= 0 .or. buf1(j)(1:1) == cc )
+          end do
+        end if
+        n_tokens = i
+        tokens( 1 : n_tokens ) = buf( 1 : n_tokens )
+    enddo
+
+  end subroutine
+
+  subroutine split_string( line, words, nw, comment_character )
 
     character(*), intent(in)  :: line
     character(*), intent(out) :: words(:)
