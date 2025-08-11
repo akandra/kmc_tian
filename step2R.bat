@@ -1,0 +1,1 @@
+cmake --build build_MinGW_release

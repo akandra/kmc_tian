@@ -1,7 +1,8 @@
 module constants
 
   use, intrinsic:: iso_fortran_env
-
+  use version_info 
+    
   implicit none
   public
 
@@ -19,10 +20,14 @@ module constants
 
   ! Version number taken from a preprocessor variable
   ! Linux
-  character(len=40), parameter :: version = __GIT_VERSION__
+  ! character(len=40), parameter :: version = __GIT_VERSION__
   ! Windows
-  ! character(len=40), parameter :: version =  "windows v1"
-
+  !character(len=40), parameter :: version =  "windows v1"
+  
+  character(len=40), parameter :: version =  VERSION_STRING
+  
+  
+    
   !-------- Site type info ---------!
 
   ! Number of site types

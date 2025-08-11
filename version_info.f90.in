@@ -1,0 +1,8 @@
+! version.f90.in
+module version_info
+	implicit none
+
+	character(len=*), parameter :: VERSION_STRING = "@GIT_VERSION_STRING@"
+! 	character(len=*), parameter :: COMMIT_STRING  = "@GIT_COMMIT_HASH@"
+  
+end module version_info
