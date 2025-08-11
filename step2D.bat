@@ -1,1 +1,0 @@
-cmake --build build_MinGW_debug
