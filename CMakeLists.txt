@@ -1,18 +1,21 @@
-cmake_minimum_required (VERSION 3.1)
+cmake_minimum_required (VERSION 4.0)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)	# produce a json file with compiler options
 
 project (kmc_tian VERSION 1.3
-		 DESCRIPTION "Fortran Hello"
+		 DESCRIPTION "kMC_tian project"
 		 LANGUAGES Fortran)
 # enable_language(Fortran)
 
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG   ${CMAKE_SOURCE_DIR}/build/debug)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE ${CMAKE_SOURCE_DIR}/build/release)
+
 if (CMAKE_Fortran_COMPILER_ID MATCHES "GNU")
-	
+
 	add_compile_options(
 	
 	# options for all builds
-    -Wall -ffree-form -fimplicit-none -fdec-format-defaults
+    -Wall -ffree-form -fimplicit-none  -fdec-format-defaults
  
 	# options for Debug builds
 	$<$<CONFIG:DEBUG>:-g3>          	# Add full debug symbols
@@ -28,8 +31,10 @@ if (CMAKE_Fortran_COMPILER_ID MATCHES "GNU")
  endif()
  
 if(CMAKE_Fortran_COMPILER_ID MATCHES "Intel")
+    set(CMAKE_Fortran_FLAGS_DEBUG "${CMAKE_Fortran_FLAGS_DEBUG} -g -traceback -check all")
     set(dialect "-stand f08 -free -implicitnone")
-    set(bounds "-check bounds")
+    set(bounds "-check bounds ")
+    set(cflags "-no-save-temps -O")
 endif()
 
 set(CMAKE_Fortran_FLAGS_DEBUG "${CMAKE_Fortran_FLAGS_DEBUG} ${bounds}")
