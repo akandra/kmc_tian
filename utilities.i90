@@ -1,3 +1,4 @@
+# 1 "/home/akandra/git/kmc_tian/utilities.f90"
 module utilities
 
   use constants
@@ -14,9 +15,9 @@ module utilities
 
 contains
 
-  !-----------------------------------------------------
-  ! Random numbers generators
-  !-----------------------------------------------------
+!-----------------------------------------------------
+! Random numbers generators
+!-----------------------------------------------------
 
   function ran1()  !returns random number between 0 - 1
 
@@ -37,9 +38,9 @@ contains
 
   end function irand
 
-  !-----------------------------------------------------
-  ! Subs and function dealing with strings
-  !-----------------------------------------------------
+!-----------------------------------------------------
+! Subs and function dealing with strings
+!-----------------------------------------------------
 
   function lower_case(input_string) result(output_string)
 
@@ -63,9 +64,9 @@ contains
 
   end function lower_case
 
-    ! Function to extract tokens from a line of text excluding comments
-    ! Tokens are separated by spaces, and brace-enclosed expressions are 
-    ! treated as single tokens
+! Function to extract tokens from a line of text excluding comments
+! Tokens are separated by spaces, and brace-enclosed expressions are
+! treated as single tokens
     
     logical function get_tokens(line_in, n_tokens, tokens, comment_character)
         implicit none
@@ -85,7 +86,7 @@ contains
             cc = '!'  ! Default to ! if no comment character is provided
         end if
 
-        ! Remove comment from the line if it exists
+! Remove comment from the line if it exists
         if (index(line_in, cc) > 0) then
             line = line_in(1:index(line_in, cc)-1)
         end if
@@ -95,18 +96,18 @@ contains
         start       = 1
         brace_level = 0
 
-        line = trim(adjustl(line))  ! the assignment does allocation with the correct length 
+        line = trim(adjustl(line))  ! the assignment does allocation with the correct length
         line_len  = len(line)
 
-        ! First pass: count tokens
+! First pass: count tokens
         do i = 1, line_len
 
-            ! check for { or } and adjust brace_level
+! check for { or } and adjust brace_level
             if (line(i:i) == '{') brace_level = brace_level + 1
             if (line(i:i) == '}') brace_level = brace_level - 1
 
-            ! Check for new token trigger: 
-            ! If brace_level is 0, a new token is triggered by ' ' '}' or end of line
+! Check for new token trigger:
+! If brace_level is 0, a new token is triggered by ' ' '}' or end of line
             if ((brace_level == 0) .and. & 
                 (line(i:i) == ' ' .or. line(i:i) == '}' .or. i == line_len)) then
 
@@ -116,9 +117,9 @@ contains
 
                 start = i + 1
             end if
-            ! Debugging output
-            !    write(*, '(i3, 1x,A, 1x,A, 1x,A, i3, 1x,A, i3)' ) &
-            !       i ,'char: ', line(i:i), '  brace_level:', brace_level, '  start:', start
+! Debugging output
+!    write(*, '(i3, 1x,A, 1x,A, 1x,A, i3, 1x,A, i3)' ) &
+!       i ,'char: ', line(i:i), '  brace_level:', brace_level, '  start:', start
         end do
 
         if (n_tokens == 0) then
@@ -131,7 +132,7 @@ contains
         if (allocated(tokens)) deallocate(tokens)
         allocate(tokens(n_tokens))
         
-        ! ! Second pass: extract tokens
+! ! Second pass: extract tokens
 
         token_index = 0
         brace_level = 0
@@ -139,12 +140,12 @@ contains
 
         do i = 1, line_len
         
-            ! check for { or } and adjust brace_level
+! check for { or } and adjust brace_level
             if (line(i:i) == '{') brace_level = brace_level + 1
             if (line(i:i) == '}') brace_level = brace_level - 1
 
-            ! Check for new token trigger: 
-            ! If brace_level is 0, a new token is triggered by ' ' '}' or end of line
+! Check for new token trigger:
+! If brace_level is 0, a new token is triggered by ' ' '}' or end of line
             if ((brace_level == 0) .and. &
                 (line(i:i) == ' ' .or. line(i:i) == '}' .or. i == line_len)) then
 
@@ -161,9 +162,9 @@ contains
 
                 start = i + 1
             
-               ! Debugging output
-               ! write(*, '(i3, 1x,A, 1x,A, 1x,A, i3, 1x,A, i3, 1x,A,i3)' ) &
-               !       i ,'char: ', line(i:i), '  brace_level:', brace_level, '  start:', start, '  token_index:', token_index
+! Debugging output
+! write(*, '(i3, 1x,A, 1x,A, 1x,A, i3, 1x,A, i3, 1x,A,i3)' ) &
+!       i ,'char: ', line(i:i), '  brace_level:', brace_level, '  start:', start, '  token_index:', token_index
             end if
         end do
 
@@ -259,7 +260,7 @@ contains
     symb = '*'
     if(present(symbol)) symb = symbol
 
-    ! construct the percent_done bar
+! construct the percent_done bar
     write(unit=bar(1:3),fmt="(i3)") percent_done
     do i=1, 50
       if(percent_done >= i*2 ) then
@@ -269,7 +270,7 @@ contains
       end if
     enddo
 
-  ! output the percent_done bar to the screen
+! output the percent_done bar to the screen
      write(output_unit, "(a, 10x, a56)", advance='no') cr, bar
     flush(output_unit)
 
@@ -289,7 +290,7 @@ contains
     character(len=31) :: bar2 = "???%|                         |"
 
 
-    ! construct the percent_done bars
+! construct the percent_done bars
     write(unit=bar1(1:3),fmt="(i3)") prog1
     write(unit=bar2(1:3),fmt="(i3)") prog2
     do i=1, 25
@@ -306,7 +307,7 @@ contains
       end if
     enddo
 
-    ! write the bars to the screen
+! write the bars to the screen
     write(output_unit, "(a,  a, 1x,  a31, 5x, a, 1x,  a31)", advance='no') &
                          cr, label1, bar1,    label2, bar2
     flush(output_unit)
@@ -359,7 +360,7 @@ contains
     call intdual_bar(label1, p1, label2, p2)
   end subroutine
 
-  !------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
   subroutine realdp_dual_bar(label1, realprog1, label2, realprog2)
 !------------------------------------------------------------------------------
     real(dp) , intent(in)            :: realprog1, realprog2
@@ -431,7 +432,7 @@ contains
     character(100)            :: dummy
     character(:), allocatable :: msg
 
-    ! process optional arguments
+! process optional arguments
     st = .true.
     if(present(stop)) st=stop
 
@@ -439,14 +440,14 @@ contains
     if(present(warning)) warn = warning
 
     if (warn) then
-      !msg = '      It is my duty to give you gentle warning concerning'
+!msg = '      It is my duty to give you gentle warning concerning'
       msg = ' Warning:'
     else
-      !msg = '      It is my duty to inform you that you have an error'
+!msg = '      It is my duty to inform you that you have an error'
       msg = ' Error:'
     end if
 
-    ! convert line number to string
+! convert line number to string
     write(dummy,*) line_number
 
     print*
