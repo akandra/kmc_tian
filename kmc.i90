@@ -1,3 +1,4 @@
+# 1 "/home/akandra/git/kmc_tian/kmc.f90"
 program kmc_tian
 
 use constants

@@ -1,3 +1,4 @@
+# 1 "/home/akandra/git/kmc_tian/mc_lat_class.f90"
 module mc_lat_class
 
   use constants
@@ -35,21 +36,21 @@ module mc_lat_class
     integer :: n_max_nn     ! maximum number of nearest neighbors (1 shell)
 
     integer, dimension(:,:), allocatable  :: occupations  !  n_rows x n_cols
-    ! array of lattice site types
+! array of lattice site types
     integer, dimension(:,:), allocatable  :: lst          !  n_rows x n_cols
-    ! lattice vectors
+! lattice vectors
     real(dp), dimension(2) :: lat_vec_1, lat_vec_2
-    ! shellwise number of neighbors
+! shellwise number of neighbors
     integer, dimension(n_max_lat_site_types,n_shells) :: n_nn
     integer, dimension(:,:,:,:), allocatable  :: shell_list
-    ! List and number of additional nn directions to scan after reaction
+! List and number of additional nn directions to scan after reaction
     integer, dimension(:,:,:), allocatable :: nn_new
     integer, dimension(:,:),   allocatable :: n_nn_new
-    ! number of adsorbates per species, current and penultimate
+! number of adsorbates per species, current and penultimate
     integer, dimension(:), allocatable :: n_ads, n_ads_penultimate
-    ! initial and current adsorbates lists, current and penultimate
+! initial and current adsorbates lists, current and penultimate
     type(adsorbate), dimension(:), allocatable  :: ads_list, ads_list_penultimate
-    ! Available adsorbtion sites list (n_species x n_max_lat_site_types x (n_avail_ads_sites))
+! Available adsorbtion sites list (n_species x n_max_lat_site_types x (n_avail_ads_sites))
     type(v_list), dimension(:,:), allocatable :: avail_ads_sites
     integer :: n_ini_confs  ! Number of available confs in the start-conf file
 
@@ -88,22 +89,22 @@ contains
     lat%n_rows = c_pars%n_rows
     lat%n_cols = c_pars%n_cols
 
-    ! Adsorption sites on the unit hex cell
-    !  T---------B1---------.           1 top       (T)
-    !   \  .              .  .          2 fcc       (F)
-    !    \     S         .    .         3 hcp       (H)
-    !     \        .   .       .        4 bridge 1  (B1)
-    !      B3        B2         .       5 bridge 2  (B2)
-    !       \       .     .      .      6 bridge 3  (B3)
-    !        \    .          H    .
-    !         \ .                  .
-    !          \. . . . . . . . . . .
+! Adsorption sites on the unit hex cell
+!  T---------B1---------.           1 top       (T)
+!   \  .              .  .          2 fcc       (F)
+!    \     S         .    .         3 hcp       (H)
+!     \        .   .       .        4 bridge 1  (B1)
+!      B3        B2         .       5 bridge 2  (B2)
+!       \       .     .      .      6 bridge 3  (B3)
+!        \    .          H    .
+!         \ .                  .
+!          \. . . . . . . . . . .
 
-    ! lattice vectors for hex lattice
+! lattice vectors for hex lattice
     lat%lat_vec_1 = [ cos(0.0_dp),    -sin(0.0_dp)   ]
     lat%lat_vec_2 = [ cos(pi/3.0_dp), -sin(pi/3.0_dp)]
 
-    ! Shell-wise number of neighbors for hex lattice with A- and B-type steps
+! Shell-wise number of neighbors for hex lattice with A- and B-type steps
     lat%n_nn(terrace_site,:) = [6,6,6]
     lat%n_nn(   step_site,:) = [5,5,7]
     lat%n_nn( corner_site,:) = [4,4,6]
@@ -122,36 +123,36 @@ contains
 
     allocate(lat%shell_list(n_max_lat_site_types, n_shells, maxval(lat%n_nn), 2))
 
-    ! terrace, ts2, or tc2
+! terrace, ts2, or tc2
 
-    ! NN list for the hexagonal 111-structure (row,col)
-    !  tc1   tc2   ts2    ts1   s
-    !  c     tc1   tc2    ts2   ts1
-    !  11    12    13***  14**  15***
-    !
-    !     21    22**   23*   24*   25**
-    !
-    !        31*** 32*   33    34*   35***
-    !
-    !           41**  42*   43*   44**  45
-    !
-    !              51*** 52**  53*** 54    55
+! NN list for the hexagonal 111-structure (row,col)
+!  tc1   tc2   ts2    ts1   s
+!  c     tc1   tc2    ts2   ts1
+!  11    12    13***  14**  15***
+!
+!     21    22**   23*   24*   25**
+!
+!        31*** 32*   33    34*   35***
+!
+!           41**  42*   43*   44**  45
+!
+!              51*** 52**  53*** 54    55
 
-    ! Nearest-neigbour (1st) shell (d = 1))
+! Nearest-neigbour (1st) shell (d = 1))
     lat%shell_list(terrace_site,1,1,:) = (/ 0, 1/)
     lat%shell_list(terrace_site,1,2,:) = (/ 1, 0/)
     lat%shell_list(terrace_site,1,3,:) = (/ 1,-1/)
     lat%shell_list(terrace_site,1,4,:) = (/ 0,-1/)
     lat%shell_list(terrace_site,1,5,:) = (/-1, 0/)
     lat%shell_list(terrace_site,1,6,:) = (/-1, 1/)
-    ! Next-Nearest-neigbour (2nd) shell  (d = sqrt(3))
+! Next-Nearest-neigbour (2nd) shell  (d = sqrt(3))
     lat%shell_list(terrace_site,2,1,:) = (/ 1, 1/)
     lat%shell_list(terrace_site,2,2,:) = (/ 2,-1/)
     lat%shell_list(terrace_site,2,3,:) = (/ 1,-2/)
     lat%shell_list(terrace_site,2,4,:) = (/-1,-1/)
     lat%shell_list(terrace_site,2,5,:) = (/-2, 1/)
     lat%shell_list(terrace_site,2,6,:) = (/-1, 2/)
-    ! Next-Next-Nearest-neigbour (3rd) shell  (d = 2)
+! Next-Next-Nearest-neigbour (3rd) shell  (d = 2)
     lat%shell_list(terrace_site,3,1,:) = (/ 0, 2/)
     lat%shell_list(terrace_site,3,2,:) = (/ 2, 0/)
     lat%shell_list(terrace_site,3,3,:) = (/ 2,-2/)
@@ -170,36 +171,36 @@ contains
     lat%shell_list(tc2A_site,1:3,:,:)    = lat%shell_list(terrace_site,1:3,:,:)
 
 
-    ! step
+! step
 
-    ! NN list for the hexagonal structure (row,col)
+! NN list for the hexagonal structure (row,col)
 
-    ! ts2   ts1    s      c     tc1
-    !                   04***
-    !
-    !  11    12    13***  14**  15
-    !
-    !     21    22**   23*   24*   25***
-    !
-    !        31*** 32*   33    34**   35
-    !
-    !           41**  42*   43*   44*** 45
-    !
-    !              51*** 52**  53*** 54    55
+! ts2   ts1    s      c     tc1
+!                   04***
+!
+!  11    12    13***  14**  15
+!
+!     21    22**   23*   24*   25***
+!
+!        31*** 32*   33    34**   35
+!
+!           41**  42*   43*   44*** 45
+!
+!              51*** 52**  53*** 54    55
 
-    ! Nearest-neigbour (1st) shell)
+! Nearest-neigbour (1st) shell)
     lat%shell_list(step_site,1,1,:) = (/-1, 1/) ! step -> corner (d=2/3)
     lat%shell_list(step_site,1,2,:) = (/ 1, 0/) ! step -> step   (d=1)
     lat%shell_list(step_site,1,3,:) = (/-1, 0/) ! step -> step   (d=1)
     lat%shell_list(step_site,1,4,:) = (/ 1,-1/) ! step -> ts1    (d=1)
     lat%shell_list(step_site,1,5,:) = (/ 0,-1/) ! step -> ts1    (d=1)
-    ! Next-Nearest-neigbour (2nd) shell
+! Next-Nearest-neigbour (2nd) shell
     lat%shell_list(step_site,2,1,:) = (/ 0, 1/) ! step -> corner (d=sqrt(13)/3)
     lat%shell_list(step_site,2,2,:) = (/-2, 1/) ! step -> corner (d=sqrt(13)/3)
     lat%shell_list(step_site,2,3,:) = (/ 2,-1/) ! step -> ts1    (d=sqrt(3))
     lat%shell_list(step_site,2,4,:) = (/-1,-1/) ! step -> ts1    (d=sqrt(3))
     lat%shell_list(step_site,2,5,:) = (/ 1,-2/) ! step -> ts2    (d=sqrt(3))
-    ! Next-Next-Nearest-neigbour (3rd) shell
+! Next-Next-Nearest-neigbour (3rd) shell
     lat%shell_list(step_site,3,1,:) = (/-1, 2/) ! step -> tc1  (d=4/3)
     lat%shell_list(step_site,3,2,:) = (/ 2, 0/) ! step -> step (d=2)
     lat%shell_list(step_site,3,3,:) = (/-2, 0/) ! step -> step (d=2)
@@ -208,33 +209,33 @@ contains
     lat%shell_list(step_site,3,6,:) = (/-3, 1/) ! step -> corner (d>2)
     lat%shell_list(step_site,3,7,:) = (/ 1, 1/) ! step -> corner (d>2)
 
-    ! corner
-    ! NN list for the hexagonal 111-structure (row,col)
+! corner
+! NN list for the hexagonal 111-structure (row,col)
 
-    ! ts1    s     c      tc1   tc2
-    !  11    12    13***  14    15
-    !
-    !     21    22    23*   24**  25***
-    !
-    !        31    32**  33    34*   35***
-    !
-    !           41*** 42*   43*   44**  45
-    !
-    !              51*** 52**  53*** 54    55
+! ts1    s     c      tc1   tc2
+!  11    12    13***  14    15
+!
+!     21    22    23*   24**  25***
+!
+!        31    32**  33    34*   35***
+!
+!           41*** 42*   43*   44**  45
+!
+!              51*** 52**  53*** 54    55
 
-    ! Nearest-neigbour (1st) shell
+! Nearest-neigbour (1st) shell
     lat%shell_list(corner_site,1,1,:) = (/ 1,-1/) ! corner -> step   (d=2/3)
     lat%shell_list(corner_site,1,2,:) = (/ 0, 1/) ! corner -> tc1    (d=2/3)
     lat%shell_list(corner_site,1,3,:) = (/ 1, 0/) ! corner -> corner (d=1)
     lat%shell_list(corner_site,1,4,:) = (/-1, 0/) ! corner -> corner (d=1)
 
-    ! Next-Nearest-neigbour (2nd) shell
+! Next-Nearest-neigbour (2nd) shell
     lat%shell_list(corner_site,2,1,:) = (/-1, 1/) ! corner -> tc1  (d=sqrt(3)-2/3)
     lat%shell_list(corner_site,2,2,:) = (/ 1, 1/) ! corner -> tc1  (d=sqrt(3)-2/3)
     lat%shell_list(corner_site,2,3,:) = (/ 2,-1/) ! corner -> step (d=sqrt(13)/3)
     lat%shell_list(corner_site,2,4,:) = (/ 0,-1/) ! corner -> step (d=sqrt(13)/3)
 
-    ! Next-Next-Nearest-neigbour (3rd) shell
+! Next-Next-Nearest-neigbour (3rd) shell
     lat%shell_list(corner_site,3,1,:) = (/ 0, 2/) ! corner -> tc2    (d=sqrt( (sqrt(3)-1/3)^2 + 1/4 ) )
     lat%shell_list(corner_site,3,5,:) = (/-1, 2/) ! corner -> tc2    (d=sqrt( (sqrt(3)-1/3)^2 + 1/4 ) )
     lat%shell_list(corner_site,3,2,:) = (/ 2, 0/) ! corner -> corner (d=2)
@@ -242,29 +243,29 @@ contains
     lat%shell_list(corner_site,3,3,:) = (/ 2,-2/) ! corner -> ts1    (d=sqrt( (5/3)^2 + 1/4 ) )
     lat%shell_list(corner_site,3,4,:) = (/ 1,-2/) ! corner -> ts1    (d=sqrt( (5/3)^2 + 1/4 ) )
 
-    ! ts1 (terrace adjacent to step)
+! ts1 (terrace adjacent to step)
 
-    ! NN list for the hexagonal structure (row,col)
+! NN list for the hexagonal structure (row,col)
 
-    !  tc2   ts2   ts1    s     c
-    !  11    12    13***  14**  15**
-    !
-    !     21    22**   23*   24*   25**
-    !
-    !        31*** 32*   33    34*   35***
-    !
-    !           41**  42*   43*   44**  45
-    !
-    !              51*** 52**  53*** 54    55
+!  tc2   ts2   ts1    s     c
+!  11    12    13***  14**  15**
+!
+!     21    22**   23*   24*   25**
+!
+!        31*** 32*   33    34*   35***
+!
+!           41**  42*   43*   44**  45
+!
+!              51*** 52**  53*** 54    55
 
-    ! Nearest-neigbour (1st) shell
+! Nearest-neigbour (1st) shell
     lat%shell_list(ts1_site,1,1,:) = (/ 0, 1/) ! ts1 -> step (d=1)
     lat%shell_list(ts1_site,1,2,:) = (/ 1, 0/) ! ts1 -> ts1  (d=1)
     lat%shell_list(ts1_site,1,3,:) = (/ 1,-1/) ! ts1 -> ts2  (d=1)
     lat%shell_list(ts1_site,1,4,:) = (/ 0,-1/) ! ts1 -> ts2  (d=1)
     lat%shell_list(ts1_site,1,5,:) = (/-1, 0/) ! ts1 -> ts1  (d=1)
     lat%shell_list(ts1_site,1,6,:) = (/-1, 1/) ! ts1 -> step (d=1)
-    ! Next-Nearest-neigbour (2nd) shell
+! Next-Nearest-neigbour (2nd) shell
     lat%shell_list(ts1_site,2,1,:) = (/ 2,-1/) ! ts1 -> ts2 (d=sqrt(3))
     lat%shell_list(ts1_site,2,2,:) = (/ 1,-2/) ! ts1 -> tc2 (d=sqrt(3))
     lat%shell_list(ts1_site,2,3,:) = (/-1,-1/) ! ts1 -> ts2 (d=sqrt(3))
@@ -272,49 +273,49 @@ contains
     lat%shell_list(ts1_site,2,5,:) = (/-2, 1/) ! ts1 -> s   (d=sqrt(3))
     lat%shell_list(ts1_site,2,6,:) = (/-2, 2/) ! ts1 -> c   (d=sqrt( (5/3)^2 + 1/4 ) )
     lat%shell_list(ts1_site,2,7,:) = (/-1, 2/) ! ts1 -> c   (d=sqrt( (5/3)^2 + 1/4 ) )
-    ! Next-Next-Nearest-neigbour (3rd) shell
+! Next-Next-Nearest-neigbour (3rd) shell
     lat%shell_list(ts1_site,3,1,:) = (/ 0, 2/) ! ts1 -> c  (d=sqrt( (sqrt(3)-1/3)^2 + 1/4 ) )
-    ! the above line is added on 2025-08-13
+! the above line is added on 2025-08-13
     lat%shell_list(ts1_site,3,2,:) = (/ 2, 0/) ! ts1 -> ts1 (d=2)
     lat%shell_list(ts1_site,3,3,:) = (/ 2,-2/) ! ts1 -> tc2 (d=2)
     lat%shell_list(ts1_site,3,4,:) = (/ 0,-2/) ! ts1 -> tc2 (d=2)
     lat%shell_list(ts1_site,3,5,:) = (/-2, 0/) ! ts1 -> ts1 (d=2)
 
-    ! tc1 (terrace adjacent to corner)
+! tc1 (terrace adjacent to corner)
 
-    ! NN list for the hexagonal structure (row,col)
+! NN list for the hexagonal structure (row,col)
 
-    !  s     c     tc1    tc2   ts2
-    !  11    12    13***  14**  15***
-    !
-    !     21   22**   23*   24*   25**
-    !
-    !        31    32*   33    34*   35***
-    !
-    !           41*** 42**  43*   44**  45
-    !
-    !              51    52    53*** 54    55
+!  s     c     tc1    tc2   ts2
+!  11    12    13***  14**  15***
+!
+!     21   22**   23*   24*   25**
+!
+!        31    32*   33    34*   35***
+!
+!           41*** 42**  43*   44**  45
+!
+!              51    52    53*** 54    55
 
-    ! Nearest-neigbour (1st) shell
+! Nearest-neigbour (1st) shell
     lat%shell_list(tc1_site,1,1,:) = (/ 0,-1/) ! tc1 -> c   (d=2/3)
     lat%shell_list(tc1_site,1,2,:) = (/ 1, 0/) ! tc1 -> tc1 (d=1)
     lat%shell_list(tc1_site,1,3,:) = (/-1, 0/) ! tc1 -> tc1 (d=1)
     lat%shell_list(tc1_site,1,4,:) = (/ 0, 1/) ! tc1 -> tc2 (d=1)
     lat%shell_list(tc1_site,1,5,:) = (/-1, 1/) ! tc1 -> tc2 (d=1)
-    ! Next-Nearest-neigbour (2nd) shell
+! Next-Nearest-neigbour (2nd) shell
     lat%shell_list(tc1_site,2,1,:) = (/-1,-1/) ! tc1 -> c   (d = sqrt(3)-2/3)
     lat%shell_list(tc1_site,2,2,:) = (/ 1,-1/) ! tc1 -> c   (d = sqrt(3)-2/3)
     lat%shell_list(tc1_site,2,3,:) = (/ 1, 1/) ! tc1 -> tc2 (d = sqrt(3))
     lat%shell_list(tc1_site,2,4,:) = (/-2, 1/) ! tc1 -> tc2 (d = sqrt(3))
     lat%shell_list(tc1_site,2,5,:) = (/-1, 2/) ! tc1 -> ts2 (d = sqrt(3))
-    ! Next-Next-Nearest-neigbour (3rd) shell  (d = 2)
+! Next-Next-Nearest-neigbour (3rd) shell  (d = 2)
     lat%shell_list(tc1_site,3,1,:) = (/ 0, 2/) ! tc1 -> ts2 (d=2)
     lat%shell_list(tc1_site,3,2,:) = (/ 2, 0/) ! tc1 -> tc1 (d=2)
     lat%shell_list(tc1_site,3,3,:) = (/-2, 0/) ! tc1 -> tc1 (d=2)
     lat%shell_list(tc1_site,3,4,:) = (/-2, 2/) ! tc1 -> ts2 (d=2)
     lat%shell_list(tc1_site,3,5,:) = (/ 1,-2/) ! tc1 -> s   (d=sqrt(13)/3)
 
-    ! Check the distances to the neighbours
+! Check the distances to the neighbours
 !    print*, sqrt( &
 !                 ( lat%shell_list(2,:,1)*cos(pi/3.0_dp) &
 !                  +lat%shell_list(2,:,2)               )**2    &
@@ -323,7 +324,7 @@ contains
 !        )
 !    stop
 
-    ! Lists and numbers of additional nn directions for hex lattice to scan after a reaction
+! Lists and numbers of additional nn directions for hex lattice to scan after a reaction
     allocate(lat%nn_new(  n_max_lat_site_types, lat%n_max_nn, 4 ) )
     allocate(lat%n_nn_new(n_max_lat_site_types, lat%n_max_nn)   )
 
@@ -485,22 +486,22 @@ contains
 
     lat%n_max_ads_sites = n_max_ads_sites
 
-    ! Allocate arrays
+! Allocate arrays
     allocate(lat%occupations(c_pars%n_rows,c_pars%n_cols))
     allocate(lat%lst(        c_pars%n_rows,c_pars%n_cols))
     allocate(lat%n_ads(            c_pars%n_species),&
              lat%n_ads_penultimate(c_pars%n_species))
-    ! Warning: the allocation assumes 1 ads. per unit cell
+! Warning: the allocation assumes 1 ads. per unit cell
     allocate(lat%ads_list(            c_pars%n_rows*c_pars%n_cols),&
              lat%ads_list_penultimate(c_pars%n_rows*c_pars%n_cols))
-    ! Initialize arrays
+! Initialize arrays
     lat%ads_list             = adsorbate(0,0,0,0)
     lat%ads_list_penultimate = adsorbate(0,0,0,0)
 
 
-    ! Define where steps, corners, and other sites are
-    ! NEXTTIME: consider using the energy file to define lst
-    ! Warning! A-type steps are not fully implemented
+! Define where steps, corners, and other sites are
+! NEXTTIME: consider using the energy file to define lst
+! Warning! A-type steps are not fully implemented
     lat%lst = terrace_site
     if ( c_pars%step_period > 5) then
       do j=1,lat%n_cols,c_pars%step_period
@@ -520,7 +521,7 @@ contains
       stop "mc_lat_init: step period between 1 and 5 not supported."
     end if
 
-    ! Check if adsorption energy is defined for each lst
+! Check if adsorption energy is defined for each lst
     do i=1,lat%n_rows
     do j=1,lat%n_cols
     do k=1,c_pars%n_species
@@ -570,7 +571,7 @@ contains
 !end do
 !----------------------------------------------------------------------------------
 
-    ! initialize lattice
+! initialize lattice
     lat%n_ini_confs = 0
     call lat%conf_init(c_pars)
 
@@ -599,23 +600,23 @@ contains
     integer :: counter,  ads_site
     integer :: i_rand, species, row, col
 
-    ! Clean up lattice structure
+! Clean up lattice structure
     this%occupations = 0
-    ! Set n_ads as in control file
+! Set n_ads as in control file
     this%n_ads = c_pars%n_ads
 
-    ! add adsorbates to the lattice
+! add adsorbates to the lattice
     if (c_pars%cfg_file_name=='none') then
 
-      ! create random population
-      ! WARNING: consider adding a special case for higher coverages
+! create random population
+! WARNING: consider adding a special case for higher coverages
       counter = 0
       do species=1,size(this%n_ads)
 
         i = 0
         do while (i < this%n_ads(species) )
 
-          ! select a random site
+! select a random site
           i_rand = irand(this%n_cols*this%n_rows)
           row = (i_rand-1)/this%n_cols + 1
           col = i_rand - (row - 1)*this%n_cols
@@ -624,7 +625,7 @@ contains
             i = i + 1
             counter = counter + 1
             this%occupations(row,col) = counter
-            ! Warning: arbitrary choice for the ads. site (the 1st available)!
+! Warning: arbitrary choice for the ads. site (the 1st available)!
             ads_site = this%avail_ads_sites(species,this%lst(row,col))%list(1)
             this%ads_list(counter) = adsorbate(row,col,ads_site,species)
           end if
@@ -632,7 +633,7 @@ contains
         end do
       end do
 
-      ! create artificial population
+! create artificial population
 !      counter = 0
 !      s_counter = 0
 !      current_species = 1
@@ -653,26 +654,26 @@ contains
 !      end do loop1
 
     else
-      ! Read in a conf from conf-file
+! Read in a conf from conf-file
 
       if (present(itraj)) then
         if (this%n_ini_confs == 0) then
           print*, 'Error: mc_lat_conf_init called with two arguments without prior initialization.'
           stop
         end if
-        ! number of conf to read from conf-file
+! number of conf to read from conf-file
         conf = mod(itraj-1,this%n_ini_confs)+1
       else
-        ! allows to read the last conf from conf-file
+! allows to read the last conf from conf-file
         conf = huge(1)
       end if
 
-      ! Read info from the configuration file
+! Read info from the configuration file
       call open_for_read(inp_unit,trim(c_pars%cfg_file_name))
       read(inp_unit,'(A)') line
       read(inp_unit,'(A)') line
       read(inp_unit,*) n_rows_in, n_cols_in, step_period_in
-      ! Check consistency with control parameters
+! Check consistency with control parameters
       if (n_rows_in      /= c_pars%n_rows .OR.&
           n_cols_in      /= c_pars%n_cols .OR.&
           step_period_in /= c_pars%step_period) then
@@ -705,7 +706,7 @@ contains
           print*, '  inconsistent number of adsorbates in control and configuration files.'
           stop
         end if
-        ! Read the configuration
+! Read the configuration
         do i=1, sum(n_ads_in)
           read(inp_unit, *, iostat=ios) idummy,this%ads_list(i)
           if (ios == -1) then
@@ -720,12 +721,12 @@ contains
         end do
 
       end do
-      ! save number of confs in the conf-file
+! save number of confs in the conf-file
       if (.not.present(itraj)) this%n_ini_confs = iconf - 1
 
       close(inp_unit)
 
-      ! put adsorbates to lattice
+! put adsorbates to lattice
       do i=1,this%n_ads_tot()
         this%occupations(this%ads_list(i)%row, this%ads_list(i)%col) = i
       end do
@@ -891,10 +892,10 @@ contains
 
     n_rows_2 = this%n_rows/2
     n_cols_2 = this%n_cols/2
-    ! calculate delta_row and delta_col
+! calculate delta_row and delta_col
     d_row = this%ads_list(ads1)%row - this%ads_list(ads2)%row
     d_col = this%ads_list(ads1)%col - this%ads_list(ads2)%col
-    ! apply periodic boundary conditions
+! apply periodic boundary conditions
     if (d_row > n_rows_2 ) then
       d_row = d_row - this%n_rows
     else if (d_row < -n_rows_2 ) then
@@ -905,7 +906,7 @@ contains
     else if (d_col < -n_cols_2 ) then
       d_col = d_col + this%n_cols
     end if
-    ! calculate the distance
+! calculate the distance
     r = sqrt(  ( d_col*this%lat_vec_1(1) + d_row*this%lat_vec_2(1) )**2 &
              + ( d_col*this%lat_vec_1(2) + d_row*this%lat_vec_2(2) )**2  )
 
@@ -1222,7 +1223,7 @@ contains
 
     do shell=1,n_shells
       do m=1,this%n_nn(lst,shell)
-        ! position of neighbor m
+! position of neighbor m
         call this%neighbor(ads,m,row,col,shell)
         if (this%occupations(row,col) > 0) then
           rate_update_q( this%occupations(row,col) ) = .true.
@@ -1256,7 +1257,7 @@ contains
         if (energy_parameters_init%int_energy_pars(i1,i1s,i1a,i2,i2s,i2a,shell,nn1) /= &
             energy_parameters_init%undefined_energy) then
 
-          ! Find the the reciprocal neighbor in the direction opposite to nn1 -> nn2
+! Find the the reciprocal neighbor in the direction opposite to nn1 -> nn2
           do nn2=1, this%n_nn(i2s,shell)
             if ( all( this%shell_list(i2s,shell,nn2) == - this%shell_list(i1s,shell,nn1) ) ) then
               energy_parameters_init%int_energy_pars(i2,i2s,i2a,i1,i1s,i1a,shell,nn2) = &
