@@ -138,6 +138,7 @@ contains
                 control_parameters_init%n_cols = control_parameters_init%n_rows
 
               case (3)
+
                 if ( .not. read_int(words(2), control_parameters_init%n_rows) .or. &
                      .not. read_int(words(3), control_parameters_init%n_cols)     )&
                   stop err // "nlat parameters must be integers"

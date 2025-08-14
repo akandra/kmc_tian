@@ -53,7 +53,8 @@ real(dp) function energy(ref, lat, e_pars)
 
         end if
 
-        energy_acc = energy_acc + e_pars%int_energy_pars(ref_id, ref_lst, ref_ast, id, lst, ast, i_shell)
+        energy_acc = energy_acc + &
+           e_pars%int_energy_pars(ref_id, ref_lst, ref_ast, id, lst, ast, i_shell,i)
 
       end if
 
@@ -109,7 +110,8 @@ real(dp) function total_energy(lat, e_pars)
             stop
 
           end if
-          energy_acc = energy_acc + e_pars%int_energy_pars(ref_id, ref_lst, ref_ast, id, lst, ast, i_shell)
+          energy_acc = energy_acc + &
+                       e_pars%int_energy_pars(ref_id, ref_lst, ref_ast, id, lst, ast, i_shell, i)
 
         end if
 

@@ -458,7 +458,7 @@ contains
               if (ast2 /= ast1) then
                 check_str = '  '
                 if (hopping_init%process_intra(species,st1,ast1,ast2) /= default_rate) check_str = check_mark
-                write(*,'(5X,A2,X,A11,A11,A4)',advance='NO') &
+                write(*,'(5X,A2,1X,A11,A11,A4)',advance='NO') &
                   check_str, c_pars%ads_names(species), same_lst_mark, ads_site_names(ast2)
                 if (debug(1)) then
                   write(*,'(3X,E10.3,2X,A,5F10.3)') hopping_init%process_intra(species,st1,ast1,ast2),&
@@ -480,7 +480,7 @@ contains
                 ast2 = lat%avail_ads_sites(species,st2)%list(i2)
                 check_str = '  '
                 if (hopping_init%process(species,st1,ast1,st2,ast2) /= default_rate) check_str = check_mark
-                write(*,'(5X,A2,X,A11,A11,A4)',advance='NO') &
+                write(*,'(5X,A2,1X,A11,A11,A4)',advance='NO') &
                   check_str, c_pars%ads_names(species), lat_site_names(st2), ads_site_names(ast2)
                 if (debug(1)) then
                   write(*,'(3X,E10.3,2X,A,5F10.3)') hopping_init%process(species,st1,ast1,st2,ast2),&
@@ -618,7 +618,8 @@ contains
             write(*,'(A,ES10.3)') "uncorrected rate =", this%process(id, lst_old, ast_old, lst_new, ast_new)
             write(*,'(A,F8.3)') "correction energy =",&
             -log(this%rates(ads,m)%list(iads)/this%process(id, lst_old, ast_old, lst_new, ast_new))/beta
-            write(*,'(A,F6.3,A,F6.3,A,F6.3,A,F6.3)') "rcic law:", this%rate_corr_pars(id, lst_old, ast_old, lst_new, ast_new)%pars(1),&
+            write(*,'(A,F6.3,A,F6.3,A,F6.3,A,F6.3)') "rcic law:", &
+                      this%rate_corr_pars(id, lst_old, ast_old, lst_new, ast_new)%pars(1),&
                       ' *', int_energy_old, ' + ', this%rate_corr_pars(id, lst_old, ast_old, lst_new, ast_new)%pars(2),&
                       ' *', int_energy_new
             write(*,'(A,F8.3)') "V_TS=", int_energy_ts

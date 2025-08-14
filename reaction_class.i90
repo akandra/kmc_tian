@@ -1,8 +1,9 @@
+# 1 "/home/akandra/git/kmc_tian/reaction_class.f90"
 module reaction_class
-  !---------------------------------------------------------------------------
-  !  Module for dealing with reactiona
-  !---------------------------------------------------------------------------
-  !---------------------------------------------------------------------------
+!---------------------------------------------------------------------------
+!  Module for dealing with reactiona
+!---------------------------------------------------------------------------
+!---------------------------------------------------------------------------
   use constants
   use control_parameters_class
   use mc_lat_class
@@ -33,10 +34,10 @@ module reaction_class
     real(dp) :: beta                                    ! inverse thermodynamic temperature
     integer  :: n_ads_total                             ! total number of adsorbates
     real(dp), dimension(n_reaction_types) :: acc_rate   ! accumulated rate for reaction types
-    ! reaction counters
-    !                  reaction
-    !                  . species
-    !                  . .
+! reaction counters
+!                  reaction
+!                  . species
+!                  . .
     integer, dimension(:,:), allocatable :: counter
 
   contains
@@ -59,7 +60,7 @@ contains
     type(mc_lat)            , intent(in)    :: lat
     type(energy_parameters) , intent(in)    :: e_pars
 
-    ! Create a rate structure
+! Create a rate structure
     reaction_init%hopping      =      hopping_init(c_pars, lat, e_pars)
     reaction_init%desorption   =   desorption_init(c_pars, lat, e_pars)
     reaction_init%dissociation = dissociation_init(c_pars, lat, e_pars)
@@ -85,9 +86,9 @@ contains
 !dja    integer :: i, m, ads, channel, n_nn
     integer :: m, ads, channel, n_nn
 
-    ! initialize the accumulated rate for hopping
+! initialize the accumulated rate for hopping
     this%acc_rate(hopping_id) = 0.0_dp
-    ! rate for hopping reactions
+! rate for hopping reactions
     if (this%hopping%is_defined) then
       do ads=1,this%n_ads_total
         n_nn = lat%n_nn( lat%lst( lat%ads_list(ads)%row,lat%ads_list(ads)%col ), 1)
@@ -97,7 +98,7 @@ contains
       end do
     end if
 
-    ! accumulate rate for desorption (= rate for desorption + hopping)
+! accumulate rate for desorption (= rate for desorption + hopping)
     this%acc_rate(desorption_id) = this%acc_rate(hopping_id)
     if (this%desorption%is_defined) then
       do ads=1,this%n_ads_total
@@ -105,7 +106,7 @@ contains
       end do
     end if
 
-    ! accumulate rate for dissociation (= rate for dissociation + desorption + hopping)
+! accumulate rate for dissociation (= rate for dissociation + desorption + hopping)
     this%acc_rate(dissociation_id) = this%acc_rate(desorption_id)
     if (this%dissociation%is_defined) then
       do ads=1,this%n_ads_total
@@ -116,7 +117,7 @@ contains
       end do
     end if
 
-    ! accumulate rate for association (= rate for association + dissociation + desorption + hopping)
+! accumulate rate for association (= rate for association + dissociation + desorption + hopping)
     this%acc_rate(association_id) = this%acc_rate(dissociation_id)
     if (this%association%is_defined) then
       do ads=1,this%n_ads_total
@@ -127,7 +128,7 @@ contains
       end do
     end if
 
-    ! accumulate rate for bimolecular reaction (= rate for bimolecular + association + dissociation + desorption + hopping)
+! accumulate rate for bimolecular reaction (= rate for bimolecular + association + dissociation + desorption + hopping)
     this%acc_rate(bimolecular_id) = this%acc_rate(association_id)
     if (this%bimolecular%is_defined) then
       do ads=1,this%n_ads_total
@@ -157,7 +158,7 @@ contains
     class(energy_parameters), intent(in)    :: e_pars
 
     integer       :: ads
-    ! Debugging variables
+! Debugging variables
 !dja    integer :: chan, i, m
 !dja    integer :: r_id, r_ast, r_lst
 !dja    integer :: p1_id, p1_ast, p1_lst
@@ -168,21 +169,21 @@ contains
 !dja    character(len=max_string_length) :: lst_name, lst_p1_name, lst_p2_name, lst_r1_name, lst_r2_name
 !dja    character(len=max_string_length) :: ast_r_name, ast_r1_name, ast_r2_name, ast_p1_name, ast_p2_name
 
-    ! Hopping
+! Hopping
     if (this%hopping%is_defined) then
       do ads = 1, this%n_ads_total
         call this%hopping%construct(ads, lat, e_pars, this%beta)
       end do
     end if
 
-    ! Desorption
+! Desorption
     if (this%desorption%is_defined) then
       do ads = 1, this%n_ads_total
         call this%desorption%construct(ads, lat, e_pars, this%beta)
       end do
     end if
 
-    ! Dissociation
+! Dissociation
     if (this%dissociation%is_defined) then
 
       do ads = 1, this%n_ads_total
@@ -191,7 +192,7 @@ contains
 
     end if
 
-    ! Association
+! Association
     if (this%association%is_defined) then
 
       do ads = 1, this%n_ads_total
@@ -200,7 +201,7 @@ contains
 
     end if
 
-    ! Bimolecular
+! Bimolecular
     if (this%bimolecular%is_defined) then
 
       do ads = 1, this%n_ads_total
@@ -354,15 +355,15 @@ contains
     class(mc_lat),            intent(inout) :: lat
     class(energy_parameters), intent(in)    :: e_pars
 
-    ! Hopping
+! Hopping
     if (this%hopping%is_defined)      call this%hopping%construct(ads, lat, e_pars, this%beta)
-    ! Desorption
+! Desorption
     if (this%desorption%is_defined)   call this%desorption%construct(ads, lat, e_pars, this%beta)
-    ! Dissociation
+! Dissociation
     if (this%dissociation%is_defined) call this%dissociation%construct(ads, lat, e_pars, this%beta)
-    ! Association
+! Association
     if (this%association%is_defined)  call this%association%construct(ads, lat, e_pars, this%beta)
-    ! Bimolecular
+! Bimolecular
     if (this%bimolecular%is_defined)  call this%bimolecular%construct(ads, lat, e_pars, this%beta)
 
   end subroutine construct_1
@@ -407,7 +408,7 @@ contains
 
     real(dp) :: u, temp_dp
 
-    ! do nothing if there is nothing to do
+! do nothing if there is nothing to do
     if (this%acc_rate(n_reaction_types) == 0.0_dp) return
 
     allocate(rate_update_q(lat%n_rows*lat%n_cols))
@@ -417,11 +418,11 @@ contains
 !debug(2) = (this%counter(reaction_id,1) == 8)
 !debug(1) = .true.
 
-    ! ------- Select the process
+! ------- Select the process
 
-    ! random rate value to select a process
+! random rate value to select a process
     u = rand*this%acc_rate(n_reaction_types)
-    ! determine the type of reaction
+! determine the type of reaction
     do reaction_id=1,n_reaction_types
       if (u < this%acc_rate(reaction_id)) exit
       if (debug(1)) print*,reaction_id, this%acc_rate(reaction_id), u
@@ -438,17 +439,17 @@ end if
     select case (reaction_id)
 
       case(hopping_id)
-        ! determine hopping channel (adsorbate, direction, ads. site of available ones)
-        !                           (      ads,      m_nn,                        iads)
+! determine hopping channel (adsorbate, direction, ads. site of available ones)
+!                           (      ads,      m_nn,                        iads)
         temp_dp = 0.0_dp
         extloop: do ads=1,this%n_ads_total
           lst = lat%lst(lat%ads_list(ads)%row, lat%ads_list(ads)%col)
           n_nn = lat%n_nn(lst,1)
           id_r  = lat%ads_list(ads)%id
 
-          ! hop to a neighbor cell
+! hop to a neighbor cell
           do m_nn=1, n_nn
-            ! a new position of particle (ads) after a hop to a neighbor (m_nn)
+! a new position of particle (ads) after a hop to a neighbor (m_nn)
             call lat%neighbor(ads,m_nn,row_new,col_new)
             lst_new = lat%lst(row_new,col_new)
             do iads=1,size(lat%avail_ads_sites(id_r,lst_new)%list)
@@ -467,7 +468,7 @@ end if
             end do
           end do
 
-          ! hop within the same cell
+! hop within the same cell
           do iads=1,size(lat%avail_ads_sites(id_r,lst)%list)
             ast_new = lat%avail_ads_sites(id_r,lst)%list(iads)
             temp_dp = temp_dp + this%hopping%rates(ads,n_nn+1)%list(iads)
@@ -486,83 +487,83 @@ end if
 
         end do extloop
 
-        ! Update hopping rate constants
-        ! Particle (ads) is going to hop in direction (m_nn) to ads. site (iads)
+! Update hopping rate constants
+! Particle (ads) is going to hop in direction (m_nn) to ads. site (iads)
 
-        ! initialize a logical array indicating adsorbates affected by hop
+! initialize a logical array indicating adsorbates affected by hop
         rate_update_q = .false.
-        ! Put the hopping particle into the list
+! Put the hopping particle into the list
         rate_update_q(ads) = .true.
-        ! scan over neighbors before hop
+! scan over neighbors before hop
         call lat%update_neighbors(rate_update_q, ads, lst)
 
-        ! make intra-site hop
+! make intra-site hop
         if (m_nn == n_nn + 1) then
-          ! Put the adsorbate into a new ast
+! Put the adsorbate into a new ast
           lat%ads_list(ads)%ast  = ast_new
 
-        ! make hop to a neighbor
+! make hop to a neighbor
         else
-          ! Delete an adsorbate from its old position
+! Delete an adsorbate from its old position
           lat%occupations(lat%ads_list(ads)%row, lat%ads_list(ads)%col) = 0
-          ! Put the adsorbate in a new position
+! Put the adsorbate in a new position
           lat%ads_list(ads)%row  = row_new
           lat%ads_list(ads)%col  = col_new
           lat%ads_list(ads)%ast  = ast_new
-          ! Update adsorbate position
+! Update adsorbate position
           lat%occupations(row_new, col_new) = ads
 
-          ! scan over neighbors after hop
+! scan over neighbors after hop
           call lat%update_neighbors(rate_update_q, ads, lst_new)
 
         end if
 
-        ! Reset the rate info for ads
+! Reset the rate info for ads
         call this%cleanup_rates(ads,lat)
 
-        ! Update rate array for the affected adsorbates
+! Update rate array for the affected adsorbates
         do i=1,this%n_ads_total
           if (rate_update_q(i)) call this%construct_1(i, lat, e_pars)
         end do
 
-        ! Update reaction counter
+! Update reaction counter
         this%counter(reaction_id,id_r) = this%counter(reaction_id,id_r) + 1
 
       case(desorption_id)
-        ! determine desorption channel (adsorbate)
-        !                              (      ads)
+! determine desorption channel (adsorbate)
+!                              (      ads)
         temp_dp = this%acc_rate(hopping_id)
         do ads=1,this%n_ads_total
           temp_dp = temp_dp + this%desorption%rates(ads)
           if (u < temp_dp) exit
         end do
 
-        ! Update desorption rate constants
-        ! Particle (ads) is going to desorb to nowhere
+! Update desorption rate constants
+! Particle (ads) is going to desorb to nowhere
 
         lst = lat%lst(lat%ads_list(ads)%row, lat%ads_list(ads)%col)
-        ! initialize a logical array indicating adsorbates affected by desorption
+! initialize a logical array indicating adsorbates affected by desorption
         rate_update_q = .false.
-        ! scan over neighbors before desorption
+! scan over neighbors before desorption
         call lat%update_neighbors(rate_update_q, ads, lst)
 
-        ! ---------- Do desorption:
+! ---------- Do desorption:
         id_r = lat%ads_list(ads)%id
-        ! Delete an adsorbate from the lattice
+! Delete an adsorbate from the lattice
         lat%occupations(lat%ads_list(ads)%row, lat%ads_list(ads)%col) = 0
-        ! Update the number of adsorbates in the lat structure
+! Update the number of adsorbates in the lat structure
         lat%n_ads(id_r) = lat%n_ads(id_r) - 1
-        ! Rearrange adsorbates except when the last adsorbate desorbs
+! Rearrange adsorbates except when the last adsorbate desorbs
         if (ads < this%n_ads_total) then
-          ! Put the last adsorbate in place of ads
+! Put the last adsorbate in place of ads
           lat%ads_list(ads) = lat%ads_list(this%n_ads_total)
-          ! Update the adsorbate number in the lattice
+! Update the adsorbate number in the lattice
           lat%occupations(lat%ads_list(ads)%row, lat%ads_list(ads)%col) = ads
-          ! Update the rates arrays
+! Update the rates arrays
 
-          ! Warning: the line below produced segmentation fault, so we have to use do loop
-          !this%hopping%rates(ads,1:lat%n_max_nn+1)        = this%hopping%rates(this%n_ads_total,1:lat%n_max_nn+1)
-          ! It would be good to find the reason.
+! Warning: the line below produced segmentation fault, so we have to use do loop
+!this%hopping%rates(ads,1:lat%n_max_nn+1)        = this%hopping%rates(this%n_ads_total,1:lat%n_max_nn+1)
+! It would be good to find the reason.
 
           do i=1,lat%n_max_nn+1
             this%hopping%rates(ads,i) = this%hopping%rates(this%n_ads_total,i)
@@ -573,22 +574,22 @@ end if
           this%bimolecular%rate_info(ads)  = this%bimolecular%rate_info(this%n_ads_total)
         end if
 
-        ! account for the tightening the ads. list
+! account for the tightening the ads. list
         rate_update_q(ads) = rate_update_q(this%n_ads_total)
-        ! Update rate array for the affected adsorbates
+! Update rate array for the affected adsorbates
         do i=1,this%n_ads_total - 1
           if (rate_update_q(i)) call this%construct_1(i, lat, e_pars)
         end do
-        ! Reset the rate info for the last adsorbate
+! Reset the rate info for the last adsorbate
         call this%cleanup_rates(this%n_ads_total,lat)
-        ! Update the the number of adsorbates in this
+! Update the the number of adsorbates in this
         this%n_ads_total = this%n_ads_total - 1
 
-        ! Update reaction counter
+! Update reaction counter
         this%counter(reaction_id,id_r) = this%counter(reaction_id,id_r) + 1
 
       case(dissociation_id)
-        ! determine dissociation channel (ads, channel)
+! determine dissociation channel (ads, channel)
         temp_dp = this%acc_rate(desorption_id)
         extloop2: do ads=1,this%n_ads_total
         do channel=1,this%dissociation%rate_info(ads)%n_channels
@@ -598,58 +599,58 @@ end if
         end do extloop2
 
         lst = lat%lst(lat%ads_list(ads)%row, lat%ads_list(ads)%col)
-        ! initialize a logical array indicating adsorbates affected by dissociation
+! initialize a logical array indicating adsorbates affected by dissociation
         rate_update_q = .false.
-        ! Put the dissociating particle into the list
+! Put the dissociating particle into the list
         rate_update_q(ads) = .true.
-        ! scan over neighbors before dissociation
+! scan over neighbors before dissociation
         call lat%update_neighbors(rate_update_q, ads, lst)
 
-        ! Do dissociation:
-        ! Find process number
+! Do dissociation:
+! Find process number
         proc = this%dissociation%rate_info(ads)%list(channel)%proc
-        ! Get reactant and products info
+! Get reactant and products info
         id_r   = lat%ads_list(ads)%id
         id_p1  = this%dissociation%channels(proc)%p1
         ast_p1 = this%dissociation%channels(proc)%p1_ast
         id_p2  = this%dissociation%channels(proc)%p2
         ast_p2 = this%dissociation%channels(proc)%p2_ast
-        ! Replace reactant with product1 preserving its number
+! Replace reactant with product1 preserving its number
         lat%ads_list(ads)%id  = id_p1
         lat%ads_list(ads)%ast = ast_p1
         lat%n_ads(id_r)  = lat%n_ads(id_r)  - 1
         lat%n_ads(id_p1) = lat%n_ads(id_p1) + 1
-        ! direction for dissociation
+! direction for dissociation
         m_nn = this%dissociation%rate_info(ads)%list(channel)%m
-        ! position for product 2
+! position for product 2
         call lat%neighbor(ads, m_nn ,row_p2,col_p2)
-        ! Add product 2
-        ! increase the total number of adsorbates
+! Add product 2
+! increase the total number of adsorbates
         this%n_ads_total = this%n_ads_total  + 1
-        ! update occupations
+! update occupations
         lat%occupations(row_p2,col_p2) = this%n_ads_total
-        ! update adsorbate list
+! update adsorbate list
         lat%ads_list(this%n_ads_total)%id  =  id_p2
         lat%ads_list(this%n_ads_total)%row = row_p2
         lat%ads_list(this%n_ads_total)%col = col_p2
         lat%ads_list(this%n_ads_total)%ast = ast_p2
         lat%n_ads(id_p2) = lat%n_ads(id_p2) + 1
 
-        ! scan over neighbors after dissociation
+! scan over neighbors after dissociation
         call lat%update_neighbors(rate_update_q, this%n_ads_total, lat%lst(row_p2,col_p2))
 
-        ! Reset the rate info for ads (product 1)
+! Reset the rate info for ads (product 1)
         call this%cleanup_rates(ads, lat)
-        ! Update rate array for the affected adsorbates
+! Update rate array for the affected adsorbates
         do i=1,this%n_ads_total
           if (rate_update_q(i)) call this%construct_1(i, lat, e_pars)
         end do
 
-        ! Update reaction counter
+! Update reaction counter
         this%counter(reaction_id,id_r) = this%counter(reaction_id,id_r) + 1
 
       case(association_id)
-        ! determine association channel (ads, channel)
+! determine association channel (ads, channel)
         temp_dp = this%acc_rate(dissociation_id)
         extloop3: do ads=1,this%n_ads_total
         do channel=1,this%association%rate_info(ads)%n_channels
@@ -658,71 +659,71 @@ end if
         end do
         end do extloop3
 
-        ! Get the position and number of reactant 2
+! Get the position and number of reactant 2
         m_nn   = this%association%rate_info(ads)%list(channel)%m
         call lat%neighbor(ads,m_nn,row,col)
         ads_r2 = lat%occupations(row,col)
-        ! Get reactants' lst
+! Get reactants' lst
         lst    = lat%lst(lat%ads_list(ads)%row,    lat%ads_list(ads)%col)
         lst_r2 = lat%lst(lat%ads_list(ads_r2)%row, lat%ads_list(ads_r2)%col)
 
-        ! initialize a logical array indicating adsorbates affected by dissociation
+! initialize a logical array indicating adsorbates affected by dissociation
         rate_update_q = .false.
-        ! account for reactants
+! account for reactants
         rate_update_q(ads)    = .true.
         rate_update_q(ads_r2) = .true.
-        ! scan over reactants' neighbors
+! scan over reactants' neighbors
         call lat%update_neighbors(rate_update_q,    ads,    lst)
         call lat%update_neighbors(rate_update_q, ads_r2, lst_r2)
 
-        ! --------------Do association:
-        ! Find process number
+! --------------Do association:
+! Find process number
         proc = this%association%rate_info(ads)%list(channel)%proc
-        ! Get reactants and products info
+! Get reactants and products info
         id_r1  = lat%ads_list(ads   )%id
         id_r2  = lat%ads_list(ads_r2)%id
         id_p1  = this%association%channels(proc)%p1
         ast_p1 = this%association%channels(proc)%p1_ast
-        ! Replace reactant 1 with product 1 preserving reactant's number
+! Replace reactant 1 with product 1 preserving reactant's number
         lat%ads_list(ads)%id  = id_p1
         lat%ads_list(ads)%ast = ast_p1
         lat%n_ads(id_r1) = lat%n_ads(id_r1) - 1
         lat%n_ads(id_p1) = lat%n_ads(id_p1) + 1
-        ! Delete reactant 2
+! Delete reactant 2
         lat%occupations( lat%ads_list(ads_r2)%row, lat%ads_list(ads_r2)%col ) = 0
         lat%n_ads(id_r2) = lat%n_ads(id_r2) - 1
-        ! Rearrange adsorbates except when reactant 2 is the last adsorbate
+! Rearrange adsorbates except when reactant 2 is the last adsorbate
         if (ads_r2 < this%n_ads_total) then
-          ! Put the last adsorbate in place of ads_r2
+! Put the last adsorbate in place of ads_r2
           lat%ads_list(ads_r2) = lat%ads_list(this%n_ads_total)
-          ! Update the last adsorbate number in the lattice
+! Update the last adsorbate number in the lattice
           lat%occupations(lat%ads_list(ads_r2)%row, lat%ads_list(ads_r2)%col) = ads_r2
-          ! Update the rates arrays
+! Update the rates arrays
           this%hopping%rates(ads_r2,:)        = this%hopping%rates(this%n_ads_total,:)
           this%desorption%rates(ads_r2)       = this%desorption%rates(this%n_ads_total)
           this%dissociation%rate_info(ads_r2) = this%dissociation%rate_info(this%n_ads_total)
           this%association%rate_info(ads_r2)  = this%association%rate_info(this%n_ads_total)
         end if
 
-        ! Reset the rate info for ads (product 1) and for the last adsorbate
+! Reset the rate info for ads (product 1) and for the last adsorbate
         call this%cleanup_rates(ads,lat)
         call this%cleanup_rates(this%n_ads_total,lat)
 
-        ! account for the tightening the ads. list
+! account for the tightening the ads. list
         rate_update_q(ads_r2) = rate_update_q(this%n_ads_total)
-        ! Update rate array for the affected adsorbates
+! Update rate array for the affected adsorbates
         do i=1,this%n_ads_total - 1
           if (rate_update_q(i)) call this%construct_1(i, lat, e_pars)
         end do
-        ! Update the the number of adsorbates
+! Update the the number of adsorbates
         this%n_ads_total = this%n_ads_total - 1
 
-        ! Update reaction counter
+! Update reaction counter
         this%counter(reaction_id,id_r1) = this%counter(reaction_id,id_r1) + 1
         this%counter(reaction_id,id_r2) = this%counter(reaction_id,id_r2) + 1
 
       case(bimolecular_id)
-        ! determine bimolecular reaction channel (ads, channel)
+! determine bimolecular reaction channel (ads, channel)
         temp_dp = this%acc_rate(association_id)
         extloop4: do ads=1,this%n_ads_total
         do channel=1,this%bimolecular%rate_info(ads)%n_channels
@@ -731,54 +732,54 @@ end if
         end do
         end do extloop4
 
-        ! Get the position and number of reactant 2
+! Get the position and number of reactant 2
         m_nn   = this%bimolecular%rate_info(ads)%list(channel)%m
         call lat%neighbor(ads,m_nn,row,col)
         ads_r2 = lat%occupations(row,col)
-        ! Get reactants' lst
+! Get reactants' lst
         lst    = lat%lst(lat%ads_list(ads)%row,    lat%ads_list(ads)%col)
         lst_r2 = lat%lst(lat%ads_list(ads_r2)%row, lat%ads_list(ads_r2)%col)
 
-        ! initialize a logical array indicating adsorbates affected by bimolecular reaction
+! initialize a logical array indicating adsorbates affected by bimolecular reaction
         rate_update_q = .false.
-        ! account for reactants
+! account for reactants
         rate_update_q(ads)    = .true.
         rate_update_q(ads_r2) = .true.
-        ! scan over reactants' neighbors
+! scan over reactants' neighbors
         call lat%update_neighbors(rate_update_q,    ads,    lst)
         call lat%update_neighbors(rate_update_q, ads_r2, lst_r2)
 
 
-        ! --------------Do bimolecular reaction:
-        ! Find process number
+! --------------Do bimolecular reaction:
+! Find process number
         proc = this%bimolecular%rate_info(ads)%list(channel)%proc
-        ! Get reactants' and products' info
+! Get reactants' and products' info
         id_r1  = lat%ads_list(ads   )%id
         id_r2  = lat%ads_list(ads_r2)%id
         id_p1  = this%bimolecular%channels(proc)%p1
         ast_p1 = this%bimolecular%channels(proc)%p1_ast
         id_p2  = this%bimolecular%channels(proc)%p2
         ast_p2 = this%bimolecular%channels(proc)%p2_ast
-        ! Replace reactant 1 with product 1 preserving reactant's number
+! Replace reactant 1 with product 1 preserving reactant's number
         lat%ads_list(ads)%id  = id_p1
         lat%ads_list(ads)%ast = ast_p1
         lat%n_ads(id_r1) = lat%n_ads(id_r1) - 1
         lat%n_ads(id_p1) = lat%n_ads(id_p1) + 1
-        ! Replace reactant 2 with product 2 preserving reactant's number
+! Replace reactant 2 with product 2 preserving reactant's number
         lat%ads_list(ads_r2)%id  = id_p2
         lat%ads_list(ads_r2)%ast = ast_p2
         lat%n_ads(id_r2) = lat%n_ads(id_r2) - 1
         lat%n_ads(id_p2) = lat%n_ads(id_p2) + 1
 
-        ! Reset the rate info for ads (product 1) and for ads_r2 (product 2)
+! Reset the rate info for ads (product 1) and for ads_r2 (product 2)
         call this%cleanup_rates(ads,lat)
         call this%cleanup_rates(ads_r2,lat)
-        ! Update rate array for the affected adsorbates
+! Update rate array for the affected adsorbates
         do i=1,this%n_ads_total
           if (rate_update_q(i)) call this%construct_1(i, lat, e_pars)
         end do
 
-        ! Update reaction counter
+! Update reaction counter
         this%counter(reaction_id,id_r1) = this%counter(reaction_id,id_r1) + 1
         this%counter(reaction_id,id_r2) = this%counter(reaction_id,id_r2) + 1
 
@@ -790,7 +791,7 @@ end if
 
     end select
 
-    ! Update the accumulated rates
+! Update the accumulated rates
     call this%accumulate_rates(lat)
 
     deallocate(rate_update_q)

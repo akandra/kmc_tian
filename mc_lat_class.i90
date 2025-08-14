@@ -108,7 +108,8 @@ contains
     lat%n_nn(terrace_site,:) = [6,6,6]
     lat%n_nn(   step_site,:) = [5,5,7]
     lat%n_nn( corner_site,:) = [4,4,6]
-    lat%n_nn(    ts1_site,:) = [6,7,5] ! the nn for the 3rd shell is changed from 4 to 5 on 2025-08-13
+    lat%n_nn(    ts1_site,:) = [6,7,4]
+!  lat%n_nn(    ts1_site,:) = [6,7,5] ! the nn for the 3rd shell is changed from 4 to 5 on 2025-08-13
     lat%n_nn(    ts2_site,:) = [6,6,6]
     lat%n_nn(    tc2_site,:) = [6,6,6]
     lat%n_nn(    tc1_site,:) = [5,5,5]
@@ -274,7 +275,7 @@ contains
     lat%shell_list(ts1_site,2,6,:) = (/-2, 2/) ! ts1 -> c   (d=sqrt( (5/3)^2 + 1/4 ) )
     lat%shell_list(ts1_site,2,7,:) = (/-1, 2/) ! ts1 -> c   (d=sqrt( (5/3)^2 + 1/4 ) )
 ! Next-Next-Nearest-neigbour (3rd) shell
-    lat%shell_list(ts1_site,3,1,:) = (/ 0, 2/) ! ts1 -> c  (d=sqrt( (sqrt(3)-1/3)^2 + 1/4 ) )
+!lat%shell_list(ts1_site,3,1,:) = (/ 0, 2/) ! ts1 -> c  (d=sqrt( (sqrt(3)-1/3)^2 + 1/4 ) )
 ! the above line is added on 2025-08-13
     lat%shell_list(ts1_site,3,2,:) = (/ 2, 0/) ! ts1 -> ts1 (d=2)
     lat%shell_list(ts1_site,3,3,:) = (/ 2,-2/) ! ts1 -> tc2 (d=2)
@@ -1245,23 +1246,23 @@ contains
     integer :: i1, i1s, i1a, i2, i2s, i2a, shell, nn1, nn2
 
     do i1=1, c_pars%n_species
-    do i1s=1, this%n_site_types
+    do i1s=1, n_max_lat_site_types
     do i1a=1, size( this%avail_ads_sites(i1,i1s)%list )
     do i2=i1+1, c_pars%n_species
-    do i2s=1, this%n_site_types
+    do i2s=1, n_max_lat_site_types
     do i2a=1, size( this%avail_ads_sites(i2,i2s)%list )
     do shell=1, n_shells
       
       do nn1=1, this%n_nn(i1s,shell)
     
-        if (energy_parameters_init%int_energy_pars(i1,i1s,i1a,i2,i2s,i2a,shell,nn1) /= &
-            energy_parameters_init%undefined_energy) then
+        if (e_pars%int_energy_pars(i1,i1s,i1a,i2,i2s,i2a,shell,nn1) /= &
+            e_pars%undefined_energy) then
 
 ! Find the the reciprocal neighbor in the direction opposite to nn1 -> nn2
           do nn2=1, this%n_nn(i2s,shell)
-            if ( all( this%shell_list(i2s,shell,nn2) == - this%shell_list(i1s,shell,nn1) ) ) then
-              energy_parameters_init%int_energy_pars(i2,i2s,i2a,i1,i1s,i1a,shell,nn2) = &
-                energy_parameters_init%int_energy_pars(i1,i1s,i1a,i2,i2s,i2a,shell,nn1)
+            if ( all( this%shell_list(i2s,shell,nn2,:) == - this%shell_list(i1s,shell,nn1,:) ) ) then
+              e_pars%int_energy_pars(i2,i2s,i2a,i1,i1s,i1a,shell,nn2) = &
+                e_pars%int_energy_pars(i1,i1s,i1a,i2,i2s,i2a,shell,nn1)
               exit
             end if
           end do

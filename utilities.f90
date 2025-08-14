@@ -74,7 +74,7 @@ contains
         character(len=*), allocatable, intent(out)   :: tokens(:)
         character(len=*), optional, intent(in)       :: comment_character
 
-        integer :: i, line_len, start, brace_level, token_index
+        integer :: i, line_len, start, brace_level, token_index, end
         character(len = :), allocatable :: line
         character(len=1) :: cc
 
@@ -85,17 +85,15 @@ contains
             cc = '!'  ! Default to ! if no comment character is provided
         end if
 
-        ! Remove comment from the line if it exists
-        if (index(line_in, cc) > 0) then
-            line = line_in(1:index(line_in, cc)-1)
-        end if
-
-
+        ! Find the end of the line excluding comments
+        end = len(line_in)
+        if (index(line_in, cc) > 0) end = index(line_in, cc) - 1
+      
         n_tokens    = 0
         start       = 1
         brace_level = 0
 
-        line = trim(adjustl(line))  ! the assignment does allocation with the correct length 
+        line = trim(adjustl(line_in(1:end)))  ! the assignment does allocation with the correct length 
         line_len  = len(line)
 
         ! First pass: count tokens
@@ -152,9 +150,9 @@ contains
                     token_index = token_index + 1
 
                     if ( (i == line_len) .or. line(i:i) == '}') then
-                        tokens(token_index) = adjustl(line(start:i))
+                        tokens(token_index) = trim(adjustl(line(start:i)))
                     else
-                        tokens(token_index) = adjustl(line(start:i-1))
+                        tokens(token_index) = trim(adjustl(line(start:i-1)))
                     end if
                     
                 end if
@@ -222,7 +220,7 @@ contains
     integer, intent(out) :: x
     integer :: error_code
 
-    read(string,'(i0)',iostat=error_code) x
+    read(string,'(i10)',iostat=error_code) x
     read_int = error_code == 0
 
   end function read_int
@@ -234,7 +232,7 @@ contains
     logical, intent(out) :: x
     integer :: error_code
 
-    read(string,'(l)',iostat=error_code) x
+    read(string,'(L2)',iostat=error_code) x
     read_logical = error_code == 0
 
   end function read_logical

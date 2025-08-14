@@ -212,7 +212,8 @@ contains
 
               ! Neighbor-specific interaction parameters
               if (tokens(i)(1:1) == '{') then
-                if (.not.get_tokens(tokens(i)(2:len(tokens(i))-1), ntoks, toks)) then
+
+                if (.not.get_tokens(tokens(i)(2:len_trim(tokens(i))-1), ntoks, toks)) then
                   call error_message(file_name, line_number, buffer, &
                               "unpaired curly braces in interaction parameters")
                 elseif (ntoks == 0 .or. ntoks > max_n_neighbors) then
@@ -229,6 +230,11 @@ contains
                     end if
                   end do
                 end if
+
+              ! Take '-' or '*' as a dummy token
+              elseif (len_trim(tokens(i)) == 1 .and. &
+                      (tokens(i)(1:1) == '-' .or. tokens(i)(1:1) == '*') ) then
+                cycle
 
               ! Common interaction parameter for all neighbors  
               else
@@ -256,14 +262,9 @@ contains
 !            print'(A,3e16.8,3L)', 'int. pars: ', energy_parameters_init%int_energy_pars(i1,i2,:)&
 !                                              , energy_parameters_init%int_energy_skip(i1,i2,:)
 
-        elseif (tokens(1) == '') then
+        elseif (tokens(1) == section_end) then
 
-          if (buffer == '') then
-            parse_state = parse_state_default
-!              print*, 'blank line '
-!            else
-!              print*, 'comment: ', trim(buffer)
-          end if
+          parse_state = parse_state_default
 
         else
 
