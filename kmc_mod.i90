@@ -1,3 +1,4 @@
+# 1 "/home/akandra/git/kmc_tian/kmc_mod.f90"
 module kmc
 
   use constants
@@ -53,7 +54,7 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
 
   version_header = '! kmc_tian Release ' // version
 
-  ! Create a rate structure
+! Create a rate structure
   r = reaction_init(c_pars, lat, e_pars)
 !------------------------------------------------------------------------------
 !  debug printing
@@ -74,7 +75,7 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
 
   bin_log_scale   = c_pars%log_scale_t1 > 0.0_dp
   bin_power_scale = c_pars%power_scale_t1  > 0.0_dp
-  ! do linear time binning for distributions
+! do linear time binning for distributions
   if (bin_log_scale) then
     log_t1 = log10(c_pars%log_scale_t1)
     step_bin(1) = ( log10(c_pars%t_end(1)) - log_t1 )/c_pars%n_bins(1)
@@ -85,7 +86,7 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
     step_bin = c_pars%t_end/c_pars%n_bins
   end if
 
-  ! calculate cumulative times for segments
+! calculate cumulative times for segments
   time_limits(1) = c_pars%t_end(1)
   do i=2, size(c_pars%t_end)
     time_limits(i) = time_limits(i-1) + c_pars%t_end(i)
@@ -93,7 +94,7 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
 
   if (c_pars%show_progress) write(*,'(20X,A)') "B.K.L. Code's progress report:"
 
-  ! Loop over trajectories
+! Loop over trajectories
   do itraj=c_pars%start_traj, c_pars%start_traj - 1 + c_pars%n_trajs
 
     debug(1) = (itraj==1)
@@ -103,22 +104,22 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
     ibin = 0
     kmc_nsteps = 0
 
-    ! initialize random number generator
+! initialize random number generator
     call random_seed(put=itraj*randseed*42)
-    ! Set initial lattice based on trajectory number
+! Set initial lattice based on trajectory number
     call lat%conf_init(c_pars, itraj )
-    ! Adjust the respective records in reaction variable
+! Adjust the respective records in reaction variable
     r%n_ads_total = lat%n_ads_tot()
-    ! Initialize stopping trigger
+! Initialize stopping trigger
     stopping_trigger = .false.
-    ! Initialize reaction counter
+! Initialize reaction counter
     r%counter = 0
-    !-------- Construct rates arrays
+!-------- Construct rates arrays
     call r%construct(lat, e_pars)
 
     if (r%n_ads_total>0) then
 
-      ! Calculate initial cluster size histogram
+! Calculate initial cluster size histogram
       hist = 0
 !      do species=1,c_pars%n_species
 !        call lat%hoshen_kopelman(species, cluster_label, largest_label)
@@ -129,7 +130,7 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
 !        end do
 !      end do
 
-      ! Calculate initial rdf
+! Calculate initial rdf
       if (c_pars%rdf_period > 0) then
         rdf_hist = 0
         call lat%rdf_hist(c_pars, rdf_hist)
@@ -137,11 +138,11 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
 
     end if
 
-    ! write trajectory files
-    !-----------------------------------------------------------------
-    ! Prepare string with traj number for using in filenames
+! write trajectory files
+!-----------------------------------------------------------------
+! Prepare string with traj number for using in filenames
     write(buffer,'(i9.9)') itraj
-    ! write initial state of the lattice into a file
+! write initial state of the lattice into a file
     call open_for_write(outcfg_unit,trim(c_pars%file_name_base)//'_'//trim(buffer)//'.confs')
     write(outcfg_unit,'(A)') trim(version_header)
     write(outcfg_unit,'(A20,A20,A20)') "# rows(|| to steps)","# cols","step_period"
@@ -151,46 +152,46 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
     write(outcfg_unit,'(100i10)') lat%n_ads
     call lat%print_ads(outcfg_unit)
 
-    ! write initial total energy of the system
+! write initial total energy of the system
     call open_for_write(outeng_unit,trim(c_pars%file_name_base)//'_'//trim(buffer)//'.en')
     write(outeng_unit,'(2A12)') 'time(s)', ' energy(eV)'
     write(outeng_unit,'(1pe19.10,1pe19.10)') 0.0_dp, total_energy(lat,e_pars)
 
-    ! open file for saving reaction counts
+! open file for saving reaction counts
     call open_for_write(outcnt_unit,trim(c_pars%file_name_base)//'_'//trim(buffer)//'.counts')
     write(outcnt_unit,'(A19,100A20)') 'time(s)', &
     ((' '//trim(c_pars%ads_names(j))//'_'//trim(reaction_names(k)), k=1,n_reaction_types), j=1,c_pars%n_species)
     write(outcnt_unit,'(1pe19.10,100i20)') 0.0_dp, r%counter
 
-    ! open file for saving cluster size histogram
+! open file for saving cluster size histogram
     call open_for_write(outhst_unit,trim(c_pars%file_name_base)//'_'//trim(buffer)//'.hist')
 
-    ! open file for saving rdf and define rdf-specific variables
+! open file for saving rdf and define rdf-specific variables
     if (c_pars%rdf_period > 0) then
       call open_for_write(outrdf_unit,trim(c_pars%file_name_base)//'_'//trim(buffer)//'.rdf')
-      ! Output formats
+! Output formats
       write(rdf_fmt,'(i10)') c_pars%rdf_n_bins
       rdf_fmt = '('//trim(adjustl(rdf_fmt))//'i8)'
     end if
 
     if (r%n_ads_total>0) then
 
-    !-----Save histogram with cluster sizes
+!-----Save histogram with cluster sizes
 
-      ! Output formats
+! Output formats
       write(n_ads_fmt,'(i10)') r%n_ads_total
       n_ads_fmt = '('//trim(adjustl(n_ads_fmt))//'i8)'
-      ! Save cluster size histogram
+! Save cluster size histogram
       write(outhst_unit,'(A6,1pe19.10)') "time ",0.0_dp
       do species=1,c_pars%n_species
         write(outhst_unit,*) species
         write(outhst_unit,n_ads_fmt) (hist(species,i), i=1,lat%n_ads(species))
       end do
 
-    !-----Save rdf
+!-----Save rdf
 
       if (c_pars%rdf_period > 0) then
-        ! Write it out
+! Write it out
         write(outrdf_unit,'(A6,1pe12.3)') "time ",0.0_dp
         do species1=1,c_pars%n_species
         do species2=1,c_pars%n_species
@@ -201,13 +202,13 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
       end if
 
     else
-      ! No output when no adsorbates
+! No output when no adsorbates
       write(outhst_unit,'(A6,1pe19.10)') "time ",0.0_dp
       write(outrdf_unit,'(A6,1pe19.10)') "time ",0.0_dp
 
     end if
 
-    ! set the time span
+! set the time span
     time = big_bang
     end_of_time = time_limits( size(time_limits) )
     time_segment_old = 1
@@ -215,19 +216,19 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
     bin_shift = 0
     time_shift = 0.0_dp
 
-    ! start time propagation
+! start time propagation
     time_loop: do while ( time < end_of_time )
 
-      ! propagate the time
+! propagate the time
       delta_t = -log(ran1())/r%acc_rate(n_reaction_types)   ! when does a reaction occur?
-      !write(*,*) 'Total rate: ', r%acc_rate(n_reaction_types), 'time step: ', delta_t
+!write(*,*) 'Total rate: ', r%acc_rate(n_reaction_types), 'time step: ', delta_t
 
       time = time + delta_t
 
-      ! set time to the final value at the end of trajectory
+! set time to the final value at the end of trajectory
       if (time > end_of_time) time = end_of_time
 
-      ! Conditionally jump over time segments
+! Conditionally jump over time segments
       do while ( time > time_limits(time_segment_new) )
         time_segment_new = time_segment_new + 1
       end do
@@ -237,7 +238,7 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
         if (time_segment == time_segment_new) then
 
           if (bin_log_scale) then
-            ! Exclude possible negative values of ibin_new for small kmc_times
+! Exclude possible negative values of ibin_new for small kmc_times
             if (time <= c_pars%log_scale_t1) then
               ibin_new = 0
             else
@@ -257,22 +258,22 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
 
         end if
 
-        ! Write when switched to the next bin taking into account jumps over more than 1 bin
-        ! by repeating output values
+! Write when switched to the next bin taking into account jumps over more than 1 bin
+! by repeating output values
         do ibin_current=ibin+1,ibin_new
 
           if (c_pars%show_progress) call progress_bar(&
             'current trajectory',&
             int(100*time/end_of_time),&
             '   total',&
-            ! total =  % completed trajs + contribution form current trajectory
+! total =  % completed trajs + contribution form current trajectory
             100*(itraj-c_pars%start_traj)/c_pars%n_trajs + int(100.*time/(end_of_time*c_pars%n_trajs)))
 
           if (r%n_ads_total>0) then
 
-            ! Reset the histogram
+! Reset the histogram
             hist = 0
-            ! Calculate histogram
+! Calculate histogram
 !            do species=1,c_pars%n_species
 !              call lat%hoshen_kopelman(species, cluster_label, largest_label)
 !              call lat%cluster_size(species, cluster_label, cluster_sizes)
@@ -283,14 +284,14 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
 !            end do
 
             if (c_pars%rdf_period > 0) then
-              ! Calculate rdf
+! Calculate rdf
               rdf_hist = 0
               call lat%rdf_hist(c_pars, rdf_hist)
             end if
 
           end if
 
-          ! write into trajectory files
+! write into trajectory files
           if (bin_log_scale) then
             time_bin = 10**( log_t1 + ibin_current*step_bin(time_segment) )
           elseif (bin_power_scale) then
@@ -299,33 +300,33 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
             time_bin = time_shift + (ibin_current - bin_shift)*step_bin(time_segment)
           end if
 
-          ! configuration
+! configuration
           write(outcfg_unit,'(A6,1pe19.10)') "time ", time_bin
           write(outcfg_unit,'(100i10)') lat%n_ads
           call lat%print_ads(outcfg_unit)
 
-          ! energy
+! energy
           write(outeng_unit,'(1pe19.10,1pe19.10)') time_bin, total_energy(lat,e_pars)
 
-          ! reaction counts
+! reaction counts
           write(outcnt_unit,'(1pe19.10,100i20)') time_bin, r%counter
-          ! Reset reaction counters
+! Reset reaction counters
 !          r%counter = 0
 
           if (r%n_ads_total>0) then
 
-            ! histogram with cluster sizes
-            ! Output formats
+! histogram with cluster sizes
+! Output formats
             write(n_ads_fmt,'(i10)') r%n_ads_total
             n_ads_fmt = '('//trim(adjustl(n_ads_fmt))//'i8)'
-            ! Save cluster size histogram
+! Save cluster size histogram
             write(outhst_unit,'(A6,1pe19.10)') "time ",time_bin
             do species=1,c_pars%n_species
               write(outhst_unit,*) species
               write(outhst_unit,n_ads_fmt) (hist(species,i), i=1,lat%n_ads(species))
             end do
 
-            ! rdf
+! rdf
             if (c_pars%rdf_period > 0) then
               write(outrdf_unit,'(A6,1pe19.10)') "time ",time_bin
               do species1=1,c_pars%n_species
@@ -338,7 +339,7 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
 
           else
 
-            ! No histogram output when no adsorbates
+! No histogram output when no adsorbates
             write(outhst_unit,'(A6,1pe19.10)') "time ",time_bin
             write(outrdf_unit,'(A6,1pe19.10)') "time ",time_bin
 
@@ -352,14 +353,14 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
 
       time_segment_old = time_segment_new
 
-      ! save penultimate state
+! save penultimate state
       lat%n_ads_penultimate    = lat%n_ads
       lat%ads_list_penultimate = lat%ads_list
 
-      ! do reaction based on a random number
+! do reaction based on a random number
       call r%do_reaction(ran1(), lat, e_pars)
 
-      ! end trajectory if all essential species are gone
+! end trajectory if all essential species are gone
       if (any(e_pars%is_essential)) then
 
         stopping_trigger = .true.
@@ -375,7 +376,7 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
 
       end if
 
-      ! end trajectory if there's no processes left
+! end trajectory if there's no processes left
       if (r%acc_rate(n_reaction_types) == 0.0_dp) then
         print*
         print *, 'nothing to do, since total rate is zero: exiting kMC loop'
@@ -388,9 +389,9 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
     end do time_loop
 !-------------------------------------------------------------
 
-    ! writing out the penultimate state
+! writing out the penultimate state
 
-    ! configuration
+! configuration
     write(outcfg_unit,'(A17,1pe19.10)') "time_penultimate ", time
     write(outcfg_unit,'(100i10)') lat%n_ads_penultimate
 

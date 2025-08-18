@@ -699,7 +699,15 @@ end if
 ! Update the last adsorbate number in the lattice
           lat%occupations(lat%ads_list(ads_r2)%row, lat%ads_list(ads_r2)%col) = ads_r2
 ! Update the rates arrays
-          this%hopping%rates(ads_r2,:)        = this%hopping%rates(this%n_ads_total,:)
+! N.B.:
+!    this%hopping%rates(ads_r2,:) = this%hopping%rates(this%n_ads_total,:)
+! is not valid Fortran if rates is an array of derived types,
+! because Fortran does not support whole-row assignment for arrays of derived types
+! with assumed-size or allocatable components.
+! Thanks to GPT-4.1 for this explanation.
+          do i=1,lat%n_max_nn+1
+            this%hopping%rates(ads_r2,i) = this%hopping%rates(this%n_ads_total,i)
+          end do
           this%desorption%rates(ads_r2)       = this%desorption%rates(this%n_ads_total)
           this%dissociation%rate_info(ads_r2) = this%dissociation%rate_info(this%n_ads_total)
           this%association%rate_info(ads_r2)  = this%association%rate_info(this%n_ads_total)

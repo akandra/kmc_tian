@@ -1,5 +1,8 @@
 do not forget to correct pptx diagrams for barrier corrections!
 
+2025-08-18 :
+    consider writing output on event (when state of the lattice changed)
+
 2025-08-13 mc_lat_class.f90:
     consider to move neighbor lists to constants module
 
