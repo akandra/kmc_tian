@@ -590,7 +590,8 @@ contains
           if (debug(10)) then
             write(*,*) ''
             write(*,'(A,I5,A,I5)') "ads_id", id, " ads_no", iads
-            write(*,'(A,I5,I5,A,I5,I5)') "from", lst_old, ast_old, " to", lst_new, ast_new
+            write(*,'(A,A4,A4,A,A4,A4)') "from ", lat_site_names(lst_old), ads_site_names(ast_old), &
+                                          " to ", lat_site_names(lst_new), ads_site_names(ast_new)
             write(*,'(A,F8.3,A,F8.3)') "E0_i=", e_pars%ads_energy(id, lst_old, ast_old),&
                                        " E0_f=", e_pars%ads_energy(id, lst_new, ast_new)
             write(*,'(A,F8.3,A,F8.3)') "E_i =", energy_old, " E_f =", energy_new
@@ -613,7 +614,7 @@ contains
           this%rates(ads,m)%list(iads) = &
             this%process(id, lst_old, ast_old, lst_new, ast_new)*exp( -beta*delta_eps )
 
-          if (debug(10)) then
+          if (debug(10) .and. ads == 1) then
             write(*,'(A,F8.3)') "delta_eps =", delta_eps
             write(*,'(A,ES10.3)') "uncorrected rate =", this%process(id, lst_old, ast_old, lst_new, ast_new)
             write(*,'(A,F8.3)') "correction energy =",&

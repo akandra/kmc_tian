@@ -59,19 +59,18 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
 !------------------------------------------------------------------------------
 !  debug printing
 !------------------------------------------------------------------------------
-!print *, 'debug printouts'
-!print '(A, i0)', ' n_processes = ', r%association%n_processes
-!print *, ' lat%n_ads   = ', lat%n_ads
-!
-!print '(A)', ' n_chan'
-!do i=1, lat%n_ads(1)
-!  n_chan = size(r%association%rate_info(i)%list)
-!  write(*, '(i4, i6)',advance='no') i, n_chan
+! print *, 'debug printouts'
+! print '(A, i0)', ' n_processes = ', r%association%n_processes
+! print *, ' lat%n_ads   = ', lat%n_ads
+
+! print '(A)', ' n_chan'
+! do i=1, lat%n_ads(1)
+!  write(*, '(i4, i6)',advance='yes') i, size(r%association%rate_info(i)%list)
 !  print*, r%association%rate_info(i)%list(:)%rate
-!
-!end do
-!
-!stop 111
+
+! end do
+
+! stop 111
 
   bin_log_scale   = c_pars%log_scale_t1 > 0.0_dp
   bin_power_scale = c_pars%power_scale_t1  > 0.0_dp

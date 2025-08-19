@@ -84,7 +84,6 @@ contains
 
 !dja    integer :: i, m, ads, channel, n_nn
     integer :: m, ads, channel, n_nn
-
     ! initialize the accumulated rate for hopping
     this%acc_rate(hopping_id) = 0.0_dp
     ! rate for hopping reactions
@@ -92,6 +91,10 @@ contains
       do ads=1,this%n_ads_total
         n_nn = lat%n_nn( lat%lst( lat%ads_list(ads)%row,lat%ads_list(ads)%col ), 1)
         do m=1,n_nn+1 ! '+1' accounts for intra-site hops
+if (ads == 1) then
+  print*, '   m = ', m, this%hopping%rates(ads,m)%list
+  print*, 'ads= ',ads , 'n_nn = ', n_nn
+end if
           this%acc_rate(hopping_id) = this%acc_rate(hopping_id) + sum(this%hopping%rates(ads,m)%list)
         end do
       end do
@@ -139,13 +142,13 @@ contains
     end if
 
 !    ! Debug printing of accumulated rates
-!    print*
-!    print*,'accumulate_rates debugging output:'
-!    print'(3A,1pe12.2)','Total rate for ',reaction_names(1), ' is ', this%acc_rate(1)
-!    do i=2, n_reaction_types
-!      print'(3A,1pe12.2)','Total rate for ',reaction_names(i), ' is ', this%acc_rate(i) - this%acc_rate(i-1)
-!    end do
-
+   print*
+   print*,'accumulate_rates debugging output:'
+   print'(3A,1pe12.2)','Total rate for ',reaction_names(1), ' is ', this%acc_rate(1)
+   do ads=2, n_reaction_types
+     print'(3A,1pe12.2)','Total rate for ',reaction_names(ads), ' is ', this%acc_rate(ads) - this%acc_rate(ads-1)
+   end do
+stop 42
   end subroutine accumulate_rates
 
 
