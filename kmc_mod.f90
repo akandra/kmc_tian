@@ -95,7 +95,7 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
   ! Loop over trajectories
   do itraj=c_pars%start_traj, c_pars%start_traj - 1 + c_pars%n_trajs
 
-    debug(1) = (itraj==1)
+    !debug(1) = (itraj==1)
 
     if (c_pars%show_progress) call progress_bar( 'current trajectory', 0 , &
                                  '   total', 100*(itraj-c_pars%start_traj+1)/c_pars%n_trajs )

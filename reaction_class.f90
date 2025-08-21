@@ -91,10 +91,6 @@ contains
       do ads=1,this%n_ads_total
         n_nn = lat%n_nn( lat%lst( lat%ads_list(ads)%row,lat%ads_list(ads)%col ), 1)
         do m=1,n_nn+1 ! '+1' accounts for intra-site hops
-if (ads == 1) then
-  print*, '   m = ', m, this%hopping%rates(ads,m)%list
-  print*, 'ads= ',ads , 'n_nn = ', n_nn
-end if
           this%acc_rate(hopping_id) = this%acc_rate(hopping_id) + sum(this%hopping%rates(ads,m)%list)
         end do
       end do
@@ -142,13 +138,15 @@ end if
     end if
 
 !    ! Debug printing of accumulated rates
-   print*
-   print*,'accumulate_rates debugging output:'
-   print'(3A,1pe12.2)','Total rate for ',reaction_names(1), ' is ', this%acc_rate(1)
-   do ads=2, n_reaction_types
-     print'(3A,1pe12.2)','Total rate for ',reaction_names(ads), ' is ', this%acc_rate(ads) - this%acc_rate(ads-1)
-   end do
-stop 42
+    if (debug(8)) then
+      print*
+      print*,'accumulate_rates debugging printout:'
+      print'(3A,1pe12.2)','Total rate for ',reaction_names(1), ' is ', this%acc_rate(1)
+      do ads=2, n_reaction_types
+        print'(3A,1pe12.2)','Total rate for ',reaction_names(ads), ' is ', this%acc_rate(ads) - this%acc_rate(ads-1)
+      end do
+    end if
+
   end subroutine accumulate_rates
 
 

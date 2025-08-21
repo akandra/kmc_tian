@@ -141,7 +141,7 @@ contains
         elseif (get_index(tokens(1),lat_site_names) /= 0) then
 
           if (parse_state /= parse_state_adsorption) then
-            ! print *, 'parse_state: ', parse_stat=
+            ! print *, 'parse_state: ', parse_state
             call error_message(file_name, line_number, buffer, "invalid site type statement")
           end if
 
@@ -257,19 +257,20 @@ contains
 
           end if
 
-print*, 'int. law: ', energy_parameters_init%int_energy_law_id(i1,i1s,i1a,i2,i2s,i2a)
-print*,  '  for species 1: ', i1,control_pars%ads_names(i1), ' at ', lat_site_names(i1s), ads_site_names(i1a)
-print*,  '      species 2: ', i2,control_pars%ads_names(i2), ' at ', lat_site_names(i2s), ads_site_names(i2a)
-do i=1,n_shells
-  print*, '    int. pars: shell ', i, ': '
-  print*,  energy_parameters_init%int_energy_pars(i1,i1s,i1a,i2,i2s,i2a,i,:)
-  print*, '    symmetrized: '
-  print*,  energy_parameters_init%int_energy_pars(i2,i2s,i2a,i1,i1s,i1a,i,:)
-  print'(A,I2,A,3L5)', 'int. skip: shell ', i, ': ', &
-    energy_parameters_init%int_energy_skip(i1,i1s,i1a,i2,i2s,i2a,i), &
-    energy_parameters_init%int_energy_skip(i2,i2s,i2a,i1,i1s,i1a,i)
-end do
-
+          if (debug(9)) then
+            print*, 'int. law: ', energy_parameters_init%int_energy_law_id(i1,i1s,i1a,i2,i2s,i2a)
+            print*,  '  for species 1: ', i1,control_pars%ads_names(i1), ' at ', lat_site_names(i1s), ads_site_names(i1a)
+            print*,  '      species 2: ', i2,control_pars%ads_names(i2), ' at ', lat_site_names(i2s), ads_site_names(i2a)
+            do i=1,n_shells
+              print*, '    int. pars: shell ', i, ': '
+              print*,  energy_parameters_init%int_energy_pars(i1,i1s,i1a,i2,i2s,i2a,i,:)
+              print*, '    symmetrized: '
+              print*,  energy_parameters_init%int_energy_pars(i2,i2s,i2a,i1,i1s,i1a,i,:)
+              print'(A,I2,A,3L5)', 'int. skip: shell ', i, ': ', &
+                energy_parameters_init%int_energy_skip(i1,i1s,i1a,i2,i2s,i2a,i), &
+                energy_parameters_init%int_energy_skip(i2,i2s,i2a,i1,i1s,i1a,i)
+            end do
+          end if
 
         elseif (tokens(1) == section_end) then
 

@@ -18,7 +18,9 @@ character(len=max_string_length) file_name_base
 
 ! initialize vector of conditions for debug trap
 debug = .false.
-debug(10) = .true. ! check energy correction consistency in rc calculations
+!debug(8) =  .true. ! check rates related stuff
+debug(9) =  .true. ! check energy interaction parameters consistency
+!debug(10) = .true. ! check energy correction consistency in rc calculations
 
 ! Print the banner
 print'(2A)', "kmc_tian. Release ",version
@@ -37,7 +39,7 @@ e_pars = energy_parameters_init(c_pars)
 !   initialize lattice
 lat = mc_lat_init(c_pars, e_pars)
 ! Symmetrize interaction parameters
-call lat%symmetrize_interaction_parameters(c_pars, e_pars)
+!call lat%symmetrize_interaction_parameters(c_pars, e_pars)
 
 select case (c_pars%algorithm)
 
