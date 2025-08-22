@@ -1,3 +1,4 @@
+# 1 "/home/akandra/git/kmc_tian/energy_parameters_class.f90"
 module energy_parameters_class
 
   use utilities
@@ -11,26 +12,26 @@ module energy_parameters_class
 
   type, public :: energy_parameters
 
-    ! Adsorpton energies (n_species x n_site_type x n_adsorption_sites)
+! Adsorpton energies (n_species x n_site_type x n_adsorption_sites)
     real(dp), dimension(:,:,:), allocatable :: ads_energy
 
-    ! Interaction energy law id (n_species x n_site_type x n_adsorption_sites x 
-    !                            n_species x n_site_type x n_adsorption_sites)
+! Interaction energy law id (n_species x n_site_type x n_adsorption_sites x
+!                            n_species x n_site_type x n_adsorption_sites)
     integer, dimension(:,:,:,:,:,:), allocatable :: int_energy_law_id
 
-    ! Interaction energy (n_species x n_site_type x n_adsorption_sites x 
-    !                     n_species x n_site_type x n_adsorption_sites x n_shells x max_n_neighbors )
+! Interaction energy (n_species x n_site_type x n_adsorption_sites x
+!                     n_species x n_site_type x n_adsorption_sites x n_shells x max_n_neighbors )
     real(dp), dimension(:,:,:,:,:,:,:,:),allocatable :: int_energy_pars
 
-    ! Interaction energy mask (n_species x n_species x n_shells)
-    ! .true. means to skip interaction
+! Interaction energy mask (n_species x n_species x n_shells)
+! .true. means to skip interaction
     logical, dimension(:,:,:,:,:,:,:),allocatable :: int_energy_skip
 
     logical :: is_interaction
-    ! Species importance key (n_species)
+! Species importance key (n_species)
     logical, dimension(:), allocatable :: is_essential
 
-    ! Default value for undefined energy
+! Default value for undefined energy
     real(dp) :: undefined_energy
 
 
@@ -86,7 +87,7 @@ contains
     energy_parameters_init%is_interaction  = .false.
     energy_parameters_init%is_essential    = .false.
 
-    !  read energy definitions from the input file
+!  read energy definitions from the input file
     file_name = control_pars%energy_file_name
     call open_for_read(inp_unit, file_name )
 
@@ -98,13 +99,13 @@ contains
 
       read(inp_unit, '(A)', iostat=ios) buffer
       line_number = line_number + 1
-        ! ios < 0: end of record condition encountered or endfile condition detected
-        ! ios > 0: an error is detected
-        ! ios = 0  otherwise
+! ios < 0: end of record condition encountered or endfile condition detected
+! ios > 0: an error is detected
+! ios = 0  otherwise
 
       if (ios /= 0) exit
 
-      ! Split an input string
+! Split an input string
       if (.not. get_tokens(buffer, ntokens, tokens)) then
         call error_message(file_name, line_number, buffer, "unpaired curly braces")
       else
@@ -141,7 +142,7 @@ contains
         elseif (get_index(tokens(1),lat_site_names) /= 0) then
 
           if (parse_state /= parse_state_adsorption) then
-            ! print *, 'parse_state: ', parse_state
+! print *, 'parse_state: ', parse_state
             call error_message(file_name, line_number, buffer, "invalid site type statement")
           end if
 
@@ -207,10 +208,10 @@ contains
             energy_parameters_init%int_energy_law_id(i1,i1s,i1a,i2,i2s,i2a) = i_law
             energy_parameters_init%int_energy_law_id(i2,i2s,i2a,i1,i1s,i1a) = i_law
 
-            ! Loop over interaction shells
+! Loop over interaction shells
             do i=8,ntokens
 
-              ! Neighbor-specific interaction parameters
+! Neighbor-specific interaction parameters
               if (tokens(i)(1:1) == '{') then
 
                 if (.not.get_tokens(tokens(i)(2:len_trim(tokens(i))-1), ntoks, toks)) then
@@ -232,26 +233,26 @@ contains
                   end do
                 end if
 
-              ! Take '-' or '*' as a dummy token
+! Take '-' or '*' as a dummy token
               elseif (len_trim(tokens(i)) == 1 .and. &
                       (tokens(i)(1:1) == '-' .or. tokens(i)(1:1) == '*') ) then
                 cycle
 
-              ! Common interaction parameter for all neighbors  
+! Common interaction parameter for all neighbors
               else
                 if (read_num(tokens(i), temp_dp)) then
                   energy_parameters_init%int_energy_skip(i1,i1s,i1a,i2,i2s,i2a,i-7) = .false.
                   energy_parameters_init%int_energy_pars(i1,i1s,i1a,i2,i2s,i2a,i-7,:) = temp_dp
-                  ! Symmetrize interaction parameters
-                  !energy_parameters_init%int_energy_pars(i2,i2s,i2a,i1,i1s,i1a,i-7,:) = &
-                  !  energy_parameters_init%int_energy_pars(i1,i1s,i1a,i2,i2s,i2a,i-7,:)
+! Symmetrize interaction parameters
+!energy_parameters_init%int_energy_pars(i2,i2s,i2a,i1,i1s,i1a,i-7,:) = &
+!  energy_parameters_init%int_energy_pars(i1,i1s,i1a,i2,i2s,i2a,i-7,:)
                 else
                   call error_message(file_name, line_number, buffer, &
                               "common interaction parameter must be a number")
                 end if
               end if
 
-              ! Symmetrize interaction enerty skip flag
+! Symmetrize interaction enerty skip flag
               energy_parameters_init%int_energy_skip(i2,i2s,i2a,i1,i1s,i1a,i-7) = &
                 energy_parameters_init%int_energy_skip(i1,i1s,i1a,i2,i2s,i2a,i-7)
             end do ! i=8,ntokens
@@ -274,7 +275,7 @@ contains
     energy_parameters_init%is_interaction = &
               any(.not.energy_parameters_init%int_energy_skip)
 
-    ! Check the input consistency
+! Check the input consistency
     do i1 =1,control_pars%n_species
     do i1s=1,n_max_lat_site_types
     do i1a=1,n_max_ads_sites
