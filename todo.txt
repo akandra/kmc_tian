@@ -1,19 +1,10 @@
 do not forget to correct pptx diagrams for barrier corrections!
 
-2025-08-22 :
-    get rid of neighbor shell-specific fields in lat class
-
 2025-08-18 :
     consider writing output on event (when state of the lattice changed)
 
-2025-08-13 mc_lat_class.f90:
-    consider to move neighbor lists to constants module
-
 2025-07-31 :
     consider using several rate and energy files in the same simulation
-
-2025-07-31 :
-    put 'end' as a section marker for energy files
 
 2025-07-31 :
     consider writing penultimate info into all output files in sake of consistency
@@ -22,11 +13,7 @@ do not forget to correct pptx diagrams for barrier corrections!
     improve keeping the penultimate configuration for the output by using the penultimate index
     instead of direct copying the content of ads_list and n_ads
 
-2025-07-17 rates_hopping_class.f90:
-    it looks like compiler has problems with allocatable of allocatables.
-    Check that. See the Warning  in do_reaction subroutine
-
-2025-07-15 :
+*2025-07-15 :
     add the interaction energy for products into rcic in the following reaction classes:
       - association
       - dissociation
@@ -44,8 +31,10 @@ do not forget to correct pptx diagrams for barrier corrections!
 
 2025-07-04 :
     deal with '!dja' comments all over the code
+
 2025-07-03 :
     save the final state independent of the time binning
+
 2025-07-01 rates_hopping_class.f90:
     simplify the parsing of local rct and rcic law ids and parameters
 
@@ -58,10 +47,6 @@ do not forget to correct pptx diagrams for barrier corrections!
 2025-06-30 checks_mod.f90:
     figure out what function check_nn_new_list does:
       presumably, it is checking double counting of nn after the hope.
-
-2025-06-30 :
-    make a code work with gfortran
-        - use iso_fortran_env is not working
 
 2025-06-27 :
     add additional run info in the output banner
@@ -76,4 +61,19 @@ do not forget to correct pptx diagrams for barrier corrections!
 2025-06-27 control_parameters_class.f90:
     unify reading of control and energy parameters by introducing
     function read_value(string, expected type, expected_property, output)
+
+
+--------------------------------------------------------------------
+done
+--------------------------------------------------------------------
+
+2025-08-13 mc_lat_class.f90:
+    consider to move neighbor lists to constants module
+
+2025-07-31 :
+    put 'end' as a section marker for energy files
+
+2025-06-30 :
+    make a code work with gfortran
+        - use iso_fortran_env is not working
 

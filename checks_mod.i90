@@ -1,3 +1,4 @@
+# 1 "/home/akandra/git/kmc_tian/checks_mod.f90"
 module checks
 
 use constants
@@ -59,7 +60,7 @@ subroutine check_nn_new_list(lat,c_pars)
 
     do i=1, lat%n_nn(lst,1)
 
-      ! Put another adsorbate into a new site
+! Put another adsorbate into a new site
       lat%occupations(pos_nn(i+1,1),pos_nn(i+1,2)) = i+1
       lat%ads_list(i+1)%id  = 1
       lat%ads_list(i+1)%row = pos_nn(i+1,1)
@@ -152,11 +153,11 @@ subroutine check_neighbor_lists(lat, c_pars)
         do nn1=1, lat%n_nn(lst1,shell)
           write(6,'(A,i3)',advance='no') '    for nn ', nn1
     
-          ! Get the column and lst of the neighbor with pbc
+! Get the column and lst of the neighbor with pbc
           col2 = modulo(col1 + lat%shell_list(lst1, shell, nn1, 2) - 1, lat%n_cols) + 1
           lst2 = lat%lst(1,col2)
 
-          ! Find the reciprocal neighbor
+! Find the reciprocal neighbor
           nn_counter = 0
           do nn2=1, lat%n_nn(lst2,shell)
             if (all( lat%shell_list(lst2,shell,nn2,:) == -lat%shell_list(lst1,shell,nn1,:))) then
