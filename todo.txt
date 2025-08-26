@@ -1,5 +1,8 @@
 do not forget to correct pptx diagrams for barrier corrections!
 
+2025-08-26 :
+    consider writing a python script which would produce a neighbor lists etc.
+
 2025-08-18 :
     consider writing output on event (when state of the lattice changed)
 

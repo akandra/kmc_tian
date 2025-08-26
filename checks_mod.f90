@@ -136,41 +136,37 @@ subroutine check_neighbor_lists(lat, c_pars)
   type(control_parameters), intent(in) :: c_pars
 
   integer :: col1, col2
-  integer :: lst1, lst2, shell, nn1, nn2, nn_counter
+  integer :: lst1, lst2, shell1, shell2, nn1, nn2, nn_counter
   logical :: all_is_okay = .true.
 
   write(6,*)
-  write(6,'(A)') ' Checking neighbor lists consistency...'
-
+  
     do col1=1, c_pars%step_period
       lst1 = lat%lst(1,col1)
       write(6,'(2A)') '  Checking neighbors for ', lat_site_names(lst1)
 
-      do shell=1, n_shells
-        write(6,'(A,i2)') '   shell ', shell
+      do shell1=1, n_shells
 
-        do nn1=1, lat%n_nn(lst1,shell)
-          write(6,'(A,i3)',advance='no') '    for nn ', nn1
+        do nn1=1, lat%n_nn(lst1,shell1)
+          write(6,'(3A,i1,A,i1)',advance='no') '    for ', lat_site_names(lst1), ' #',  nn1, ' in shell ', shell1
     
           ! Get the column and lst of the neighbor with pbc
-          col2 = modulo(col1 + lat%shell_list(lst1, shell, nn1, 2) - 1, lat%n_cols) + 1
+          col2 = modulo(col1 + lat%shell_list(lst1, shell1, nn1, 2) - 1, lat%n_cols) + 1
           lst2 = lat%lst(1,col2)
 
           ! Find the reciprocal neighbor
           nn_counter = 0
-          do nn2=1, lat%n_nn(lst2,shell)
-            if (all( lat%shell_list(lst2,shell,nn2,:) == -lat%shell_list(lst1,shell,nn1,:))) then
+          do shell2=1, n_shells
+          do nn2=1, lat%n_nn(lst2,shell2)
+            if (all( lat%shell_list(lst2,shell2,nn2,:) == -lat%shell_list(lst1,shell1,nn1,:))) then
               nn_counter = nn_counter + 1
-              write(6,'(2X,2A,i3,A)') lat_site_names(lst2), ' nn ', nn2, ' found'
+              write(6,'(2X,3A,i1,A,i1)') 'reciprocal neighbor is ', lat_site_names(lst2), ' #', nn2, ' in shell ', shell2
             end if
           end do
+          end do
 
-          if (nn_counter >  1) then
-            write(6,'(2X,A)') 'multiple neighbors found. Error!'
-            all_is_okay = .false.
-          end if
-          if (nn_counter == 0) then
-            write(6,'(2X,A)') 'no reciprocal neighbour found'
+          if (nn_counter /=  1) then
+            write(6,'(2X,i1,A)') nn_counter, ' reciprocal neighbors found. Error!'
             all_is_okay = .false.
           end if
           
