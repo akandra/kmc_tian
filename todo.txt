@@ -1,5 +1,11 @@
 do not forget to correct pptx diagrams for barrier corrections!
 
+2025-08-28 constants.f90:
+
+    bring the neighbor shell list in order 
+    (for example, by considering numbering neighbors clock-wise)
+    Pay particular attention to constructing nn shell lists for corner
+
 2025-08-26 :
     consider writing a python script which would produce a neighbor lists etc.
 
