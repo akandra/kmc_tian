@@ -2,7 +2,7 @@ cmake_minimum_required (VERSION 4.0)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)	# produce a json file with compiler options
 
-project (kmc_tian VERSION 1.3
+project (kmc_tian
 		 DESCRIPTION "kMC_tian project"
 		 LANGUAGES Fortran)
 # enable_language(Fortran)
@@ -31,15 +31,11 @@ if (CMAKE_Fortran_COMPILER_ID MATCHES "GNU")
  endif()
  
 if(CMAKE_Fortran_COMPILER_ID MATCHES "Intel")
-    set(CMAKE_Fortran_FLAGS_DEBUG "${CMAKE_Fortran_FLAGS_DEBUG} -g -traceback -check all")
     set(dialect "-stand f08 -free -implicitnone")
     set(bounds "-check bounds ")
-    set(cflags "-no-save-temps -nofpp -O2")
+    set(CMAKE_Fortran_FLAGS_DEBUG   "-g -traceback -check all ${bounds} ${dialect}")
+    set(CMAKE_Fortran_FLAGS_RELEASE " -O2 -no-save-temps -nofpp  ${dialect}")
 endif()
-
-set(CMAKE_Fortran_FLAGS_DEBUG "${CMAKE_Fortran_FLAGS_DEBUG} ${bounds}")
-set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} ${dialect}")
-
 
 # Get information from GIT if available
 find_package(Git)
