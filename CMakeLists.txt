@@ -34,7 +34,7 @@ if(CMAKE_Fortran_COMPILER_ID MATCHES "Intel")
     set(CMAKE_Fortran_FLAGS_DEBUG "${CMAKE_Fortran_FLAGS_DEBUG} -g -traceback -check all")
     set(dialect "-stand f08 -free -implicitnone")
     set(bounds "-check bounds ")
-    set(cflags "-no-save-temps -O")
+    set(cflags "-no-save-temps -nofpp -O2")
 endif()
 
 set(CMAKE_Fortran_FLAGS_DEBUG "${CMAKE_Fortran_FLAGS_DEBUG} ${bounds}")
