@@ -17,14 +17,20 @@ module energy_parameters_class
     ! Interaction energy law id (n_species x n_site_type x n_adsorption_sites x 
     !                            n_species x n_site_type x n_adsorption_sites)
     integer, dimension(:,:,:,:,:,:), allocatable :: int_energy_law_id
+    integer, dimension(:,:,:,:,:,:), allocatable :: n_interactions
 
     ! Interaction energy (n_species x n_site_type x n_adsorption_sites x 
     !                     n_species x n_site_type x n_adsorption_sites x n_shells x max_n_neighbors )
-    real(dp), dimension(:,:,:,:,:,:,:,:),allocatable :: int_energy_pars
+    !real(dp), dimension(:,:,:,:,:,:,:,:),allocatable :: int_energy_pars
+
+    ! Interaction energy (n_species x n_site_type x n_adsorption_sites x 
+    !                     n_species x n_site_type x n_adsorption_sites x max_neighbors )
+    real(dp), dimension(:,:,:,:,:,:,:),  allocatable :: int_energy_pars
+    integer,  dimension(:,:,:,:,:,:,:,:),allocatable :: neighbor
 
     ! Interaction energy mask (n_species x n_species x n_shells)
     ! .true. means to skip interaction
-    logical, dimension(:,:,:,:,:,:,:),allocatable :: int_energy_skip
+    !logical, dimension(:,:,:,:,:,:,:),allocatable :: int_energy_skip
 
     logical :: is_interaction
     ! Species importance key (n_species)
@@ -67,27 +73,37 @@ contains
     logical :: first_warning = .true.
     integer,  parameter:: default_int = 0
     real(dp) :: temp_dp
+    integer  :: temp_int
 
     i = control_pars%n_species
     allocate(energy_parameters_init%ads_energy(i,n_max_lat_site_types,n_max_ads_sites))
     allocate(energy_parameters_init%int_energy_law_id(i,n_max_lat_site_types,n_max_ads_sites,&
                                                       i,n_max_lat_site_types,n_max_ads_sites))
-    allocate(energy_parameters_init%int_energy_pars(i,n_max_lat_site_types,n_max_ads_sites,&
-                                                    i,n_max_lat_site_types,n_max_ads_sites,n_shells,max_n_neighbors))
-    allocate(energy_parameters_init%int_energy_skip(i,n_max_lat_site_types,n_max_ads_sites,&
-                                                    i,n_max_lat_site_types,n_max_ads_sites,n_shells))
+    allocate(energy_parameters_init%n_interactions(i,n_max_lat_site_types,n_max_ads_sites,&
+                                                   i,n_max_lat_site_types,n_max_ads_sites))
+    !allocate(energy_parameters_init%int_energy_pars(i,n_max_lat_site_types,n_max_ads_sites,&
+    !                                                i,n_max_lat_site_types,n_max_ads_sites,n_shells,max_n_neighbors))
+    !allocate(energy_parameters_init%int_energy_skip(i,n_max_lat_site_types,n_max_ads_sites,&
+    !                                                i,n_max_lat_site_types,n_max_ads_sites,n_shells))
     allocate(energy_parameters_init%is_essential(i))
 
     energy_parameters_init%undefined_energy = huge(0.0_dp)
     energy_parameters_init%ads_energy = energy_parameters_init%undefined_energy
     energy_parameters_init%int_energy_law_id = default_int
-    energy_parameters_init%int_energy_pars = energy_parameters_init%undefined_energy
-    energy_parameters_init%int_energy_skip = .true.
+    energy_parameters_init%n_interactions    = 0
+    !energy_parameters_init%int_energy_pars = energy_parameters_init%undefined_energy
+    !energy_parameters_init%int_energy_skip = .true.
     energy_parameters_init%is_interaction  = .false.
     energy_parameters_init%is_essential    = .false.
 
     !  read energy definitions from the input file
     file_name = control_pars%energy_file_name
+
+!-------------------------------------------------------------------------------
+!   First pass of processing an .energy file:
+!     * define the maximal number of interactions and do allocation for int_energy_pars
+!     * check for parsing errors
+!-------------------------------------------------------------------------------
     call open_for_read(inp_unit, file_name )
 
     ios = 0
@@ -115,10 +131,102 @@ contains
           if (parse_state /= parse_state_default) &
             call error_message(file_name, line_number, buffer, &
                       "invalid ending of the adsorption/interaction section")
+
           parse_state = parse_state_adsorption
+
           if (ntokens/=2 .and. ntokens/=3) &
             call error_message(file_name, line_number, buffer, &
                       "adsorption key must have 1 or 2 parameters")
+
+        elseif (get_index(tokens(1),lat_site_names) /= 0) then
+
+          if (parse_state /= parse_state_adsorption) then
+            ! print *, 'parse_state: ', parse_state
+            call error_message(file_name, line_number, buffer, &
+                       "adsorption site definition outside of the adsorption section")
+          end if
+
+        elseif (tokens(1) == 'interaction') then
+
+          if (parse_state /= parse_state_default) &
+            call error_message(file_name, line_number, buffer, &
+                      "invalid ending of the adsorption/interaction section")
+
+          parse_state = parse_state_interaction
+
+          if (ntokens/=1) call error_message(file_name, line_number, buffer, &
+                            "interaction key must have no parameters")
+
+        elseif (get_index(tokens(1),int_law_names) /= 0) then
+
+          if (parse_state /= parse_state_interaction) &
+            call error_message(file_name, line_number, buffer, &
+                      "interaction law statement is outside of the interaction section")
+
+        elseif (read_int(tokens(1), temp_int)) then
+
+          if (parse_state /= parse_state_interaction) &
+            call error_message(file_name, line_number, buffer, &
+                      "line starts with an integer outside of the interaction section")
+
+          energy_parameters_init%n_interactions(i1,i1s,i1a,i2,i2s,i2a) = &
+               energy_parameters_init%n_interactions(i1,i1s,i1a,i2,i2s,i2a) + 1
+
+        elseif (tokens(1) == section_end) then
+
+          parse_state = parse_state_default
+
+        else
+
+!            print*, 'unprocessed line: ', trim(buffer)
+          call error_message(file_name, line_number, buffer, "unknown key")
+
+        end if
+      end if ! get_tokens
+    end do ! while ios=0
+
+    close(inp_unit)
+
+    allocate(energy_parameters_init%int_energy_pars(i,n_max_lat_site_types,n_max_ads_sites,&
+                                                    i,n_max_lat_site_types,n_max_ads_sites,&
+                                                  maxval(energy_parameters_init%n_interactions)))
+    allocate(energy_parameters_init%neighbor(       i,n_max_lat_site_types,n_max_ads_sites,&
+                                                    i,n_max_lat_site_types,n_max_ads_sites,&
+                                                  maxval(energy_parameters_init%n_interactions),2))
+    
+    energy_parameters_init%int_energy_pars = 0.0_dp
+    energy_parameters_init%neighbor = 0
+    
+!-------------------------------------------------------------------------------
+!   Second pass of processing an .energy file:
+!     * build the energy parameters structure
+!-------------------------------------------------------------------------------
+
+    call open_for_read(inp_unit, file_name )
+
+    ios = 0
+    parse_state = parse_state_default
+    line_number = 0
+
+    do while (ios == 0)
+
+      read(inp_unit, '(A)', iostat=ios) buffer
+      line_number = line_number + 1
+        ! ios < 0: end of record condition encountered or endfile condition detected
+        ! ios > 0: an error is detected
+        ! ios = 0  otherwise
+
+      if (ios /= 0) exit
+
+      ! Split an input string
+      if (.not. get_tokens(buffer, ntokens, tokens)) then
+        call error_message(file_name, line_number, buffer, "unpaired curly braces")
+      else
+        if (ntokens == 0) cycle ! skip empty lines
+
+        if (tokens(1) =='adsorption') then
+
+          parse_state = parse_state_adsorption
 
           read(tokens(2),'(A)') current_species_name
           current_species_id = get_index(current_species_name, control_pars%ads_names )
@@ -140,12 +248,6 @@ contains
 
         elseif (get_index(tokens(1),lat_site_names) /= 0) then
 
-          if (parse_state /= parse_state_adsorption) then
-            ! print *, 'parse_state: ', parse_state
-            call error_message(file_name, line_number, buffer, "invalid site type statement")
-          end if
-
-
           i1 = get_index(tokens(1),lat_site_names)
           i2 = get_index(tokens(2),ads_site_names)
 
@@ -158,32 +260,22 @@ contains
           if (energy_parameters_init%ads_energy(current_species_id,i1,i2 ) /= energy_parameters_init%undefined_energy)&
               call error_message(file_name, line_number, buffer, "duplicated entry")
 
-          read(tokens(3),*) energy_parameters_init%ads_energy(current_species_id,i1,i2 )
-!              print*, 'species  ' ,current_species_id, &
-!                      'site     ' ,get_index(tokens(1),lat_site_names),&
-!                      'ads_site ' ,get_index(tokens(2),ads_site_names)
-!              print*, 'energy:  ' ,energy_parameters_init%ads_energy&
-!                                    (current_species_id,&
-!                                     get_index(tokens(1),lat_site_names),&
-!                                     get_index(tokens(2),ads_site_names) )
+          if (read_num(tokens(3), temp_dp)) then
+            energy_parameters_init%ads_energy(current_species_id,i1,i2 ) = temp_dp
+          else
+            call error_message(file_name, line_number, buffer, &
+                        "adsorption energy must be a number")
+          end if
 
         elseif (tokens(1) == 'interaction') then
 
-          if (parse_state /= parse_state_default) &
-            call error_message(file_name, line_number, buffer, &
-                      "invalid ending of the adsorption/interaction section")
           parse_state = parse_state_interaction
-          if (ntokens/=1) call error_message(file_name, line_number, buffer, &
-                            "interaction key must have no parameters")
 
         elseif (get_index(tokens(1),int_law_names) /= 0) then
 
-          if (parse_state /= parse_state_interaction) &
+          if (ntokens /= 7) then
             call error_message(file_name, line_number, buffer, &
-                      "invalid interaction law statement")
-          if (ntokens /= 7+n_shells) then
-            call error_message(file_name, line_number, buffer, &
-                            "interaction law key must have (7 + n_shells) sets of parameters")
+                            "interaction law key must have 7 parameters")
           else
 
             i_law = get_index(tokens(1),int_law_names)
@@ -207,57 +299,46 @@ contains
             energy_parameters_init%int_energy_law_id(i1,i1s,i1a,i2,i2s,i2a) = i_law
             energy_parameters_init%int_energy_law_id(i2,i2s,i2a,i1,i1s,i1a) = i_law
 
-            ! Loop over interaction shells
-            do i=8,ntokens
+            do n=1,energy_parameters_init%n_interactions(i1,i1s,i1a,i2,i2s,i2a)
 
-              ! Neighbor-specific interaction parameters
-              if (tokens(i)(1:1) == '{') then
+              read(inp_unit, '(A)', iostat=ios) buffer
+              ! Split an input string
+              if (get_tokens(buffer, ntokens, tokens)) then
+                if (ntokens /= 3) &
+                  call error_message(file_name, line_number, buffer, &
+                              "neighbor interaction line must have 3 parameters")
 
-                if (.not.get_tokens(tokens(i)(2:len_trim(tokens(i))-1), ntoks, toks)) then
-                  call error_message(file_name, line_number, buffer, &
-                              "unpaired curly braces in interaction parameters")
-                elseif (ntoks == 0 .or. ntoks > max_n_neighbors) then
-                  call error_message(file_name, line_number, buffer, &
-                              "wrong number of neighbor-specific interaction parameters")
+                if (read_int(tokens(1),temp_int)) then
+                  energy_parameters_init%neighbor(i1,i1s,i1a,i2,i2s,i2a,n,1) = temp_int
                 else
-                  do nn=1,ntoks
-                    if (.not.read_num(toks(nn), temp_dp)) then
-                      call error_message(file_name, line_number, buffer, &
-                              "neighbor-specific interaction parameters must be numbers")
-                    else
-                      energy_parameters_init%int_energy_skip(i1,i1s,i1a,i2,i2s,i2a,i-7) = .false.
-                      energy_parameters_init%int_energy_pars(i1,i1s,i1a,i2,i2s,i2a,i-7,nn) = temp_dp
-
-                    end if
-                  end do
+                  call error_message(file_name, line_number, buffer, &
+                              "1st neighbor direction must be an integer")
                 end if
 
-              ! Take '-' or '*' as a dummy token
-              elseif (len_trim(tokens(i)) == 1 .and. &
-                      (tokens(i)(1:1) == '-' .or. tokens(i)(1:1) == '*') ) then
-                cycle
+                if (read_int(tokens(2),temp_int)) then
+                  energy_parameters_init%neighbor(i1,i1s,i1a,i2,i2s,i2a,n,2) = temp_int
+                else
+                  call error_message(file_name, line_number, buffer, &
+                              "2nd neighbor direction must be an integer")
+                end if
 
-              ! Common interaction parameter for all neighbors  
+                if (read_num(tokens(3),temp_dp)) then
+                  energy_parameters_init%int_energy_pars(i1,i1s,i1a,i2,i2s,i2a,n) = temp_dp
+                else
+                  call error_message(file_name, line_number, buffer, &
+                              "interaction energy must be a number")
+                end if
+
               else
-                if (read_num(tokens(i), temp_dp)) then
-                  energy_parameters_init%int_energy_skip(i1,i1s,i1a,i2,i2s,i2a,i-7) = .false.
-                  energy_parameters_init%int_energy_pars(i1,i1s,i1a,i2,i2s,i2a,i-7,:) = temp_dp
-                  ! Symmetrize interaction parameters
-                  !energy_parameters_init%int_energy_pars(i2,i2s,i2a,i1,i1s,i1a,i-7,:) = &
-                  !  energy_parameters_init%int_energy_pars(i1,i1s,i1a,i2,i2s,i2a,i-7,:)
-                else
-                  call error_message(file_name, line_number, buffer, &
-                              "common interaction parameter must be a number")
-                end if
+                call error_message(file_name, line_number, buffer, "unpaired curly braces")
+
               end if
 
-              ! Symmetrize interaction enerty skip flag
-              energy_parameters_init%int_energy_skip(i2,i2s,i2a,i1,i1s,i1a,i-7) = &
-                energy_parameters_init%int_energy_skip(i1,i1s,i1a,i2,i2s,i2a,i-7)
-            end do ! i=8,ntokens
+            end do
 
           end if
 
+        
         elseif (tokens(1) == section_end) then
 
           parse_state = parse_state_default
@@ -270,6 +351,9 @@ contains
         end if
       end if ! get_tokens
     end do ! while ios=0
+
+
+    close(inp_unit)
 
     energy_parameters_init%is_interaction = &
               any(.not.energy_parameters_init%int_energy_skip)
