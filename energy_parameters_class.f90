@@ -20,17 +20,13 @@ module energy_parameters_class
     integer, dimension(:,:,:,:,:,:), allocatable :: n_interactions
 
     ! Interaction energy (n_species x n_site_type x n_adsorption_sites x 
-    !                     n_species x n_site_type x n_adsorption_sites x n_shells x max_n_neighbors )
-    !real(dp), dimension(:,:,:,:,:,:,:,:),allocatable :: int_energy_pars
-
-    ! Interaction energy (n_species x n_site_type x n_adsorption_sites x 
-    !                     n_species x n_site_type x n_adsorption_sites x max_neighbors )
+    !                     n_species x n_site_type x n_adsorption_sites x max_n_neighbors )
     real(dp), dimension(:,:,:,:,:,:,:),  allocatable :: int_energy_pars
-    integer,  dimension(:,:,:,:,:,:,:,:),allocatable :: neighbor
 
-    ! Interaction energy mask (n_species x n_species x n_shells)
-    ! .true. means to skip interaction
-    !logical, dimension(:,:,:,:,:,:,:),allocatable :: int_energy_skip
+    ! List of directions to neighbors 
+    !                    (n_species x n_site_type x n_adsorption_sites x 
+    !                     n_species x n_site_type x n_adsorption_sites x max_n_neighbors x 2)
+    integer,  dimension(:,:,:,:,:,:,:,:),allocatable :: neighbor
 
     logical :: is_interaction
     ! Species importance key (n_species)
@@ -55,7 +51,7 @@ contains
 
     type(control_parameters), intent(inout) :: control_pars
 
-    integer :: i, ios, line_number, i1, i1s, i1a, i2, i2s, i2a, i_law
+    integer :: i, ios, line_number, i1, i1s, i1a, i2, i2s, i2a, i_law, n
 
     character(len=max_string_length) :: buffer
     character(len=max_string_length), allocatable :: tokens(:), toks(:)
@@ -81,10 +77,6 @@ contains
                                                       i,n_max_lat_site_types,n_max_ads_sites))
     allocate(energy_parameters_init%n_interactions(i,n_max_lat_site_types,n_max_ads_sites,&
                                                    i,n_max_lat_site_types,n_max_ads_sites))
-    !allocate(energy_parameters_init%int_energy_pars(i,n_max_lat_site_types,n_max_ads_sites,&
-    !                                                i,n_max_lat_site_types,n_max_ads_sites,n_shells,max_n_neighbors))
-    !allocate(energy_parameters_init%int_energy_skip(i,n_max_lat_site_types,n_max_ads_sites,&
-    !                                                i,n_max_lat_site_types,n_max_ads_sites,n_shells))
     allocate(energy_parameters_init%is_essential(i))
 
     energy_parameters_init%undefined_energy = huge(0.0_dp)
@@ -299,6 +291,17 @@ contains
             energy_parameters_init%int_energy_law_id(i1,i1s,i1a,i2,i2s,i2a) = i_law
             energy_parameters_init%int_energy_law_id(i2,i2s,i2a,i1,i1s,i1a) = i_law
 
+            if (energy_parameters_init%n_interactions(i1,i1s,i1a,i2,i2s,i2a) > 0) then
+              if (energy_parameters_init%n_interactions(i2,i2s,i2a,i1,i1s,i1a) == 0) then
+                energy_parameters_init%n_interactions(i2,i2s,i2a,i1,i1s,i1a) = &
+                     energy_parameters_init%n_interactions(i1,i1s,i1a,i2,i2s,i2a)
+              else
+                call error_message(file_name, line_number, buffer, &
+                            "duplicated entry in the interaction section",)
+              end if
+
+            end if
+
             do n=1,energy_parameters_init%n_interactions(i1,i1s,i1a,i2,i2s,i2a)
 
               read(inp_unit, '(A)', iostat=ios) buffer
@@ -309,14 +312,18 @@ contains
                               "neighbor interaction line must have 3 parameters")
 
                 if (read_int(tokens(1),temp_int)) then
-                  energy_parameters_init%neighbor(i1,i1s,i1a,i2,i2s,i2a,n,1) = temp_int
+                  energy_parameters_init%neighbor(i1,i1s,i1a,i2,i2s,i2a,n,1) =  temp_int
+                  ! Reverse direction for the opposite interaction
+                  energy_parameters_init%neighbor(i2,i2s,i2a,i1,i1s,i1a,n,1) = -temp_int
                 else
                   call error_message(file_name, line_number, buffer, &
                               "1st neighbor direction must be an integer")
                 end if
 
                 if (read_int(tokens(2),temp_int)) then
-                  energy_parameters_init%neighbor(i1,i1s,i1a,i2,i2s,i2a,n,2) = temp_int
+                  energy_parameters_init%neighbor(i1,i1s,i1a,i2,i2s,i2a,n,2) =  temp_int
+                  ! Reverse direction for the opposite interaction
+                  energy_parameters_init%neighbor(i2,i2s,i2a,i1,i1s,i1a,n,2) = -temp_int
                 else
                   call error_message(file_name, line_number, buffer, &
                               "2nd neighbor direction must be an integer")
@@ -324,6 +331,8 @@ contains
 
                 if (read_num(tokens(3),temp_dp)) then
                   energy_parameters_init%int_energy_pars(i1,i1s,i1a,i2,i2s,i2a,n) = temp_dp
+                  ! Symmetric interaction energy for the opposite interaction
+                  energy_parameters_init%int_energy_pars(i2,i2s,i2a,i1,i1s,i1a,n) = temp_dp
                 else
                   call error_message(file_name, line_number, buffer, &
                               "interaction energy must be a number")
@@ -334,6 +343,9 @@ contains
 
               end if
 
+              if ( all(energy_parameters_init%neighbor(i1,i1s,i1a,i2,i2s,i2a,n,:)==0) ) &
+                error_message(file_name, line_number, buffer, &
+                              "invalid neighbor direction (0,0)" )
             end do
 
           end if

@@ -1,5 +1,14 @@
 do not forget to correct pptx diagrams for barrier corrections!
 
+2025-09-03 :
+
+    consider to define a type with fields: (species, lst, ast). It should simplify a lot
+    the argument lists for many subroutines and functons
+
+2025-09-03 mc_lat_class.f90:
+
+    consider to intoduce v_list for LSTs
+
 2025-08-28 constants.f90:
 
     bring the neighbor shell list in order 

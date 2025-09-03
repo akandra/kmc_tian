@@ -145,7 +145,7 @@ subroutine check_neighbor_lists(lat, c_pars)
       lst1 = lat%lst(1,col1)
       write(6,'(2A)') '  Checking neighbors for ', lat_site_names(lst1)
 
-      do shell1=1, n_shells
+      do shell1=1, 1
 
         do nn1=1, lat%n_nn(lst1,shell1)
           write(6,'(3A,i1,A,i1)',advance='no') '    for ', lat_site_names(lst1), ' #',  nn1, ' in shell ', shell1
@@ -156,7 +156,7 @@ subroutine check_neighbor_lists(lat, c_pars)
 
           ! Find the reciprocal neighbor
           nn_counter = 0
-          do shell2=1, n_shells
+          do shell2=1, 1
           do nn2=1, lat%n_nn(lst2,shell2)
             if (all( lat%shell_list(lst2,shell2,nn2,:) == -lat%shell_list(lst1,shell1,nn1,:))) then
               nn_counter = nn_counter + 1

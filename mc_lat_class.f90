@@ -40,7 +40,7 @@ module mc_lat_class
     ! lattice vectors
     real(dp), dimension(2) :: lat_vec_1, lat_vec_2
     ! shellwise number of neighbors
-    integer, dimension(n_max_lat_site_types,n_shells) :: n_nn
+    integer, dimension(n_max_lat_site_types,1) :: n_nn
     integer, dimension(:,:,:,:), allocatable  :: shell_list
     ! List and number of additional nn directions to scan after reaction
     integer, dimension(:,:,:), allocatable :: nn_new
@@ -60,6 +60,7 @@ module mc_lat_class
       procedure :: print_ads  => mc_lat_print_ads
       procedure :: hop        => mc_lat_hop_with_pbc
       procedure :: neighbor   => mc_lat_neighbor_with_pbc
+      procedure :: neighbor2  => mc_lat_neighbor_with_pbc_2
       procedure :: adjacent   => mc_lat_adjacent
       procedure :: distance   => mc_lat_distance_with_pbc
       procedure :: n_ads_tot  => mc_lat_n_ads_total
@@ -69,7 +70,6 @@ module mc_lat_class
       procedure :: conf_init  => mc_lat_conf_init
       procedure, nopass, public :: mc_lat_init
       procedure :: update_neighbors
-      procedure :: symmetrize_interaction_parameters
 
   end type mc_lat
 
@@ -109,7 +109,7 @@ contains
 
     lat%n_max_nn = max_n_neighbors
 
-    allocate(lat%shell_list(n_max_lat_site_types, n_shells, maxval(lat%n_nn), 2))
+    allocate(lat%shell_list(n_max_lat_site_types, 1, maxval(lat%n_nn), 2))
 
     ! get nn shell lists LSTs
 
@@ -641,6 +641,7 @@ contains
 
 ! ---------------------------------------------------------------------
 ! Subroutine finding  position of neighbor accounting for PBCs
+!   NB: we need this subroutine for finding neighbors when hopping
 ! ---------------------------------------------------------------------
   subroutine mc_lat_neighbor_with_pbc(this,i,ihop, row, col, shell)
 
@@ -659,6 +660,26 @@ contains
     if (present(shell)) ishell = shell
     row = modulo(row_old + this%shell_list(this%lst(row_old,col_old),ishell,ihop,1) - 1, this%n_rows) + 1
     col = modulo(col_old + this%shell_list(this%lst(row_old,col_old),ishell,ihop,2) - 1, this%n_cols) + 1
+
+  end subroutine
+
+! ---------------------------------------------------------------------
+! Subroutine finding  position of neighbor accounting for PBCs
+! without appealing to shells
+! ---------------------------------------------------------------------
+  subroutine mc_lat_neighbor_with_pbc_2(this,i,direction, row, col)
+
+    class(mc_lat), intent(in) :: this
+    integer, intent(in)  :: i, direction(2)
+    integer, intent(out) :: row, col
+
+    integer :: row_old, col_old
+
+    row_old = this%ads_list(i)%row
+    col_old = this%ads_list(i)%col
+
+    row = modulo(row_old + direction(1) - 1, this%n_rows) + 1
+    col = modulo(col_old + direction(2) - 1, this%n_cols) + 1
 
   end subroutine
 
@@ -1024,108 +1045,49 @@ contains
   end subroutine
 
 !-----------------------------------------------------------------------------
-  subroutine update_neighbors(this, rate_update_q, ads, lst)
+  subroutine update_neighbors(this, c_pars, e_pars, rate_update_q, ads, lst1)
 !-----------------------------------------------------------------------------
 
     class(mc_lat),            intent(in)        :: this
+    type(control_parameters), intent(in) :: c_pars
+    type(energy_parameters ), intent(in) :: e_pars
     logical, dimension(:),    intent(inout)     :: rate_update_q
     integer,                  intent(in)        :: ads
-    integer,                  intent(in)        :: lst
+    integer,                  intent(in)        :: lst1
 
-    integer:: shell, m, row, col
+    integer:: species1, species2, lst2, ast1, ast2, i_ast1, i_ast2
+    integer:: m, row, col
 
-    do shell=1,n_shells
-      do m=1,this%n_nn(lst,shell)
-        ! position of neighbor m
-        call this%neighbor(ads,m,row,col,shell)
-        if (this%occupations(row,col) > 0) then
-          rate_update_q( this%occupations(row,col) ) = .true.
-        end if
+    species1 = this%ads_list(ads)%id
+
+    do i_ast1=1,size(lat%avail_ads_sites(species,lst1)%list)
+
+      ast1 = this%avail_ads_sites(species1,lst1)%list(i_ast1)
+      do species2=1,c_pars%n_species
+      do lst2=1,n_max_lat_site_types
+      do i_ast2=1,size(lat%avail_ads_sites(species2,lst2)%list)
+        
+        ast2 = this%avail_ads_sites(species2,lst2)%list(i_ast2)
+
+        do n =1,e_pars%n_interactions(species1, lst1, ast1, &
+                                      species2, lst2, ast2)
+
+          direction = e_pars%neighbors(species1, lst1, ast1, &
+                                       species2, lst2, ast2, n, :)
+          call this%neighbor2(ads, direction, row, col)
+
+          if (lat%occupations(row,col) > 0) then
+            rate_update_q( this%occupations(row,col) ) = .true.
+          end if
+
+        end do
+
+      end do 
       end do
+      end do
+
     end do
 
   end subroutine update_neighbors
-
-!-----------------------------------------------------------------------------
-  subroutine symmetrize_interaction_parameters(this, c_pars, e_pars)
-!-----------------------------------------------------------------------------
-
-    class(mc_lat),            intent(in)    :: this
-    type(control_parameters), intent(in)    :: c_pars
-    type(energy_parameters),  intent(inout) :: e_pars
-
-
-    integer :: i1, i1s, i1a, i2, i2s, i2a, shell, nn1, nn2
-    integer :: ast1, ast2
-
-    if (debug(9)) then
-      print*
-      print*, '------- mc_lat symmetrize_interaction_parameters subroutine reporting:'
-    end if
-
-    do i1= 1,    c_pars%n_species
-    do i2= 1, c_pars%n_species
-    do i1s=1, n_max_lat_site_types
-    do i1a=1, size( this%avail_ads_sites(i1,i1s)%list )
-    do i2s=1, n_max_lat_site_types
-    do i2a=1, size( this%avail_ads_sites(i2,i2s)%list )
-
-      ast1 = this%avail_ads_sites(i1,i1s)%list(i1a)
-      ast2 = this%avail_ads_sites(i2,i2s)%list(i2a)
-
-      if (debug(9) .and. e_pars%int_energy_law_id(i1,i1s,ast1,i2,i2s,ast2) > 0  ) then
-        print*, ' int. law: ', &
-          e_pars%int_energy_law_id(i1,i1s,ast1,&
-                                   i2,i2s,ast2)
-        print*,  '  for species 1: ', i1,c_pars%ads_names(i1), ' at ', lat_site_names(i1s), &
-                                      ads_site_names(ast1)
-        print*,  '      species 2: ', i2,c_pars%ads_names(i2), ' at ', lat_site_names(i2s), &
-                                      ads_site_names(ast2)
-      end if
-  
-      do shell=1, n_shells
-
-        do nn1=1, this%n_nn(i1s,shell)
-      
-          if (e_pars%int_energy_pars(i1,i1s,ast1,i2,i2s,ast2,shell,nn1) /= &
-              e_pars%undefined_energy) then
-
-            ! Find the the reciprocal neighbor in the direction opposite to nn1 -> nn2
-            do nn2=1, this%n_nn(i2s,shell)
-              if ( all( this%shell_list(i2s,shell,nn2,:) == - this%shell_list(i1s,shell,nn1,:) ) ) then
-                e_pars%int_energy_pars(i2,i2s,ast2,i1,i1s,ast1,shell,nn2) = &
-                  e_pars%int_energy_pars(i1,i1s,ast1,i2,i2s,ast2,shell,nn1)
-                if (debug(9)) then 
-                  print*, '  nn1: ', nn1,  this%shell_list(i1s,shell,nn1,:)
-                  print*, '  nn2: ', nn2,  this%shell_list(i2s,shell,nn2,:)
-                end if
-                exit
-              end if
-            end do
-
-          end if
-
-        end do ! nn1
-
-        if (debug(9) .and. e_pars%int_energy_law_id(i1,i1s,ast1,i2,i2s,ast2) > 0 ) then
-          print*, '    int. pars: shell ', shell, ': '
-          print*,  e_pars%int_energy_pars(i1,i1s,ast1,i2,i2s,ast2,shell,1:this%n_nn(i1s,shell))
-          print*, '    symmetrized: '
-          print*,  e_pars%int_energy_pars(i2,i2s,ast2,i1,i1s,ast1,shell,1:this%n_nn(i2s,shell))
-          print'(A,I2,A,3L5)', 'int. skip: shell ', shell, ': ', &
-            e_pars%int_energy_skip(i1,i1s,ast1,i2,i2s,ast2,shell), &
-            e_pars%int_energy_skip(i2,i2s,ast2,i1,i1s,ast1,shell)
-        end if
-
-      end do ! shell
-
-    end do ! i2a
-    end do ! i2s
-    end do ! i2
-    end do ! i1a
-    end do ! i1s
-    end do ! i1
-
-  end subroutine symmetrize_interaction_parameters
 
 end module mc_lat_class

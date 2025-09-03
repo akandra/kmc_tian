@@ -36,10 +36,9 @@ end select
 ! Read simulation parameters
 c_pars = control_parameters_init(file_name_base)
 e_pars = energy_parameters_init(c_pars)
-!   initialize lattice
+
+! initialize lattice
 lat = mc_lat_init(c_pars, e_pars)
-! Symmetrize interaction parameters
-call lat%symmetrize_interaction_parameters(c_pars, e_pars)
 
 select case (c_pars%algorithm)
 
