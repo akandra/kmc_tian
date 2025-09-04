@@ -28,11 +28,6 @@ module energy_parameters_class
     !                     n_species x n_site_type x n_adsorption_sites x max_n_neighbors x 2)
     integer,  dimension(:,:,:,:,:,:,:,:),allocatable :: neighbor
 
-! DJA change 2025-09-03
-!   comment following lines
-!   logical :: is_interaction
-!    ! Species importance key (n_species)
-! END CHANGE
     logical, dimension(:), allocatable :: is_essential
 
     ! Default value for undefined energy
@@ -58,12 +53,8 @@ contains
 
     character(len=max_string_length) :: buffer
     
-! DJA Change 2025-09-03
-!   character(len=max_string_length), allocatable :: tokens(:), toks(:)
     character(len=max_string_length), allocatable :: tokens(:)
-!   integer :: ntokens, ntoks, nn
     integer :: ntokens
-! END Change
 
 
     character(len=len(trim(control_pars%energy_file_name))) :: file_name
@@ -76,11 +67,10 @@ contains
     integer           :: parse_state_adsorption   =1
     integer           :: parse_state_interaction  =2
 
-!DJA Change 2025-09-03 -- commented 1 line
-    ! logical :: first_warning = .true.
     integer,  parameter:: default_int = 0
     real(dp) :: temp_dp
     integer  :: temp_int
+    logical  :: error_found = .false.
 
     i = control_pars%n_species
     allocate(energy_parameters_init%ads_energy(i,n_max_lat_site_types,n_max_ads_sites))
@@ -94,13 +84,6 @@ contains
     energy_parameters_init%ads_energy = energy_parameters_init%undefined_energy
     energy_parameters_init%int_energy_law_id = default_int
     energy_parameters_init%n_interactions    = 0
-    !energy_parameters_init%int_energy_pars = energy_parameters_init%undefined_energy
-    !energy_parameters_init%int_energy_skip = .true.
-! DJA change 2025-09-03
-! comment following line
-    !energy_parameters_init%is_interaction  = .false.
-! END CHANGE
-    
     energy_parameters_init%is_essential    = .false.
 
     !  read energy definitions from the input file
@@ -129,7 +112,7 @@ contains
 
       ! Split an input string
       if (.not. get_tokens(buffer, ntokens, tokens)) then
-        call error_message(file_name, line_number, buffer, "unpaired curly braces")
+        call error_message(file_name, line_number, buffer, "malformed line")
       else
         if (ntokens == 0) cycle ! skip empty lines
 
@@ -160,6 +143,8 @@ contains
                       "invalid ending of the adsorption/interaction section")
 
           parse_state = parse_state_interaction
+          ! Prevent apperarance of interaction parameters before interaction law definition
+          i_law = 0
 
           if (ntokens/=1) call error_message(file_name, line_number, buffer, &
                             "interaction key must have no parameters")
@@ -170,18 +155,31 @@ contains
             call error_message(file_name, line_number, buffer, &
                       "interaction law statement is outside of the interaction section")
 
-!-------------------------------------------------------------------------------------------------------------------------------
-! DJA COMMENT - WARNING 2025-09-03
-!    I think we have to process the contents of the lines like
-!       linear O tc2 fcc NH3 ts2 top
-!    We need i1, i1s, i1a, i2, i2s, i2a to to the counting of n_interactions
-!    they are undefined at this point
-!
-!   Also I think there is a problem with using integer to trigger parsing line as an interaction with neghbors
-!     If the lines are out of order we won't be able to associate the interaction energies to the corect 
-!     i1, i1s, i1a, i2, i2s,i2a
-! ----------------------------------------------------------------------------------------------------------------------------------
+          if (ntokens /= 7) then
+            call error_message(file_name, line_number, buffer, &
+                            "interaction law key must have 7 parameters")
+          else
 
+            i_law = get_index(tokens(1),int_law_names)
+            i1    = get_index(tokens(2),control_pars%ads_names)
+            i1s   = get_index(tokens(3),lat_site_names)
+            i1a   = get_index(tokens(4),ads_site_names)
+            i2    = get_index(tokens(5),control_pars%ads_names)
+            i2s   = get_index(tokens(6),lat_site_names)
+            i2a   = get_index(tokens(7),ads_site_names)
+
+            if ( i1==0 .or. i2==0 ) call error_message(file_name, line_number, buffer, &
+                              "unknown species name in the interaction law")
+            if ( i1s==0 .or. i2s==0 ) &
+                call error_message(file_name, line_number, buffer, &
+                            "unknown lattice site type in the interaction section")
+            if ( i1a==0 .or. i2a==0 ) &
+                call error_message(file_name, line_number, buffer, &
+                            "unknown adsorption site type in the interaction section")
+            if (energy_parameters_init%int_energy_law_id(i1,i1s,i1a,i2,i2s,i2a) /= default_int)&
+                call error_message(file_name, line_number, buffer, "duplicated entry in the interaction section")
+
+          end if
 
         elseif (read_int(tokens(1), temp_int)) then
 
@@ -189,7 +187,11 @@ contains
             call error_message(file_name, line_number, buffer, &
                       "line starts with an integer outside of the interaction section")
 
-          energy_parameters_init%n_interactions(i1,i1s,i1a,i2,i2s,i2a) = &
+          if (i_law == 0) &
+            call error_message(file_name, line_number, buffer, &
+                      "line starts with an integer befor interaction law definition")
+
+                      energy_parameters_init%n_interactions(i1,i1s,i1a,i2,i2s,i2a) = &
                energy_parameters_init%n_interactions(i1,i1s,i1a,i2,i2s,i2a) + 1
 
         elseif (tokens(1) == section_end) then
@@ -240,7 +242,7 @@ contains
 
       ! Split an input string
       if (.not. get_tokens(buffer, ntokens, tokens)) then
-        call error_message(file_name, line_number, buffer, "unpaired curly braces")
+        call error_message(file_name, line_number, buffer, "malformed line")
       else
         if (ntokens == 0) cycle ! skip empty lines
 
@@ -293,11 +295,6 @@ contains
 
         elseif (get_index(tokens(1),int_law_names) /= 0) then
 
-          if (ntokens /= 7) then
-            call error_message(file_name, line_number, buffer, &
-                            "interaction law key must have 7 parameters")
-          else
-
             i_law = get_index(tokens(1),int_law_names)
             i1    = get_index(tokens(2),control_pars%ads_names)
             i1s   = get_index(tokens(3),lat_site_names)
@@ -306,16 +303,7 @@ contains
             i2s   = get_index(tokens(6),lat_site_names)
             i2a   = get_index(tokens(7),ads_site_names)
 
-            if ( i1==0 .or. i2==0 ) call error_message(file_name, line_number, buffer, &
-                              "unknown species name in the interaction law")
-            if ( i1s==0 .or. i2s==0 ) &
-                call error_message(file_name, line_number, buffer, &
-                            "unknown lattice site type in the interaction section")
-            if ( i1a==0 .or. i2a==0 ) &
-                call error_message(file_name, line_number, buffer, &
-                            "unknown adsorption site type in the interaction section")
-            if (energy_parameters_init%int_energy_law_id(i1,i1s,i1a,i2,i2s,i2a) /= default_int)&
-                call error_message(file_name, line_number, buffer, "duplicated entry in the interaction section")
+            ! Set the interaction law id symmetrically for interaction pairs
             energy_parameters_init%int_energy_law_id(i1,i1s,i1a,i2,i2s,i2a) = i_law
             energy_parameters_init%int_energy_law_id(i2,i2s,i2a,i1,i1s,i1a) = i_law
 
@@ -325,13 +313,9 @@ contains
                      energy_parameters_init%n_interactions(i1,i1s,i1a,i2,i2s,i2a)
               else
                 call error_message(file_name, line_number, buffer, &
-
-!-------------------------------------------------------------------------------
-! DJA change 2025-09-03
-!                           "duplicated entry in the interaction section",)
-                            "duplicated entry in the interaction section")
+                            "duplicated entry in the interaction section", stop=.false.)
+                error_found = .true.
               end if
-
             end if
 
             do n=1,energy_parameters_init%n_interactions(i1,i1s,i1a,i2,i2s,i2a)
@@ -371,21 +355,15 @@ contains
                 end if
 
               else
-                call error_message(file_name, line_number, buffer, "unpaired curly braces")
+                call error_message(file_name, line_number, buffer, "malformed line")
 
               end if
 
               if ( all(energy_parameters_init%neighbor(i1,i1s,i1a,i2,i2s,i2a,n,:)==0) ) &
-! DJA change 2025-09-03
-!---------------------------------------------------------------------              
-!               error_message(file_name, line_number, buffer, &
                 call error_message(file_name, line_number, buffer, &              
                               "invalid neighbor direction (0,0)" )
             end do
 
-          end if
-
-        
         elseif (tokens(1) == section_end) then
 
           parse_state = parse_state_default
@@ -399,49 +377,49 @@ contains
       end if ! get_tokens
     end do ! while ios=0
 
-
     close(inp_unit)
 
-! DJA change 2025-09-03
-! comment following 2 lines
-!   energy_parameters_init%is_interaction = &
-!             any(.not.energy_parameters_init%int_energy_skip)
-! END CHANGE
+    if (error_found) stop 'Errors in the interaction section of the energy file'
 
-! ATTENTION ATTENTION ATTENTION -- WORK NEEDED
-! DJA change 2025-09-03
-! Following needs to be rewritten make a check of whether interactions are defined for sites with undefined adsorption energy
-! Commented out to allow compile to complete
+    ! Check the input consistency
+    do i1 =1,control_pars%n_species
+    do i1s=1,n_max_lat_site_types
+    do i1a=1,n_max_ads_sites
+    do i2 =1,control_pars%n_species
+    do i2s=1,n_max_lat_site_types
+    do i2a=1,n_max_ads_sites
 
-!   I think this check can be done in the parsing of interactions section. Just check that adsorption energy is defined for 
-!   all sites involved in the interaction.
-!
-    ! ! Check the input consistency
-    ! do i1 =1,control_pars%n_species
-    ! do i1s=1,n_max_lat_site_types
-    ! do i1a=1,n_max_ads_sites
-    !   if (energy_parameters_init%ads_energy(i1,i1s,i1a) == energy_parameters_init%undefined_energy) then
-    !     do i2 =1,control_pars%n_species
-    !     do i2s=1,n_max_lat_site_types
-    !     do i2a=1,n_max_ads_sites
-    !       if (any(.not. energy_parameters_init%int_energy_skip(i1,i1s,i1a, i2,i2s,i2a, :))) then
-    !         if (first_warning) then
-    !           write(*,'(A)') ' Warning:'
-    !           write(*,'(A)') '    file: '//trim(file_name)
-    !           first_warning = .false.
-    !         end if
-    !         write(*,'(A)')   '    interaction section: adsorption energy for '//&
-    !                               trim(control_pars%ads_names(i1))//' '//&
-    !                               trim(lat_site_names(i1s))//' '//trim(ads_site_names(i1a))//' '//&
-    !                               'not defined'
-    !       end if
-    !     end do
-    !     end do
-    !     end do
-    !   end if
-    ! end do
-    ! end do
-    ! end do
+      if (energy_parameters_init%n_interactions(i1,i1s,i1a, i2,i2s,i2a) > 0 ) then
+  
+        if (energy_parameters_init%ads_energy(i1,i1s,i1a) == energy_parameters_init%undefined_energy) then
+          call error_message(file_name, 0, '', &
+                "interaction section: adsorption energy for "//&
+                trim(control_pars%ads_names(i1))//' '//&
+                trim(lat_site_names(i1s))//' '//trim(ads_site_names(i1a))//' '//&
+                "not defined", stop=.false.)
+          error_found = .true.
+        end if
+  
+        if (energy_parameters_init%ads_energy(i2,i2s,i2a) == energy_parameters_init%undefined_energy) then
+          call error_message(file_name, 0, '', &
+                "interaction section: adsorption energy for "//&
+                trim(control_pars%ads_names(i2))//' '//&
+                trim(lat_site_names(i2s))//' '//trim(ads_site_names(i2a))//' '//&
+                "not defined", stop=.false.)
+          error_found = .true.
+        end if
+  
+      end if
+
+    end do
+    end do
+    end do
+    end do
+    end do
+    end do
+
+    if (error_found) stop 'Errors in the energy input file'
+
 
   end function
 

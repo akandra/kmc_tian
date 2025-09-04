@@ -34,33 +34,29 @@ real(dp) function energy(ref, lat, c_pars, e_pars)
 
   energy_acc = e_pars%ads_energy(ref_species, ref_lst, ref_ast)
 
-  if (e_pars%is_interaction) then
+  do species=1,c_pars%n_species
+  do lst=1,n_max_lat_site_types
+  do i_ast=1,size(lat%avail_ads_sites(species,lst)%list)
+    
+    ast = lat%avail_ads_sites(species,lst)%list(i_ast)
+    do n =1,e_pars%n_interactions(ref_species, ref_lst, ref_ast, species, lst, ast)
 
-    do species=1,c_pars%n_species
-    do lst=1,n_max_lat_site_types
-    do i_ast=1,size(lat%avail_ads_sites(species,lst)%list)
-      
-      ast = this%avail_ads_sites(species,lst)%list(i_ast)
-      do n =1,e_pars%n_interactions(ref_species, ref_lst, ref_ast, species, lst, ast)
+      direction = e_pars%neighbor(ref_species, ref_lst, ref_ast, &
+                                      species,     lst,     ast, n, :)
+      call lat%neighbor2(ref, direction, row, col)
 
-        direction = e_pars%neighbors(ref_species, ref_lst, ref_ast, &
-                                        species,     lst,     ast, n, :)
-        call lat%neighbor2(ref, direction, row, col)
+      if (lat%occupations(row,col) > 0) then
 
-        if (lat%occupations(row,col) > 0) then
+        energy_acc = energy_acc + &
+          e_pars%int_energy_pars(ref_species, ref_lst, ref_ast,&
+                                      species,     lst,     ast,  n)
 
-          energy_acc = energy_acc + &
-            e_pars%int_energy_pars(ref_species, ref_lst, ref_ast,&
-                                        species,     lst,     ast,  n)
+      end if
 
-        end if
-
-      end do
     end do
-    end do
-    end do
-
-  end if
+  end do
+  end do
+  end do
 
   energy = energy_acc
 
@@ -90,34 +86,30 @@ real(dp) function total_energy(lat, c_pars, e_pars)
 
     energy_acc = energy_acc + e_pars%ads_energy(ref_species, ref_lst, ref_ast)
 
-    if (e_pars%is_interaction) then
+    do species=1,c_pars%n_species
+    do lst=1,n_max_lat_site_types
+    do i_ast=1,size(lat%avail_ads_sites(species,lst)%list)
+      ast = lat%avail_ads_sites(species,lst)%list(i_ast)
+      do n =1,e_pars%n_interactions(ref_species, ref_lst, ref_ast, species, lst, ast)
 
-      do species=1,c_pars%n_species
-      do lst=1,n_max_lat_site_types
-      do i_ast=1,size(lat%avail_ads_sites(species,lst)%list)
-        ast = this%avail_ads_sites(species,lst)%list(i_ast)
-        do n =1,e_pars%n_interactions(ref_species, ref_lst, ref_ast, species, lst, ast)
+        ast = lat%avail_ads_sites(species,lst)%list(i_ast)
+        direction = e_pars%neighbor(ref_species, ref_lst, ref_ast, &
+                                        species,     lst,     ast, n, :)
+        call lat%neighbor2(ref, direction, row, col)
 
-          ast = this%avail_ads_sites(species,lst)%list(i_ast)
-          direction = e_pars%neighbors(ref_species, ref_lst, ref_ast, &
-                                          species,     lst,     ast, n, :)
-          call lat%neighbor2(ref, direction, row, col)
+        if (lat%occupations(row,col) > 0) then
 
-          if (lat%occupations(row,col) > 0) then
+          if (lat%occupations(row,col) < ref) cycle ! Avoid double counting
+          energy_acc = energy_acc + &
+            e_pars%int_energy_pars(ref_species, ref_lst, ref_ast,&
+                                      species,     lst,     ast,  n)
 
-            if (lat%occupations(row,col) < ref) cycle ! Avoid double counting
-            energy_acc = energy_acc + &
-              e_pars%int_energy_pars(ref_species, ref_lst, ref_ast,&
-                                        species,     lst,     ast,  n)
+        end if
 
-          end if
-
-        end do
       end do
-      end do
-      end do
-
-    end if
+    end do
+    end do
+    end do
 
   end do
 

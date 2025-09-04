@@ -113,7 +113,7 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
     ! Initialize reaction counter
     r%counter = 0
     !-------- Construct rates arrays
-    call r%construct(lat, e_pars)
+    call r%construct(lat, c_pars, e_pars)
 
     if (r%n_ads_total>0) then
 
@@ -153,7 +153,7 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
     ! write initial total energy of the system
     call open_for_write(outeng_unit,trim(c_pars%file_name_base)//'_'//trim(buffer)//'.en')
     write(outeng_unit,'(2A12)') 'time(s)', ' energy(eV)'
-    write(outeng_unit,'(1pe19.10,1pe19.10)') 0.0_dp, total_energy(lat,e_pars)
+    write(outeng_unit,'(1pe19.10,1pe19.10)') 0.0_dp, total_energy(lat,c_pars, e_pars)
 
     ! open file for saving reaction counts
     call open_for_write(outcnt_unit,trim(c_pars%file_name_base)//'_'//trim(buffer)//'.counts')
@@ -304,7 +304,7 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
           call lat%print_ads(outcfg_unit)
 
           ! energy
-          write(outeng_unit,'(1pe19.10,1pe19.10)') time_bin, total_energy(lat,e_pars)
+          write(outeng_unit,'(1pe19.10,1pe19.10)') time_bin, total_energy(lat,c_pars, e_pars)
 
           ! reaction counts
           write(outcnt_unit,'(1pe19.10,100i20)') time_bin, r%counter
@@ -356,7 +356,7 @@ subroutine Bortz_Kalos_Lebowitz(lat, c_pars, e_pars)
       lat%ads_list_penultimate = lat%ads_list
 
       ! do reaction based on a random number
-      call r%do_reaction(ran1(), lat, e_pars)
+      call r%do_reaction(ran1(), lat, c_pars, e_pars)
 
       ! end trajectory if all essential species are gone
       if (any(e_pars%is_essential)) then

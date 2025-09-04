@@ -448,12 +448,10 @@ contains
     write(dummy,*) line_number
 
     print*
-!    print '(A)',  '--- Dear Sir/Madam: '
     print '(A)',  msg
     print '(2A)', '    file: ', trim(file_name)
-    print '(2A)', '    line: ' // trim(adjustl(dummy)) // ': ' // trim(line)
+    if (line_number > 0) print '(2A)', '    line: ' // trim(adjustl(dummy)) // ': ' // trim(line)
     print '(2A)', '    reason: ',trim(message)
-!    print '(/A)', '      As always, I remain your humble servant, kMC Code'
 
     if(st) stop 999
 

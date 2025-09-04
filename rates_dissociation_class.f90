@@ -528,11 +528,12 @@ contains
 !-------------------------------------------------------------------------------
 !  subroutine construct
 !-------------------------------------------------------------------------------
-  subroutine construct(this, ads, lat, e_pars, beta)
+  subroutine construct(this, ads, lat, c_pars, e_pars, beta)
 
     class(dissociation_type), intent(inout) :: this
     integer, intent(in) :: ads
     class(mc_lat), intent(inout) :: lat
+    class(control_parameters), intent(in) :: c_pars
     class(energy_parameters), intent(in) :: e_pars
     real(dp), intent(in) :: beta
 
@@ -588,7 +589,7 @@ contains
             ! Calculate interaction correction
             ! WARNING! here we assume that the correction does not depend on products
             !          consider to introduce it later
-            int_energy    = energy(ads,lat,e_pars) - e_pars%ads_energy(id_r, lst, ast)
+            int_energy    = energy(ads,lat,c_pars,e_pars) - e_pars%ads_energy(id_r, lst, ast)
             int_energy_ts = rcic_law(this%channels(iprocs)%rcic, int_energy, 0.0_dp)
             ! Barrier correction due to the perturbation
             delta_eps = int_energy_ts - int_energy

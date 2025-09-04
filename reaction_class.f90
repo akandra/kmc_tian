@@ -151,10 +151,11 @@ contains
 
 
 !-----------------------------------------------------------------------------
-  subroutine construct(this, lat, e_pars)
+  subroutine construct(this, lat, c_pars, e_pars)
 !-----------------------------------------------------------------------------
     class(reaction_type),     intent(inout) :: this
     class(mc_lat),            intent(inout) :: lat
+    class(control_parameters), intent(in) :: c_pars
     class(energy_parameters), intent(in)    :: e_pars
 
     integer       :: ads
@@ -172,14 +173,14 @@ contains
     ! Hopping
     if (this%hopping%is_defined) then
       do ads = 1, this%n_ads_total
-        call this%hopping%construct(ads, lat, e_pars, this%beta)
+        call this%hopping%construct(ads, lat, c_pars, e_pars, this%beta)
       end do
     end if
 
     ! Desorption
     if (this%desorption%is_defined) then
       do ads = 1, this%n_ads_total
-        call this%desorption%construct(ads, lat, e_pars, this%beta)
+        call this%desorption%construct(ads, lat, c_pars, e_pars, this%beta)
       end do
     end if
 
@@ -187,7 +188,7 @@ contains
     if (this%dissociation%is_defined) then
 
       do ads = 1, this%n_ads_total
-        call this%dissociation%construct(ads, lat, e_pars, this%beta)
+        call this%dissociation%construct(ads, lat, c_pars, e_pars, this%beta)
       end do
 
     end if
@@ -196,7 +197,7 @@ contains
     if (this%association%is_defined) then
 
       do ads = 1, this%n_ads_total
-        call this%association%construct(ads, lat, e_pars, this%beta)
+        call this%association%construct(ads, lat, c_pars, e_pars, this%beta)
       end do
 
     end if
@@ -205,7 +206,7 @@ contains
     if (this%bimolecular%is_defined) then
 
       do ads = 1, this%n_ads_total
-        call this%bimolecular%construct(ads, lat, e_pars, this%beta)
+        call this%bimolecular%construct(ads, lat, c_pars, e_pars, this%beta)
       end do
 
     end if
@@ -348,23 +349,24 @@ contains
   end subroutine construct
 
 !-----------------------------------------------------------------------------
-  subroutine construct_1(this, ads, lat, e_pars)
+  subroutine construct_1(this, ads, lat, c_pars, e_pars)
 !-----------------------------------------------------------------------------
     class(reaction_type),     intent(inout) :: this
     integer,                  intent(in)    :: ads
     class(mc_lat),            intent(inout) :: lat
+    class(control_parameters), intent(in) :: c_pars
     class(energy_parameters), intent(in)    :: e_pars
 
     ! Hopping
-    if (this%hopping%is_defined)      call this%hopping%construct(ads, lat, e_pars, this%beta)
+    if (this%hopping%is_defined)      call this%hopping%construct(ads, lat, c_pars, e_pars, this%beta)
     ! Desorption
-    if (this%desorption%is_defined)   call this%desorption%construct(ads, lat, e_pars, this%beta)
+    if (this%desorption%is_defined)   call this%desorption%construct(ads, lat, c_pars, e_pars, this%beta)
     ! Dissociation
-    if (this%dissociation%is_defined) call this%dissociation%construct(ads, lat, e_pars, this%beta)
+    if (this%dissociation%is_defined) call this%dissociation%construct(ads, lat, c_pars, e_pars, this%beta)
     ! Association
-    if (this%association%is_defined)  call this%association%construct(ads, lat, e_pars, this%beta)
+    if (this%association%is_defined)  call this%association%construct(ads, lat, c_pars, e_pars, this%beta)
     ! Bimolecular
-    if (this%bimolecular%is_defined)  call this%bimolecular%construct(ads, lat, e_pars, this%beta)
+    if (this%bimolecular%is_defined)  call this%bimolecular%construct(ads, lat, c_pars, e_pars, this%beta)
 
   end subroutine construct_1
 
@@ -391,11 +393,12 @@ contains
   end subroutine cleanup_rates
 
 !-----------------------------------------------------------------------------
-  subroutine do_reaction(this, rand, lat, e_pars)
+  subroutine do_reaction(this, rand, lat, c_pars, e_pars)
 !-----------------------------------------------------------------------------
     class(reaction_type),     intent(inout)     :: this
     real(dp),                 intent(in)        :: rand
     class(mc_lat),            intent(inout)     :: lat
+    class(control_parameters), intent(in)        :: c_pars
     class(energy_parameters), intent(in)    :: e_pars
 
     integer :: i, ads, iads, reaction_id, channel
@@ -523,7 +526,7 @@ end if
 
         ! Update rate array for the affected adsorbates
         do i=1,this%n_ads_total
-          if (rate_update_q(i)) call this%construct_1(i, lat, e_pars)
+          if (rate_update_q(i)) call this%construct_1(i, lat, c_pars, e_pars)
         end do
 
         ! Update reaction counter
@@ -578,7 +581,7 @@ end if
         rate_update_q(ads) = rate_update_q(this%n_ads_total)
         ! Update rate array for the affected adsorbates
         do i=1,this%n_ads_total - 1
-          if (rate_update_q(i)) call this%construct_1(i, lat, e_pars)
+          if (rate_update_q(i)) call this%construct_1(i, lat, c_pars, e_pars)
         end do
         ! Reset the rate info for the last adsorbate
         call this%cleanup_rates(this%n_ads_total,lat)
@@ -643,7 +646,7 @@ end if
         call this%cleanup_rates(ads, lat)
         ! Update rate array for the affected adsorbates
         do i=1,this%n_ads_total
-          if (rate_update_q(i)) call this%construct_1(i, lat, e_pars)
+          if (rate_update_q(i)) call this%construct_1(i, lat, c_pars, e_pars)
         end do
 
         ! Update reaction counter
@@ -721,7 +724,7 @@ end if
         rate_update_q(ads_r2) = rate_update_q(this%n_ads_total)
         ! Update rate array for the affected adsorbates
         do i=1,this%n_ads_total - 1
-          if (rate_update_q(i)) call this%construct_1(i, lat, e_pars)
+          if (rate_update_q(i)) call this%construct_1(i, lat, c_pars, e_pars)
         end do
         ! Update the the number of adsorbates
         this%n_ads_total = this%n_ads_total - 1
@@ -784,7 +787,7 @@ end if
         call this%cleanup_rates(ads_r2,lat)
         ! Update rate array for the affected adsorbates
         do i=1,this%n_ads_total
-          if (rate_update_q(i)) call this%construct_1(i, lat, e_pars)
+          if (rate_update_q(i)) call this%construct_1(i, lat, c_pars, e_pars)
         end do
 
         ! Update reaction counter

@@ -1,5 +1,20 @@
 do not forget to correct pptx diagrams for barrier corrections!
 
+2025-09-04 :
+
+    consider put together neighbors with the same interaction into a line like
+    {0 1 1 1 ...  }  0.019, or better 
+    define symmetric pairs automatically for each line in the energy input
+
+2025-09-04 :
+
+    consider going beyond 2-body interactions - the new energy input parsing format provides
+    convenient framework for that. For example, in the interaction section we can have:
+
+        linear O tc2 fcc O tc1 fcc NH3 tc1 top
+             -1 -1 1 -1 0.10 
+
+
 2025-09-03 :
 
     consider to define a type with fields: (species, lst, ast). It should simplify a lot

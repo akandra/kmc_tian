@@ -1,3 +1,4 @@
+# 1 "/home/akandra/git/kmc_tian/mc_lat_class.f90"
 module mc_lat_class
 
   use constants
@@ -35,21 +36,21 @@ module mc_lat_class
     integer :: n_max_nn     ! maximum number of nearest neighbors (1 shell)
 
     integer, dimension(:,:), allocatable  :: occupations  !  n_rows x n_cols
-    ! array of lattice site types
+! array of lattice site types
     integer, dimension(:,:), allocatable  :: lst          !  n_rows x n_cols
-    ! lattice vectors
+! lattice vectors
     real(dp), dimension(2) :: lat_vec_1, lat_vec_2
-    ! shellwise number of neighbors
+! shellwise number of neighbors
     integer, dimension(n_max_lat_site_types,1) :: n_nn
     integer, dimension(:,:,:,:), allocatable  :: shell_list
-    ! List and number of additional nn directions to scan after reaction
+! List and number of additional nn directions to scan after reaction
     integer, dimension(:,:,:), allocatable :: nn_new
     integer, dimension(:,:),   allocatable :: n_nn_new
-    ! number of adsorbates per species, current and penultimate
+! number of adsorbates per species, current and penultimate
     integer, dimension(:), allocatable :: n_ads, n_ads_penultimate
-    ! initial and current adsorbates lists, current and penultimate
+! initial and current adsorbates lists, current and penultimate
     type(adsorbate), dimension(:), allocatable  :: ads_list, ads_list_penultimate
-    ! Available adsorbtion sites list (n_species x n_max_lat_site_types x (n_avail_ads_sites))
+! Available adsorbtion sites list (n_species x n_max_lat_site_types x (n_avail_ads_sites))
     type(v_list), dimension(:,:), allocatable :: avail_ads_sites
     integer :: n_ini_confs  ! Number of available confs in the start-conf file
 
@@ -88,11 +89,11 @@ contains
     lat%n_rows = c_pars%n_rows
     lat%n_cols = c_pars%n_cols
 
-    ! get lattice vectors
+! get lattice vectors
     lat%lat_vec_1 = hex_lat_vec_1
     lat%lat_vec_2 = hex_lat_vec_2
 
-    ! Shell-wise number of neighbors for hex lattice with A- and B-type steps
+! Shell-wise number of neighbors for hex lattice with A- and B-type steps
     lat%n_nn(terrace_site,:) = hex_n_nn_terrace(1)
     lat%n_nn(   step_site,:) = hex_n_nn_step(1)
     lat%n_nn( corner_site,:) = hex_n_nn_corner(1)
@@ -111,7 +112,7 @@ contains
 
     allocate(lat%shell_list(n_max_lat_site_types, 1, maxval(lat%n_nn), 2))
 
-    ! get nn shell lists LSTs
+! get nn shell lists LSTs
 
     lat%shell_list(terrace_site,1,1:hex_n_nn_terrace(1),:) = hex_shell_list_terrace(1,1:hex_n_nn_terrace(1),:)
     lat%shell_list(ts2_site,:,:,:)     = lat%shell_list(terrace_site,:,:,:)
@@ -128,7 +129,7 @@ contains
     lat%shell_list(ts1_site,   1,1:hex_n_nn_ts1(1),   :) = hex_shell_list_ts1(1,1:hex_n_nn_ts1(1),:)
     lat%shell_list(tc1_site,   1,1:hex_n_nn_tc1(1),   :) = hex_shell_list_tc1(1,1:hex_n_nn_tc1(1),:)
 
-    ! Check the distances to the neighbours
+! Check the distances to the neighbours
 !    print*, sqrt( &
 !                 ( lat%shell_list(2,:,1)*cos(pi/3.0_dp) &
 !                  +lat%shell_list(2,:,2)               )**2    &
@@ -137,7 +138,7 @@ contains
 !        )
 !    stop
 
-    ! Lists and numbers of additional nn directions for hex lattice to scan after a reaction
+! Lists and numbers of additional nn directions for hex lattice to scan after a reaction
     allocate(lat%nn_new(  n_max_lat_site_types, lat%n_max_nn, 4 ) )
     allocate(lat%n_nn_new(n_max_lat_site_types, lat%n_max_nn)   )
 
@@ -299,22 +300,22 @@ contains
 
     lat%n_max_ads_sites = n_max_ads_sites
 
-    ! Allocate arrays
+! Allocate arrays
     allocate(lat%occupations(c_pars%n_rows,c_pars%n_cols))
     allocate(lat%lst(        c_pars%n_rows,c_pars%n_cols))
     allocate(lat%n_ads(            c_pars%n_species),&
              lat%n_ads_penultimate(c_pars%n_species))
-    ! Warning: the allocation assumes 1 ads. per unit cell
+! Warning: the allocation assumes 1 ads. per unit cell
     allocate(lat%ads_list(            c_pars%n_rows*c_pars%n_cols),&
              lat%ads_list_penultimate(c_pars%n_rows*c_pars%n_cols))
-    ! Initialize arrays
+! Initialize arrays
     lat%ads_list             = adsorbate(0,0,0,0)
     lat%ads_list_penultimate = adsorbate(0,0,0,0)
 
 
-    ! Define where steps, corners, and other sites are
-    ! NEXTTIME: consider using the energy file to define lst
-    ! Warning! A-type steps are not fully implemented
+! Define where steps, corners, and other sites are
+! NEXTTIME: consider using the energy file to define lst
+! Warning! A-type steps are not fully implemented
     lat%lst = terrace_site
     if ( c_pars%step_period > 5) then
       do j=1,lat%n_cols,c_pars%step_period
@@ -334,7 +335,7 @@ contains
       stop "mc_lat_init: step period between 1 and 5 not supported."
     end if
 
-    ! Check if adsorption energy is defined for each lst
+! Check if adsorption energy is defined for each lst
     do i=1,lat%n_rows
     do j=1,lat%n_cols
     do k=1,c_pars%n_species
@@ -384,7 +385,7 @@ contains
 !end do
 !----------------------------------------------------------------------------------
 
-    ! initialize lattice
+! initialize lattice
     lat%n_ini_confs = 0
     call lat%conf_init(c_pars)
 
@@ -413,23 +414,23 @@ contains
     integer :: counter,  ads_site
     integer :: i_rand, species, row, col
 
-    ! Clean up lattice structure
+! Clean up lattice structure
     this%occupations = 0
-    ! Set n_ads as in control file
+! Set n_ads as in control file
     this%n_ads = c_pars%n_ads
 
-    ! add adsorbates to the lattice
+! add adsorbates to the lattice
     if (c_pars%cfg_file_name=='none') then
 
-      ! create random population
-      ! WARNING: consider adding a special case for higher coverages
+! create random population
+! WARNING: consider adding a special case for higher coverages
       counter = 0
       do species=1,size(this%n_ads)
 
         i = 0
         do while (i < this%n_ads(species) )
 
-          ! select a random site
+! select a random site
           i_rand = irand(this%n_cols*this%n_rows)
           row = (i_rand-1)/this%n_cols + 1
           col = i_rand - (row - 1)*this%n_cols
@@ -438,7 +439,7 @@ contains
             i = i + 1
             counter = counter + 1
             this%occupations(row,col) = counter
-            ! Warning: arbitrary choice for the ads. site (the 1st available)!
+! Warning: arbitrary choice for the ads. site (the 1st available)!
             ads_site = this%avail_ads_sites(species,this%lst(row,col))%list(1)
             this%ads_list(counter) = adsorbate(row,col,ads_site,species)
           end if
@@ -446,7 +447,7 @@ contains
         end do
       end do
 
-      ! create artificial population
+! create artificial population
 !      counter = 0
 !      s_counter = 0
 !      current_species = 1
@@ -467,26 +468,26 @@ contains
 !      end do loop1
 
     else
-      ! Read in a conf from conf-file
+! Read in a conf from conf-file
 
       if (present(itraj)) then
         if (this%n_ini_confs == 0) then
           print*, 'Error: mc_lat_conf_init called with two arguments without prior initialization.'
           stop
         end if
-        ! number of conf to read from conf-file
+! number of conf to read from conf-file
         conf = mod(itraj-1,this%n_ini_confs)+1
       else
-        ! allows to read the last conf from conf-file
+! allows to read the last conf from conf-file
         conf = huge(1)
       end if
 
-      ! Read info from the configuration file
+! Read info from the configuration file
       call open_for_read(inp_unit,trim(c_pars%cfg_file_name))
       read(inp_unit,'(A)') line
       read(inp_unit,'(A)') line
       read(inp_unit,*) n_rows_in, n_cols_in, step_period_in
-      ! Check consistency with control parameters
+! Check consistency with control parameters
       if (n_rows_in      /= c_pars%n_rows .OR.&
           n_cols_in      /= c_pars%n_cols .OR.&
           step_period_in /= c_pars%step_period) then
@@ -519,7 +520,7 @@ contains
           print*, '  inconsistent number of adsorbates in control and configuration files.'
           stop
         end if
-        ! Read the configuration
+! Read the configuration
         do i=1, sum(n_ads_in)
           read(inp_unit, *, iostat=ios) idummy,this%ads_list(i)
           if (ios == -1) then
@@ -534,12 +535,12 @@ contains
         end do
 
       end do
-      ! save number of confs in the conf-file
+! save number of confs in the conf-file
       if (.not.present(itraj)) this%n_ini_confs = iconf - 1
 
       close(inp_unit)
 
-      ! put adsorbates to lattice
+! put adsorbates to lattice
       do i=1,this%n_ads_tot()
         this%occupations(this%ads_list(i)%row, this%ads_list(i)%col) = i
       end do
@@ -726,10 +727,10 @@ contains
 
     n_rows_2 = this%n_rows/2
     n_cols_2 = this%n_cols/2
-    ! calculate delta_row and delta_col
+! calculate delta_row and delta_col
     d_row = this%ads_list(ads1)%row - this%ads_list(ads2)%row
     d_col = this%ads_list(ads1)%col - this%ads_list(ads2)%col
-    ! apply periodic boundary conditions
+! apply periodic boundary conditions
     if (d_row > n_rows_2 ) then
       d_row = d_row - this%n_rows
     else if (d_row < -n_rows_2 ) then
@@ -740,7 +741,7 @@ contains
     else if (d_col < -n_cols_2 ) then
       d_col = d_col + this%n_cols
     end if
-    ! calculate the distance
+! calculate the distance
     r = sqrt(  ( d_col*this%lat_vec_1(1) + d_row*this%lat_vec_2(1) )**2 &
              + ( d_col*this%lat_vec_1(2) + d_row*this%lat_vec_2(2) )**2  )
 

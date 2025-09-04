@@ -530,11 +530,12 @@ contains
   end function hopping_init
 
 !-----------------------------------------------------------------------------
-  subroutine construct(this, ads, lat, e_pars, beta)
+  subroutine construct(this, ads, lat, c_pars, e_pars, beta)
 !-----------------------------------------------------------------------------
     class(hopping_type), intent(inout) :: this
     integer, intent(in) :: ads
     class(mc_lat), intent(inout) :: lat
+    class(control_parameters), intent(in) :: c_pars
     class(energy_parameters), intent(in) :: e_pars
     real(dp), intent(in) :: beta
 
@@ -544,7 +545,7 @@ contains
     real(dp) :: energy_old, energy_new, int_energy_old, int_energy_new, int_energy_ts, delta_eps
 
     ! energy for particle ads in its old position
-    energy_old = energy(ads, lat, e_pars)
+    energy_old = energy(ads, lat, c_pars, e_pars)
     ! Save the old configuration
     row_old = lat%ads_list(ads)%row
     col_old = lat%ads_list(ads)%col
@@ -585,7 +586,7 @@ contains
           lat%ads_list(ads)%ast = ast_new
 
           ! Calculate energy of ads in new position
-          energy_new = energy(ads, lat, e_pars)
+          energy_new = energy(ads, lat, c_pars, e_pars)
 
           if (debug(10)) then
             write(*,*) ''
@@ -660,7 +661,7 @@ contains
         lat%ads_list(ads)%ast = ast_new
 
         ! Calculate energy of ads in new position
-        energy_new = energy(ads, lat, e_pars)
+        energy_new = energy(ads, lat, c_pars, e_pars)
 
 !        if (debug(2)) then
 !          print*, '-----------construct debug(2)'

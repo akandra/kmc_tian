@@ -88,7 +88,7 @@ subroutine metropolis(lat, c_pars, e_pars)
   ! write initial total energy of the system
   call open_for_write(outeng_unit,trim(c_pars%file_name_base)//'.en')
   write(outeng_unit,'(3A12)') 'mmc_step', ' energy(eV)', 'n_ads'
-  write(outeng_unit,*) 0, total_energy(lat,e_pars), lat%n_ads
+  write(outeng_unit,*) 0, total_energy(lat, c_pars, e_pars), lat%n_ads
 
   ! open file for saving running averages
   if (c_pars%running_avgs_save) call open_for_write(outrav_unit,trim(c_pars%file_name_base)//'.rav')
@@ -119,7 +119,7 @@ subroutine metropolis(lat, c_pars, e_pars)
     ! Loop over all adsorbates to do a canonical mmc step
     do i=1, lat%n_ads_tot()
 
-      energy_old = energy(i, lat, e_pars)
+      energy_old = energy(i, lat, c_pars, e_pars)
 
       old_row = lat%ads_list(i)%row
       old_col = lat%ads_list(i)%col
@@ -144,7 +144,7 @@ subroutine metropolis(lat, c_pars, e_pars)
         lat%ads_list(i)%col = new_col
         lat%ads_list(i)%ast = new_ads_site
 
-        delta_E = energy(i, lat, e_pars) - energy_old
+        delta_E = energy(i, lat, c_pars, e_pars) - energy_old
 
         ! Accept if delta_E is non-positive
         ! Calculate probability if delta_E is positive
@@ -195,7 +195,7 @@ subroutine metropolis(lat, c_pars, e_pars)
         end if
 
         ! energy change due to the added adsorbate minus chemical potential
-        delta = energy(new_n_ads, lat, e_pars) - c_pars%chem_pots(species)
+        delta = energy(new_n_ads, lat, c_pars, e_pars) - c_pars%chem_pots(species)
 
         ! If delta is non-positive, accept the addition of adsorbate , i.e., do nothing
         ! this check also prevents overflow in exp
@@ -222,7 +222,7 @@ subroutine metropolis(lat, c_pars, e_pars)
         i_ads = lat%occupations(row,col)
 
         ! chemical potential minus the energy change due to the removal of the adsorbate
-        delta = c_pars%chem_pots(species) - energy(i_ads, lat, e_pars)
+        delta = c_pars%chem_pots(species) - energy(i_ads, lat, c_pars, e_pars)
 
         ! Prevents overflow in exp
         beta_delta = - beta*delta
@@ -324,7 +324,7 @@ subroutine metropolis(lat, c_pars, e_pars)
       if (c_pars%show_progress) call progress_bar(100*istep/c_pars%n_mmc_steps)
 
       ! Save energy
-      write(outeng_unit,*) istep, total_energy(lat,e_pars), lat%n_ads
+      write(outeng_unit,*) istep, total_energy(lat, c_pars, e_pars), lat%n_ads
 
       ! Save configuration
       if (c_pars%conf_save) then

@@ -78,20 +78,9 @@ module constants
 
   ! List of interaction laws
 
-  ! ---------------------------------------------------
-  ! DJA change
-  ! ----------------------------------------------------
-  ! old lines
-  ! character(len=10), dimension(2), parameter :: &
-  !         int_law_names = [character(10)::'linear']
-  !
-  ! new lines
   character(len=10), dimension(1), parameter :: &
           int_law_names = [character(10)::'linear']
-  !
-  ! end DJA change
-  ! ----------------------------------------------------
-
+  
   ! Interaction energy law ids
   integer, parameter :: linear_id = 1
 
