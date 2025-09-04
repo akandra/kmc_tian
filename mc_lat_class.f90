@@ -93,19 +93,23 @@ contains
     lat%lat_vec_2 = hex_lat_vec_2
 
     ! Shell-wise number of neighbors for hex lattice with A- and B-type steps
-    lat%n_nn(terrace_site,:) = hex_n_nn_terrace
-    lat%n_nn(   step_site,:) = hex_n_nn_step
-    lat%n_nn( corner_site,:) = hex_n_nn_corner
-    lat%n_nn(    ts1_site,:) = hex_n_nn_ts1
-    lat%n_nn(    ts2_site,:) = hex_n_nn_terrace
-    lat%n_nn(    tc2_site,:) = hex_n_nn_terrace
-    lat%n_nn(    tc1_site,:) = hex_n_nn_tc1
-    lat%n_nn(  stepA_site,:) = hex_n_nn_terrace
-    lat%n_nn(cornerA_site,:) = hex_n_nn_terrace
-    lat%n_nn(   ts1A_site,:) = hex_n_nn_terrace
-    lat%n_nn(   ts2A_site,:) = hex_n_nn_terrace
-    lat%n_nn(   tc1A_site,:) = hex_n_nn_terrace
-    lat%n_nn(   tc2A_site,:) = hex_n_nn_terrace
+! DJA Change 2025-09-03
+! select first element of constant nearest neigbor structures to fill array  n_nn(site, :) array which is of length 1
+! might be better to make to have an integer:: n_nn()
+    lat%n_nn(terrace_site,:) = hex_n_nn_terrace(1)
+    lat%n_nn(   step_site,:) = hex_n_nn_step(1)
+    lat%n_nn( corner_site,:) = hex_n_nn_corner(1)
+    lat%n_nn(    ts1_site,:) = hex_n_nn_ts1(1)
+    lat%n_nn(    ts2_site,:) = hex_n_nn_terrace(1)
+    lat%n_nn(    tc2_site,:) = hex_n_nn_terrace(1)
+    lat%n_nn(    tc1_site,:) = hex_n_nn_tc1(1)
+    lat%n_nn(  stepA_site,:) = hex_n_nn_terrace(1)
+    lat%n_nn(cornerA_site,:) = hex_n_nn_terrace(1)
+    lat%n_nn(   ts1A_site,:) = hex_n_nn_terrace(1)
+    lat%n_nn(   ts2A_site,:) = hex_n_nn_terrace(1)
+    lat%n_nn(   tc1A_site,:) = hex_n_nn_terrace(1)
+    lat%n_nn(   tc2A_site,:) = hex_n_nn_terrace(1)
+! End Change
 
     lat%n_max_nn = max_n_neighbors
 
@@ -1058,25 +1062,40 @@ contains
     integer:: species1, species2, lst2, ast1, ast2, i_ast1, i_ast2
     integer:: m, row, col
 
+! DJA Change 2025-09-03
+    integer :: n, direction(2)
+! End Change
     species1 = this%ads_list(ads)%id
 
-    do i_ast1=1,size(lat%avail_ads_sites(species,lst1)%list)
+! DJA change 2025-09-03
+!   do i_ast1=1,size(lat%avail_ads_sites(species1,lst1)%list)
+    do i_ast1=1,size(this%avail_ads_sites(species1,lst1)%list)
+! END Change
 
       ast1 = this%avail_ads_sites(species1,lst1)%list(i_ast1)
       do species2=1,c_pars%n_species
       do lst2=1,n_max_lat_site_types
-      do i_ast2=1,size(lat%avail_ads_sites(species2,lst2)%list)
+
+! DJA change 2025-09-03
+!     do i_ast2=1,size(lat%avail_ads_sites(species2,lst2)%list)
+      do i_ast2=1,size(this%avail_ads_sites(species2,lst2)%list)
+! END Change
         
         ast2 = this%avail_ads_sites(species2,lst2)%list(i_ast2)
 
         do n =1,e_pars%n_interactions(species1, lst1, ast1, &
                                       species2, lst2, ast2)
 
-          direction = e_pars%neighbors(species1, lst1, ast1, &
+! DJA change 2025-09-03
+!         direction = e_pars%neighbors(species1, lst1, ast1, &
+          direction = e_pars%neighbor( species1, lst1, ast1, &
+! END Change
                                        species2, lst2, ast2, n, :)
           call this%neighbor2(ads, direction, row, col)
-
-          if (lat%occupations(row,col) > 0) then
+! DJA change 2025-09-03
+!          if (lat%occupations(row,col) > 0) then
+          if (this%occupations(row,col) > 0) then
+! END Change
             rate_update_q( this%occupations(row,col) ) = .true.
           end if
 

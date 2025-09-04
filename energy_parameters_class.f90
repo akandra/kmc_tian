@@ -28,8 +28,11 @@ module energy_parameters_class
     !                     n_species x n_site_type x n_adsorption_sites x max_n_neighbors x 2)
     integer,  dimension(:,:,:,:,:,:,:,:),allocatable :: neighbor
 
-    logical :: is_interaction
-    ! Species importance key (n_species)
+! DJA change 2025-09-03
+!   comment following lines
+!   logical :: is_interaction
+!    ! Species importance key (n_species)
+! END CHANGE
     logical, dimension(:), allocatable :: is_essential
 
     ! Default value for undefined energy
@@ -54,8 +57,15 @@ contains
     integer :: i, ios, line_number, i1, i1s, i1a, i2, i2s, i2a, i_law, n
 
     character(len=max_string_length) :: buffer
-    character(len=max_string_length), allocatable :: tokens(:), toks(:)
-    integer :: ntokens, ntoks, nn
+    
+! DJA Change 2025-09-03
+!   character(len=max_string_length), allocatable :: tokens(:), toks(:)
+    character(len=max_string_length), allocatable :: tokens(:)
+!   integer :: ntokens, ntoks, nn
+    integer :: ntokens
+! END Change
+
+
     character(len=len(trim(control_pars%energy_file_name))) :: file_name
 
     character(len=10) :: current_species_name
@@ -66,7 +76,8 @@ contains
     integer           :: parse_state_adsorption   =1
     integer           :: parse_state_interaction  =2
 
-    logical :: first_warning = .true.
+!DJA Change 2025-09-03 -- commented 1 line
+    ! logical :: first_warning = .true.
     integer,  parameter:: default_int = 0
     real(dp) :: temp_dp
     integer  :: temp_int
@@ -85,7 +96,11 @@ contains
     energy_parameters_init%n_interactions    = 0
     !energy_parameters_init%int_energy_pars = energy_parameters_init%undefined_energy
     !energy_parameters_init%int_energy_skip = .true.
-    energy_parameters_init%is_interaction  = .false.
+! DJA change 2025-09-03
+! comment following line
+    !energy_parameters_init%is_interaction  = .false.
+! END CHANGE
+    
     energy_parameters_init%is_essential    = .false.
 
     !  read energy definitions from the input file
@@ -154,6 +169,19 @@ contains
           if (parse_state /= parse_state_interaction) &
             call error_message(file_name, line_number, buffer, &
                       "interaction law statement is outside of the interaction section")
+
+!-------------------------------------------------------------------------------------------------------------------------------
+! DJA COMMENT - WARNING 2025-09-03
+!    I think we have to process the contents of the lines like
+!       linear O tc2 fcc NH3 ts2 top
+!    We need i1, i1s, i1a, i2, i2s, i2a to to the counting of n_interactions
+!    they are undefined at this point
+!
+!   Also I think there is a problem with using integer to trigger parsing line as an interaction with neghbors
+!     If the lines are out of order we won't be able to associate the interaction energies to the corect 
+!     i1, i1s, i1a, i2, i2s,i2a
+! ----------------------------------------------------------------------------------------------------------------------------------
+
 
         elseif (read_int(tokens(1), temp_int)) then
 
@@ -297,7 +325,11 @@ contains
                      energy_parameters_init%n_interactions(i1,i1s,i1a,i2,i2s,i2a)
               else
                 call error_message(file_name, line_number, buffer, &
-                            "duplicated entry in the interaction section",)
+
+!-------------------------------------------------------------------------------
+! DJA change 2025-09-03
+!                           "duplicated entry in the interaction section",)
+                            "duplicated entry in the interaction section")
               end if
 
             end if
@@ -344,7 +376,10 @@ contains
               end if
 
               if ( all(energy_parameters_init%neighbor(i1,i1s,i1a,i2,i2s,i2a,n,:)==0) ) &
-                error_message(file_name, line_number, buffer, &
+! DJA change 2025-09-03
+!---------------------------------------------------------------------              
+!               error_message(file_name, line_number, buffer, &
+                call error_message(file_name, line_number, buffer, &              
                               "invalid neighbor direction (0,0)" )
             end do
 
@@ -367,35 +402,46 @@ contains
 
     close(inp_unit)
 
-    energy_parameters_init%is_interaction = &
-              any(.not.energy_parameters_init%int_energy_skip)
+! DJA change 2025-09-03
+! comment following 2 lines
+!   energy_parameters_init%is_interaction = &
+!             any(.not.energy_parameters_init%int_energy_skip)
+! END CHANGE
 
-    ! Check the input consistency
-    do i1 =1,control_pars%n_species
-    do i1s=1,n_max_lat_site_types
-    do i1a=1,n_max_ads_sites
-      if (energy_parameters_init%ads_energy(i1,i1s,i1a) == energy_parameters_init%undefined_energy) then
-        do i2 =1,control_pars%n_species
-        do i2s=1,n_max_lat_site_types
-        do i2a=1,n_max_ads_sites
-          if (any(.not. energy_parameters_init%int_energy_skip(i1,i1s,i1a, i2,i2s,i2a, :))) then
-            if (first_warning) then
-              write(*,'(A)') ' Warning:'
-              write(*,'(A)') '    file: '//trim(file_name)
-              first_warning = .false.
-            end if
-            write(*,'(A)')   '    interaction section: adsorption energy for '//&
-                                  trim(control_pars%ads_names(i1))//' '//&
-                                  trim(lat_site_names(i1s))//' '//trim(ads_site_names(i1a))//' '//&
-                                  'not defined'
-          end if
-        end do
-        end do
-        end do
-      end if
-    end do
-    end do
-    end do
+! ATTENTION ATTENTION ATTENTION -- WORK NEEDED
+! DJA change 2025-09-03
+! Following needs to be rewritten make a check of whether interactions are defined for sites with undefined adsorption energy
+! Commented out to allow compile to complete
+
+!   I think this check can be done in the parsing of interactions section. Just check that adsorption energy is defined for 
+!   all sites involved in the interaction.
+!
+    ! ! Check the input consistency
+    ! do i1 =1,control_pars%n_species
+    ! do i1s=1,n_max_lat_site_types
+    ! do i1a=1,n_max_ads_sites
+    !   if (energy_parameters_init%ads_energy(i1,i1s,i1a) == energy_parameters_init%undefined_energy) then
+    !     do i2 =1,control_pars%n_species
+    !     do i2s=1,n_max_lat_site_types
+    !     do i2a=1,n_max_ads_sites
+    !       if (any(.not. energy_parameters_init%int_energy_skip(i1,i1s,i1a, i2,i2s,i2a, :))) then
+    !         if (first_warning) then
+    !           write(*,'(A)') ' Warning:'
+    !           write(*,'(A)') '    file: '//trim(file_name)
+    !           first_warning = .false.
+    !         end if
+    !         write(*,'(A)')   '    interaction section: adsorption energy for '//&
+    !                               trim(control_pars%ads_names(i1))//' '//&
+    !                               trim(lat_site_names(i1s))//' '//trim(ads_site_names(i1a))//' '//&
+    !                               'not defined'
+    !       end if
+    !     end do
+    !     end do
+    !     end do
+    !   end if
+    ! end do
+    ! end do
+    ! end do
 
   end function
 
