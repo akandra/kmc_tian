@@ -1,0 +1,34 @@
+{
+    "buildType": {
+        "default": "debug",
+        "description": "The build type",
+        "choices": {
+            "debug": {
+                "short": "Debug",
+                "long": "Debug build",
+                "buildType": "Debug"
+            },
+            "release": {
+                "short": "Release",
+                "long": "Release build",
+                "buildType": "Release"
+            },
+            "debug-static": {
+                "short": "Debug Static",
+                "long": "Debug build with static linking (GNU only)",
+                "buildType": "Debug",
+                "settings": {
+                    "BUILD_STATIC": "ON"
+                }
+            },
+            "release-static": {
+                "short": "Release Static",
+                "long": "Release build with static linking (GNU only)",
+                "buildType": "Release",
+                "settings": {
+                    "BUILD_STATIC": "ON"
+                }
+            }
+        }
+    }
+}

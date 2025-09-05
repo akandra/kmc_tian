@@ -1,3 +1,5 @@
 build*
 release*
 debug*
+debug_static
+release_static

@@ -1,0 +1,43 @@
+cmake_minimum_required(VERSION 4.0)
+
+project(kmc_tian
+    DESCRIPTION "kMC_tian project"
+    LANGUAGES Fortran)
+
+
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG   ${CMAKE_SOURCE_DIR}/debug)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE ${CMAKE_SOURCE_DIR}/release)
+
+# Compiler flags for GNU Fortran
+if (CMAKE_Fortran_COMPILER_ID MATCHES "GNU")
+    set(dialect "-ffree-form -fimplicit-none -fdec-format-defaults -std=f2008")
+    set(CMAKE_Fortran_FLAGS         "-Wall ${dialect}")
+    set(CMAKE_Fortran_FLAGS_DEBUG   "-g3 -Og -fcheck=all")
+    set(CMAKE_Fortran_FLAGS_RELEASE "-O2 -DNDEBUG")
+endif()
+
+# Get information from GIT if available
+find_package(Git)
+if (GIT_FOUND)
+    execute_process(COMMAND ${GIT_EXECUTABLE} describe --tags --always --dirty --broken
+                    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+                    OUTPUT_VARIABLE GIT_VERSION_STRING
+                    OUTPUT_STRIP_TRAILING_WHITESPACE)
+else()
+    set(GIT_VERSION_STRING "N/A")
+endif()
+
+# Generate version_info.f90 from template
+configure_file("${CMAKE_SOURCE_DIR}/version_info.f90.in"
+               "${CMAKE_BINARY_DIR}/version_info.f90"
+               @ONLY)
+
+# Gather sources but exclude any version_info.f90 in source tree
+file(GLOB_RECURSE sources RELATIVE ${CMAKE_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/*.f90)
+list(FILTER sources EXCLUDE REGEX "version_info\\.f90$")
+
+# Add executable and explicitly include generated version file (from build dir)
+add_executable(kmc_tian ${sources} ${CMAKE_BINARY_DIR}/version_info.f90)
+
+# Make generated module visible to sources
+target_include_directories(kmc_tian PUBLIC "${CMAKE_BINARY_DIR}")
