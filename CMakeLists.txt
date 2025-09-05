@@ -49,6 +49,29 @@ if (CMAKE_Fortran_COMPILER_ID MATCHES "Intel|IntelLLVM")
     set(CMAKE_Fortran_FLAGS_RELEASE "-O2 -no-save-temps -nofpp")
 endif()
 
+# # Get information from GIT if available
+# find_package(Git)
+# if (GIT_FOUND)
+#     execute_process(COMMAND ${GIT_EXECUTABLE} describe --tags --always --dirty --broken
+#                     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+#                     OUTPUT_VARIABLE GIT_VERSION_STRING
+#                     OUTPUT_STRIP_TRAILING_WHITESPACE)
+#     execute_process(COMMAND ${GIT_EXECUTABLE} rev-parse --short HEAD
+#                     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+#                     OUTPUT_VARIABLE GIT_COMMIT_HASH
+#                     OUTPUT_STRIP_TRAILING_WHITESPACE)
+# else()
+#     set(GIT_VERSION_STRING "N/A")
+#     set(GIT_COMMIT_HASH    "N/A")
+# endif()
+# Generate version_info.f90 from template
+# configure_file(
+#     "${CMAKE_SOURCE_DIR}/version_info.f90.in"
+#     "${CMAKE_BINARY_DIR}/version_info.f90"
+#     @ONLY)
+
+
+
 # Get information from GIT if available
 find_package(Git)
 if (GIT_FOUND)
@@ -60,16 +83,60 @@ if (GIT_FOUND)
                     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
                     OUTPUT_VARIABLE GIT_COMMIT_HASH
                     OUTPUT_STRIP_TRAILING_WHITESPACE)
+    
+    # Find the current branch ref file for dependency tracking
+    execute_process(COMMAND ${GIT_EXECUTABLE} symbolic-ref HEAD
+                    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+                    OUTPUT_VARIABLE GIT_HEAD_REF
+                    OUTPUT_STRIP_TRAILING_WHITESPACE
+                    ERROR_QUIET)
+    
+    if(GIT_HEAD_REF)
+        string(REPLACE "refs/" "" GIT_HEAD_REF "${GIT_HEAD_REF}")
+        set(GIT_REF_FILE "${CMAKE_SOURCE_DIR}/.git/${GIT_HEAD_REF}")
+    endif()
 else()
     set(GIT_VERSION_STRING "N/A")
     set(GIT_COMMIT_HASH    "N/A")
 endif()
 
-# Generate version_info.f90 from template
+# Initial generation of version_info.f90 from template (for configure time)
 configure_file(
     "${CMAKE_SOURCE_DIR}/version_info.f90.in"
     "${CMAKE_BINARY_DIR}/version_info.f90"
     @ONLY)
+
+# Make version_info.f90 depend on Git state files so it regenerates on commits/changes
+if(GIT_FOUND)
+    set(GIT_DEPENDENCIES 
+        "${CMAKE_SOURCE_DIR}/.git/HEAD"
+        "${CMAKE_SOURCE_DIR}/.git/index")
+    
+    if(EXISTS "${GIT_REF_FILE}")
+        list(APPEND GIT_DEPENDENCIES "${GIT_REF_FILE}")
+    endif()
+    
+    add_custom_command(
+        OUTPUT "${CMAKE_BINARY_DIR}/version_info.f90"
+        COMMAND ${CMAKE_COMMAND} -E copy 
+            "${CMAKE_SOURCE_DIR}/version_info.f90.in" 
+            "${CMAKE_BINARY_DIR}/version_info.f90.in.tmp"
+        COMMAND ${CMAKE_COMMAND} 
+            -DGIT_EXECUTABLE=${GIT_EXECUTABLE}
+            -DSOURCE_DIR=${CMAKE_SOURCE_DIR}
+            -DINPUT_FILE=${CMAKE_BINARY_DIR}/version_info.f90.in.tmp
+            -DOUTPUT_FILE=${CMAKE_BINARY_DIR}/version_info.f90
+            -P "${CMAKE_SOURCE_DIR}/cmake/UpdateVersion.cmake"
+        DEPENDS 
+            "${CMAKE_SOURCE_DIR}/version_info.f90.in"
+            ${GIT_DEPENDENCIES}
+        COMMENT "Updating version information from Git"
+    )
+endif()
+
+
+
+
 
 # Gather sources but exclude any version_info.f90 in the source tree
 file(GLOB_RECURSE sources RELATIVE ${CMAKE_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/*.f90)
