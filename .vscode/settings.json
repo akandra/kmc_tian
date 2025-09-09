@@ -1,3 +1,4 @@
 {
-	"cmake.generator": "Ninja"
+	"cmake.generator": "Ninja",
+	"fortran.fortls.disabled": true
 }

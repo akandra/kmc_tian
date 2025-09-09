@@ -72,6 +72,11 @@ contains
     integer  :: temp_int
     logical  :: error_found = .false.
 
+    if (debug(7)) then
+      print*
+      print*, '---Checking parsing of energy input file: '
+    end if
+
     i = control_pars%n_species
     allocate(energy_parameters_init%ads_energy(i,n_max_lat_site_types,n_max_ads_sites))
     allocate(energy_parameters_init%int_energy_law_id(i,n_max_lat_site_types,n_max_ads_sites,&
@@ -201,7 +206,8 @@ contains
         else
 
 !            print*, 'unprocessed line: ', trim(buffer)
-          call error_message(file_name, line_number, buffer, "unknown key")
+        call error_message(file_name, line_number, buffer, &
+                                         "unknown key " // tokens(1))
 
         end if
       end if ! get_tokens
@@ -264,9 +270,12 @@ contains
             end if
           end if
 
-!            print*, 'name     =', current_species_name
-!            print*, 'id       =', current_species_id
-!            print*, control_pars%ads_names
+          if (debug(7)) then
+            print*, 'adsorption section for species: ', trim(current_species_name)
+            print*, 'id       =', current_species_id
+            print*, 'is_ess   =', energy_parameters_init%is_essential(current_species_id)
+            print*, 'list of species: ', control_pars%ads_names
+          end if
 
         elseif (get_index(tokens(1),lat_site_names) /= 0) then
 
@@ -371,7 +380,8 @@ contains
         else
 
 !            print*, 'unprocessed line: ', trim(buffer)
-          call error_message(file_name, line_number, buffer, "unknown key")
+          call error_message(file_name, line_number, buffer, &
+                                         "unknown key: " // tokens(1))
 
         end if
       end if ! get_tokens
@@ -418,8 +428,58 @@ contains
     end do
     end do
 
-    if (error_found) stop 'Errors in the energy input file'
+    if (debug(7)) then
+      print*
+      print*, ' Adsorption energies:'
+      do i1 =1,control_pars%n_species
+      do i1s=1,n_max_lat_site_types
+      do i1a=1,n_max_ads_sites
+        if (energy_parameters_init%ads_energy(i1,i1s,i1a) /= energy_parameters_init%undefined_energy) then
+            write(*,'(A4,A11,A4,F12.4)') trim(control_pars%ads_names(i1)), &
+                 trim(lat_site_names(i1s)), &
+                 trim(ads_site_names(i1a)), &
+                 energy_parameters_init%ads_energy(i1,i1s,i1a)
+        end if
+      end do
+      end do
+      end do
 
+      print*
+      print*, ' Interaction energies:'
+      print*
+      do i1 =1,control_pars%n_species
+      do i1s=1,n_max_lat_site_types
+      do i1a=1,n_max_ads_sites
+      do i2 =1,control_pars%n_species
+      do i2s=1,n_max_lat_site_types
+      do i2a=1,n_max_ads_sites
+
+        if (energy_parameters_init%n_interactions(i1,i1s,i1a,i2,i2s,i2a) > 0) then
+          write(*,'(A,3X,8(A,1X),I2)') &
+                   trim(int_law_names(energy_parameters_init%int_energy_law_id(i1,i1s,i1a,i2,i2s,i2a))),&
+                   trim(control_pars%ads_names(i1)), &
+                   trim(lat_site_names(i1s)), &
+                   trim(ads_site_names(i1a)), '   ', &
+                   trim(control_pars%ads_names(i2)), &
+                   trim(lat_site_names(i2s)), &
+                   trim(ads_site_names(i2a))
+          do n=1,energy_parameters_init%n_interactions(i1,i1s,i1a,i2,i2s,i2a)
+            write(*,'(3X,2I3,F12.4)') &
+                   energy_parameters_init%neighbor(i1,i1s,i1a,i2,i2s,i2a,n,:), &
+                   energy_parameters_init%int_energy_pars(i1,i1s,i1a,i2,i2s,i2a,n)
+          end do
+          print*
+        end if
+      end do
+      end do
+      end do
+      end do
+      end do
+      end do
+
+    end if
+
+    if (error_found) stop 'Errors in the energy input file'
 
   end function
 

@@ -18,6 +18,7 @@ character(len=max_string_length) file_name_base
 
 ! initialize vector of conditions for debug trap
 debug = .false.
+!debug(7) =  .true. ! check parsing of input energy file
 !debug(8) =  .true. ! check rates related stuff
 !debug(9) =  .true. ! check energy interaction parameters consistency
 !debug(10) = .true. ! check energy correction consistency in rc calculations

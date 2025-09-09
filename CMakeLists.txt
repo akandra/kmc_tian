@@ -1,4 +1,4 @@
-cmake_minimum_required (VERSION 4.0)
+cmake_minimum_required (VERSION 3.28)
 
 # Build option for static linking (GNU only)
 # to use: cmake -S . -B build -G "Ninja" -DBUILD_STATIC=ON
