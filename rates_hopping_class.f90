@@ -24,28 +24,25 @@ module rates_hopping_class
 
     ! Hopping Rates
     !                          n_adsorbate              -> which particle
-    !                          .  n_neighbor            -> where to
-    !                          .  .
-    type(v_list_dp), dimension(:, :), allocatable :: rates
+    !                          .  n_direction           -> which direction
+    !                          .  .  (x,y)
+    !                          .  .  .
+    type(v_list_dp), dimension(:, :, :), allocatable :: rates
 
 
           !                    (   n_species                       -> which species
           !                        .  n_site_type                  -> where from
           !                        .  .  n_adsorption_sites
           !                        .  .  .  n_site_type            -> where to
-          !                        .  .  .  .  n_adsorption_sites )
-          !                        .  .  .  .  .
-    real(dp),            dimension(:, :, :, :, :), allocatable :: process
-    type(int_law_pars),  dimension(:, :, :, :, :), allocatable :: rate_corr_pars
+          !                        .  .  .  .  n_adsorption_sites 
+          !                        .  .  .  .  .  n_direction      -> which direction
+          !                        .  .  .  .  .  .  (x,y)
+          !                        .  .  .  .  .  .  .
+    real(dp),            dimension(:, :, :, :, :, :, :), allocatable :: process
+    type(int_law_pars),  dimension(:, :, :, :, :, :, :), allocatable :: rate_corr_pars
 
-
-          !                    (   n_species                       -> which species
-          !                        .  n_site_type                  -> where from
-          !                        .  .  n_adsorption_sites
-          !                        .  .  .  n_adsorption_sites )   -> where to
-          !                        .  .  .  .
-    real(dp),            dimension(:, :, :, :), allocatable :: process_intra
-    type(int_law_pars),  dimension(:, :, :, :), allocatable :: rate_corr_pars_intra
+CONTINUE HERE: 
+   - implement 2-pass reading of rates
 
   contains
     procedure :: construct
@@ -63,7 +60,7 @@ contains
     type(mc_lat)            , intent(in)    :: lat
     type(energy_parameters) , intent(in)    :: e_pars
 
-    integer :: i, ios, nwords, line_number, i1, i2, i3, i4, m, j
+    integer :: i, ios, nwords, line_number, i1, i2, i3, i4, m, j, n1, n2
 
     integer :: species, st1, st2, ast1, ast2, col_st1(2)
 !    logical :: e_defined1, e_defined2, r_defined, undefined_rate, undefined_energy
@@ -203,6 +200,11 @@ contains
           !    temperature law records,
           !    interaction law records,
           !    to-from records,
+          !    hopping direction records:
+          !      - 0 1
+          !      - 0 1 Arrhenius 1.0E13 0.5
+          !      - 0 1 linear 0.5 0.5
+          !      - 0 1 Arrhenius 1.0E13 0.5 linear 0.5 0.5
           !    section end
 
 
@@ -248,163 +250,174 @@ contains
             endif
 
           else
-            ! ---------------------------------------------------------
-            ! check if we have a valid from-to rate record
-            ! ---------------------------------------------------------
-            if (nwords < 4) &
+            ! check if we have a hopping direction record
+            if (read_int(words(1), n1) .and.&
+                            nwords > 1 .and.& 
+                read_int(words(2), n2))  then
+
+              ! we have a valid hopping direction record. Process it
+              !   if record only has hopping direction information, 
+              !      set the law ids and pars to global default values
+              if (nwords == 2) then
+                if (rct_law_defined .and. rcic_law_defined) then
+                  rct_law_id  = rct_law_id_glob
+                  rct_pars    = rct_pars_glob
+                  rcic_law_id = rcic_law_id_glob
+                  rcic_pars   = rcic_pars_glob
+                elseif ( .not. rct_law_defined .and. .not. rcic_law_defined ) then
+                    call error_message(file_name, line_number, buffer, &
+                                  "temperature and interaction laws are not defined")
+                elseif (.not. rct_law_defined) then
+                    call error_message(file_name, line_number, buffer, &
+                                  "temperature law is not defined")
+                else
+                    call error_message(file_name, line_number, buffer, &
+                                  "interaction law is not defined")
+                end if
+
+              else
+                ! set rct_law_id and rcic_law_id to 0  
+                ! to indicate no law on this line found yet
+                rct_law_id  = 0
+                rcic_law_id = 0
+
+                do i=3,nwords
+                  ! check  for rct law on this line
+                  if (get_index(words(i), rct_law_names) /= 0) then
+                    rct_law_id = get_index(words(i), rct_law_names)
+                    select case (rct_law_id)
+                      case (Arrhenius_id)
+                        do j=1,2
+                          if ( .not. read_num(words(i+j),rct_pars(j)) )&
+                            call error_message(file_name, line_number, buffer,&
+                                                    "Arrhenius must have 2 numerical parameters")
+                        end do
+                      case (extArrhenius_id)
+                        do j=1,3
+                          if ( .not. read_num(words(i+j),rct_pars(j)) )&
+                            call error_message(file_name, line_number, buffer,&
+                                                    "extArrhenius must have 3 numerical parameters")
+                        end do
+                      case default
+                        call error_message(file_name, line_number, buffer, "This should not happen! Check the code!")
+                    end select
+
+                  end if
+
+                  ! check if we have an rcic law on this line
+                  if (get_index(words(i), rcic_law_names) /= 0) then
+                    rcic_law_id = get_index(words(i), rcic_law_names)
+                    select case (rcic_law_id)
+                      case (rcic_linear_id)
+                        do j=1,2
+                          if ( .not. read_num(words(i+j),rcic_pars(j)) )&
+                            call error_message(file_name, line_number, buffer,&
+                                                    "linear interaction must have 2 numerical parameters")
+                        end do
+                      case default
+                        call error_message(file_name, line_number, buffer, "This should not happen! Check the code!")
+                    end select
+                  end if
+
+                end do ! i=3,nwords
+
+                ! if rct_law  or rcic_law are not defined on this line, 
+                ! set to global defaults
+                if (rct_law_id == 0) then
+                  rct_law_id = rct_law_id_glob
+                  rct_pars   = rct_pars_glob
+                end if
+                if (rcic_law_id == 0) then
+                  rcic_law_id = rcic_law_id_glob
+                  rcic_pars   = rcic_pars_glob
+                end if
+
+                ! check for valid temperature and interaction laws
+                if (rct_law_id == 0) &
+                  call error_message(file_name, line_number, buffer, &
+                                    "no temperature law is specified")
+                if (rcic_law_id == 0) &
+                  call error_message(file_name, line_number, buffer, &
+                                    "no interaction law is specified")
+
+              end if ! (nwords==2)
+
+              ! Check if rct and rcic laws are properly set
+              if (rct_law_id == 0) &
+                call error_message(file_name, line_number, buffer, "invalid temperature law")
+              if (rcic_law_id == 0) &
+                call error_message(file_name, line_number, buffer, "invalid interaction law")
+
+              ! Set rate constants and rcic for hopping channels
+              if (is_same_lst) then
+                hopping_init%process_intra(current_species_id,i1,i2,i4 ) = &
+                            rct_law(rct_law_id, c_pars%temperature, rct_pars)
+                hopping_init%rate_corr_pars_intra(current_species_id,i1,i2,i4)%id = rcic_law_id
+                hopping_init%rate_corr_pars_intra(current_species_id,i1,i2,i4)%pars = rcic_pars
+                ! symmetrize
+                hopping_init%process_intra(current_species_id,i1,i4,i2 ) = &
+                hopping_init%process_intra(current_species_id,i1,i2,i4 )
+                hopping_init%rate_corr_pars_intra(current_species_id,i1,i4,i2)%id = rcic_law_id
+                hopping_init%rate_corr_pars_intra(current_species_id,i1,i4,i2)%pars = rcic_pars
+              else
+                hopping_init%process(current_species_id,i1,i2,i3,i4 ) = &
+                            rct_law(rct_law_id, c_pars%temperature, rct_pars)
+                hopping_init%rate_corr_pars(current_species_id,i1,i2,i3,i4)%id = rcic_law_id
+                hopping_init%rate_corr_pars(current_species_id,i1,i2,i3,i4)%pars = rcic_pars
+                ! symmetrize
+                hopping_init%process(current_species_id,i3,i4,i1,i2 ) = &
+                hopping_init%process(current_species_id,i1,i2,i3,i4 )
+                hopping_init%rate_corr_pars(current_species_id,i3,i4,i1,i2)%id = rcic_law_id
+                hopping_init%rate_corr_pars(current_species_id,i3,i4,i1,i2)%pars = rcic_pars
+              end if
+
+
+
+            ! check if we have an invalid record
+            else if (nwords /= 4)
               call error_message(file_name, line_number, buffer, &
                                  "invalid to-from rate record in the hopping section")
-            i1 = get_index(words(1),lat_site_names)
-            i2 = get_index(words(2),ads_site_names)
-            i3 = get_index(words(3),lat_site_names)
-            i4 = get_index(words(4),ads_site_names)
-            is_same_lst = (words(3) == same_lst_mark)
-            if (is_same_lst) i3 = i1
 
-            ! check for invalid site name (invalid lst or ast in either from or to site)
-            if ( i1==0 .or. i2==0 .or. i3==0 .or. i4==0) then
-              print *, 'parse state: ', parse_state
-              call error_message(file_name, line_number, buffer, &
-                                 "wrong site name in the hopping section")
-            end if
-
-            ! ---------------------------------------------------------
-            ! check for duplicate entry
-            ! ---------------------------------------------------------
-            if (is_same_lst) then
-              if (hopping_init%process_intra(current_species_id,i1,i2,i4 ) /= default_rate)&
-                call error_message(file_name, line_number, buffer, "duplicated entry (check symmetry duplicates)")
+            ! check if we have a valid from-to rate record
             else
-              if (hopping_init%process(current_species_id,i1,i2,i3,i4 ) /= default_rate)&
-              call error_message(file_name, line_number, buffer, "duplicated entry (check symmetry duplicates)")
-            end if
 
-            ! check energy is defined for initial and final site_type and ads_site
-            if( e_pars%ads_energy(current_species_id, i1, i2) == e_pars%undefined_energy .or. &
-                e_pars%ads_energy(current_species_id, i3, i4) == e_pars%undefined_energy ) then
-              call error_message(file_name, line_number, buffer, &
-                               "rate defined for a site with undefined adsorption energy", &
-                               stop=.false., warning=.false.)
+              i1 = get_index(words(1),lat_site_names)
+              i2 = get_index(words(2),ads_site_names)
+              i3 = get_index(words(3),lat_site_names)
+              i4 = get_index(words(4),ads_site_names)
+              is_same_lst = (words(3) == same_lst_mark)
+              if (is_same_lst) i3 = i1
 
-              undefined_energy = .true.
-            end if
+              ! check for invalid site name (invalid lst or ast in either from or to site)
+              if ( i1==0 .or. i2==0 .or. i3==0 .or. i4==0) then
+                print *, 'parse state: ', parse_state
+                call error_message(file_name, line_number, buffer, &
+                                  "wrong site name in the hopping section")
+              end if
 
-
-            ! ---------------------------------------------------------
-            ! we have a valid rate record. Process it
-            ! ---------------------------------------------------------
-            ! if record only has to-from site information then set the law ids and pars to global default values
-            if (nwords == 4) then
-              if (rct_law_defined .and. rcic_law_defined) then
-                rct_law_id  = rct_law_id_glob
-                rct_pars    = rct_pars_glob
-                rcic_law_id = rcic_law_id_glob
-                rcic_pars   = rcic_pars_glob
-              elseif ( .not. rct_law_defined .and. .not. rcic_law_defined ) then
-                  call error_message(file_name, line_number, buffer, &
-                                 "temperature and interaction laws are not defined")
-              elseif (.not. rct_law_defined) then
-                  call error_message(file_name, line_number, buffer, &
-                                 "temperature law is not defined")
+              ! ---------------------------------------------------------
+              ! check for duplicate entry
+              ! ---------------------------------------------------------
+              if (is_same_lst) then
+                if (hopping_init%process_intra(current_species_id,i1,i2,i4 ) /= default_rate)&
+                  call error_message(file_name, line_number, buffer, "duplicated entry (check symmetry duplicates)")
               else
-                  call error_message(file_name, line_number, buffer, &
-                                 "interaction law is not defined")
+                if (hopping_init%process(current_species_id,i1,i2,i3,i4 ) /= default_rate)&
+                call error_message(file_name, line_number, buffer, "duplicated entry (check symmetry duplicates)")
               end if
 
-            else
-              ! set rct_law_id and rcic_law_id to 0 to indicate no law on this line found yet
-              rct_law_id  = 0
-              rcic_law_id = 0
-
-              do i=5,nwords
-                ! check  for rct law on this line
-                if (get_index(words(i), rct_law_names) /= 0) then
-                  rct_law_id = get_index(words(i), rct_law_names)
-                  select case (rct_law_id)
-                    case (Arrhenius_id)
-                      do j=1,2
-                        if ( .not. read_num(words(i+j),rct_pars(j)) )&
-                          call error_message(file_name, line_number, buffer,&
-                                                  "Arrhenius must have 2 numerical parameters")
-                      end do
-                    case (extArrhenius_id)
-                      do j=1,3
-                        if ( .not. read_num(words(i+j),rct_pars(j)) )&
-                          call error_message(file_name, line_number, buffer,&
-                                                  "extArrhenius must have 3 numerical parameters")
-                      end do
-                    case default
-                      call error_message(file_name, line_number, buffer, "This should not happen! Check the code!")
-                  end select
-
-                end if
-
-                ! check if we have an rcic law on this line
-                if (get_index(words(i), rcic_law_names) /= 0) then
-                  rcic_law_id = get_index(words(i), rcic_law_names)
-                  select case (rcic_law_id)
-                    case (rcic_linear_id)
-                      do j=1,2
-                        if ( .not. read_num(words(i+j),rcic_pars(j)) )&
-                          call error_message(file_name, line_number, buffer,&
-                                                  "linear interaction must have 2 numerical parameters")
-                      end do
-                    case default
-                      call error_message(file_name, line_number, buffer, "This should not happen! Check the code!")
-                  end select
-                end if
-
-              end do ! i=5,nwords
-
-              ! if rct_law  or rcic_law are not defined on this line, set to global defaults
-              if (rct_law_id == 0) then
-                rct_law_id = rct_law_id_glob
-                rct_pars   = rct_pars_glob
-              end if
-              if (rcic_law_id == 0) then
-                rcic_law_id = rcic_law_id_glob
-                rcic_pars   = rcic_pars_glob
-              end if
-
-              ! check for valid temperature and interaction laws
-              if (rct_law_id == 0) &
+              ! check energy is defined for initial and final site_type and ads_site
+              if( e_pars%ads_energy(current_species_id, i1, i2) == e_pars%undefined_energy .or. &
+                  e_pars%ads_energy(current_species_id, i3, i4) == e_pars%undefined_energy ) then
                 call error_message(file_name, line_number, buffer, &
-                                  "no temperature law is specified")
-              if (rcic_law_id == 0) &
-                call error_message(file_name, line_number, buffer, &
-                                   "no interaction law is specified")
+                                "rate defined for a site with undefined adsorption energy", &
+                                stop=.false., warning=.false.)
 
-            end if ! (nwords==4)
+                undefined_energy = .true.
+              end if
 
-            ! Check if rct and rcic laws are properly set
-            if (rct_law_id == 0) &
-              call error_message(file_name, line_number, buffer, "invalid temperature law")
-            if (rcic_law_id == 0) &
-              call error_message(file_name, line_number, buffer, "invalid interaction law")
 
-            ! Set rate constants and rcic for hopping channels
-            if (is_same_lst) then
-              hopping_init%process_intra(current_species_id,i1,i2,i4 ) = &
-                          rct_law(rct_law_id, c_pars%temperature, rct_pars)
-              hopping_init%rate_corr_pars_intra(current_species_id,i1,i2,i4)%id = rcic_law_id
-              hopping_init%rate_corr_pars_intra(current_species_id,i1,i2,i4)%pars = rcic_pars
-              ! symmetrize
-              hopping_init%process_intra(current_species_id,i1,i4,i2 ) = &
-              hopping_init%process_intra(current_species_id,i1,i2,i4 )
-              hopping_init%rate_corr_pars_intra(current_species_id,i1,i4,i2)%id = rcic_law_id
-              hopping_init%rate_corr_pars_intra(current_species_id,i1,i4,i2)%pars = rcic_pars
-            else
-              hopping_init%process(current_species_id,i1,i2,i3,i4 ) = &
-                          rct_law(rct_law_id, c_pars%temperature, rct_pars)
-              hopping_init%rate_corr_pars(current_species_id,i1,i2,i3,i4)%id = rcic_law_id
-              hopping_init%rate_corr_pars(current_species_id,i1,i2,i3,i4)%pars = rcic_pars
-              ! symmetrize
-              hopping_init%process(current_species_id,i3,i4,i1,i2 ) = &
-              hopping_init%process(current_species_id,i1,i2,i3,i4 )
-              hopping_init%rate_corr_pars(current_species_id,i3,i4,i1,i2)%id = rcic_law_id
-              hopping_init%rate_corr_pars(current_species_id,i3,i4,i1,i2)%pars = rcic_pars
             end if
-
           endif ! words(1) == section_end
 
       end select
