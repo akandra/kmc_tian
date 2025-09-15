@@ -25,24 +25,21 @@ module rates_hopping_class
     ! Hopping Rates
     !                          n_adsorbate              -> which particle
     !                          .  n_direction           -> which direction
-    !                          .  .  (x,y)
-    !                          .  .  .
-    type(v_list_dp), dimension(:, :, :), allocatable :: rates
-
+    !                          .  .
+    type(v_list_dp), dimension(:, :), allocatable :: rates
 
           !                    (   n_species                       -> which species
           !                        .  n_site_type                  -> where from
           !                        .  .  n_adsorption_sites
           !                        .  .  .  n_site_type            -> where to
           !                        .  .  .  .  n_adsorption_sites 
-          !                        .  .  .  .  .  n_direction      -> which direction
-          !                        .  .  .  .  .  .  (x,y)
+          !                        .  .  .  .  .  max_n_directions -> which direction
+          !                        .  .  .  .  .  . 
+    real(dp),            dimension(:, :, :, :, :, :), allocatable :: process
+    type(int_law_pars),  dimension(:, :, :, :, :, :), allocatable :: rate_corr_pars
+          !                        .  .  .  .  .  .  1=row, 2=col 
           !                        .  .  .  .  .  .  .
-    real(dp),            dimension(:, :, :, :, :, :, :), allocatable :: process
-    type(int_law_pars),  dimension(:, :, :, :, :, :, :), allocatable :: rate_corr_pars
-
-CONTINUE HERE: 
-   - implement 2-pass reading of rates
+    integer,             dimension(:, :, :, :, :, :, :), allocatable :: directions
 
   contains
     procedure :: construct
@@ -89,10 +86,9 @@ contains
     integer,  parameter   :: default_int = 0
     real(dp), parameter   :: default_rate  = -1.0_dp
 
-    integer :: max_avail_ads_sites
+    integer :: max_avail_ads_sites, pass, dcounter, max_n_directions
 
     character(len=2) :: check_str
-    logical :: is_same_lst
     !character(len=100) :: status_str
 
 
@@ -108,344 +104,359 @@ contains
     end do
     end do
 
-    ! Allocate and initialize rates array
-    allocate( hopping_init%rates(lat%n_rows*lat%n_cols,lat%n_max_nn+1) ) ! '+1' accounts for intra-site hops
-    do i=1,lat%n_rows*lat%n_cols
-    do m=1,lat%n_max_nn+1
-      allocate( hopping_init%rates(i,m)%list(max_avail_ads_sites) )
-      hopping_init%rates(i,m)%list = 0.0_dp
-    end do
-    end do
-
-    allocate(hopping_init%process( c_pars%n_species,&
-                                 n_max_lat_site_types, n_max_ads_sites,&
-                                 n_max_lat_site_types, n_max_ads_sites) )
-    allocate(hopping_init%process_intra( c_pars%n_species,&
-                                 n_max_lat_site_types, n_max_ads_sites, n_max_ads_sites) )
-
-    hopping_init%process       = default_rate
-    hopping_init%process_intra = default_rate
-
-    allocate(hopping_init%rate_corr_pars( c_pars%n_species,&
-                                 n_max_lat_site_types, n_max_ads_sites,&
-                                 n_max_lat_site_types, n_max_ads_sites) )
-    allocate(hopping_init%rate_corr_pars_intra( c_pars%n_species,&
-                                 n_max_lat_site_types, n_max_ads_sites, n_max_ads_sites) )
-
-    hopping_init%rate_corr_pars       = int_law_pars(default_int,default_rate)
-    hopping_init%rate_corr_pars_intra = int_law_pars(default_int,default_rate)
-
     !  read rate definitions from the input file
     file_name = c_pars%rate_file_name
-    call open_for_read(inp_unit, file_name )
 
-    ios = 0
-    parse_state = parse_state_default
-    line_number = 0
-    undefined_energy = .false.
+    do pass = 1,2
 
-    !---------------------------------------------------------------------------
-    ! loop over all lines of rate input file
-    !---------------------------------------------------------------------------
+      ! Allocate and initialize rates array before the second pass
+      if (pass == 2) then
 
-    do while (ios == 0)
+        allocate( hopping_init%rates(lat%n_rows*lat%n_cols, max_n_directions) )
+        do i=1,lat%n_rows*lat%n_cols
+        do m=1,max_n_directions
+          allocate( hopping_init%rates(i,m)%list(max_avail_ads_sites) )
+          hopping_init%rates(i,m)%list = 0.0_dp
+        end do
+        end do
 
-      read(inp_unit, '(A)', iostat=ios) buffer
+        allocate(hopping_init%process( c_pars%n_species,&
+                                    n_max_lat_site_types, n_max_ads_sites,&
+                                    n_max_lat_site_types, n_max_ads_sites) )
+        allocate(hopping_init%process_intra( c_pars%n_species,&
+                                    n_max_lat_site_types, n_max_ads_sites, n_max_ads_sites) )
 
-      line_number = line_number + 1
-      ! ios = 0: valid record read
-      ! ios < 0: end of record condition encountered or end of file condition detected
-      ! ios > 0: an error is detected
-      !if (ios < 0) buffer = section_end  ! treat end of file as the section end
+        hopping_init%process       = default_rate
+        hopping_init%process_intra = default_rate
 
-      ! Split an input string
-      words = ''
-      call split_string(buffer, words, nwords)
+        allocate(hopping_init%rate_corr_pars( c_pars%n_species,&
+                                    n_max_lat_site_types, n_max_ads_sites,&
+                                    n_max_lat_site_types, n_max_ads_sites,
+                                    max_n_directions) )
+        hopping_init%rate_corr_pars       = int_law_pars(default_int,default_rate)
 
-      ! skip comments
-      if (nwords == 0) cycle
+        allocate(hopping_init%directions( c_pars%n_species,&
+                                    n_max_lat_site_types, n_max_ads_sites,&
+                                    n_max_lat_site_types, n_max_ads_sites,
+                                    max_n_directions,2) )
+        hopping_init%directions = 0
 
-      select case (parse_state)
+      endif
 
-        case(parse_state_default)
-          ! in parse state default:
-          !    word 'hopping' to mark beginning of a hopping section
-          !    ignore anything else until hopping section begins
+      call open_for_read(inp_unit, file_name )
 
-          if (words(1) == reaction_names(hopping_id)) then
+      ios = 0
+      parse_state = parse_state_default
+      line_number = 0
+      undefined_energy = .false.
 
-            hopping_init%is_defined = .true.
-            parse_state = parse_state_hopping
-            ! reset necessary to allow multiple hopping sections
-            rct_law_defined  = .false.
-            rcic_law_defined = .false.
-            rct_law_id_glob  = 0
-            rcic_law_id_glob = 0
+      !---------------------------------------------------------------------------
+      ! loop over all lines of rate input file
+      !---------------------------------------------------------------------------
 
-            if (nwords == 2) then
-              read(words(2),'(A)') current_species_name
-              current_species_id = get_index(current_species_name, c_pars%ads_names)
-              if (current_species_id == 0) call error_message(file_name, line_number, buffer, &
-                                                              "unknown species in hopping section definition")
-            else
-              call error_message(file_name, line_number, buffer, &
-                         "hopping key must have 1 parameter -- species")
-            end if !nwords == 2
+      do while (ios == 0)
 
-          end if ! words(1)
+        read(inp_unit, '(A)', iostat=ios) buffer
 
+        line_number = line_number + 1
+        ! ios = 0: valid record read
+        ! ios < 0: end of record condition encountered or end of file condition detected
+        ! ios > 0: an error is detected
+        !if (ios < 0) buffer = section_end  ! treat end of file as the section end
 
-        case(parse_state_hopping)
-          ! process:
-          !    temperature law records,
-          !    interaction law records,
-          !    to-from records,
-          !    hopping direction records:
-          !      - 0 1
-          !      - 0 1 Arrhenius 1.0E13 0.5
-          !      - 0 1 linear 0.5 0.5
-          !      - 0 1 Arrhenius 1.0E13 0.5 linear 0.5 0.5
-          !    section end
+        ! Split an input string
+        words = ''
+        call split_string(buffer, words, nwords)
 
+        ! skip comments
+        if (nwords == 0) cycle
 
-          if (words(1) == section_end) then
-            parse_state = parse_state_default
+        select case (parse_state)
 
-          elseif (words(1) =='temperature_law') then
-            rct_law_id_glob = get_index(words(2), rct_law_names)
-            if (rct_law_id_glob == 0) then
-              call error_message(file_name, line_number, buffer,&
-                                 "invalid temperature law statement")
-            else
-              rct_law_defined = .true.
-              select case (rct_law_id_glob)
-                case (Arrhenius_id)
-                  if (nwords/=4) call error_message(file_name, line_number, buffer,&
-                                                    "Arrhenius must have 2 parameters")
-                  read(words(3),*) rct_pars_glob(1)
-                  read(words(4),*) rct_pars_glob(2)
-                case (extArrhenius_id)
-                  if (nwords/=5) call error_message(file_name, line_number, buffer,&
-                                                    "extArrhenius must have 3 parameters")
-                  read(words(3),*) rct_pars_glob(1)
-                  read(words(4),*) rct_pars_glob(2)
-                  read(words(5),*) rct_pars_glob(3)
-              end select
-            endif
+          case(parse_state_default)
+            ! in parse state default:
+            !    word 'hopping' to mark beginning of a hopping section
+            !    ignore anything else until hopping section begins
 
-          elseif (words(1) =='interaction_law') then
-            rcic_law_id_glob = get_index(words(2), rcic_law_names)
-            if (rcic_law_id_glob == 0) then
-              call error_message(file_name, line_number, buffer,&
-                                 "invalid interaction law statement")
-            else
-              rcic_law_defined = .true.
-              select case (rcic_law_id_glob)
-                case (rcic_linear_id)
-                  if (nwords/=4) call error_message(file_name, line_number, buffer,&
-                                                    "linear interaction law must have 2 parameters")
-                  read(words(3),*) rcic_pars_glob(1)
-                  read(words(4),*) rcic_pars_glob(2)
-              end select
-            endif
+            if (words(1) == reaction_names(hopping_id)) then
 
-          else
-            ! check if we have a hopping direction record
-            if (read_int(words(1), n1) .and.&
-                            nwords > 1 .and.& 
-                read_int(words(2), n2))  then
+              hopping_init%is_defined = .true.
+              parse_state = parse_state_hopping
+              ! reset necessary to allow multiple hopping sections
+              rct_law_defined  = .false.
+              rcic_law_defined = .false.
+              rct_law_id_glob  = 0
+              rcic_law_id_glob = 0
 
-              ! we have a valid hopping direction record. Process it
-              !   if record only has hopping direction information, 
-              !      set the law ids and pars to global default values
               if (nwords == 2) then
-                if (rct_law_defined .and. rcic_law_defined) then
-                  rct_law_id  = rct_law_id_glob
-                  rct_pars    = rct_pars_glob
-                  rcic_law_id = rcic_law_id_glob
-                  rcic_pars   = rcic_pars_glob
-                elseif ( .not. rct_law_defined .and. .not. rcic_law_defined ) then
-                    call error_message(file_name, line_number, buffer, &
-                                  "temperature and interaction laws are not defined")
-                elseif (.not. rct_law_defined) then
-                    call error_message(file_name, line_number, buffer, &
-                                  "temperature law is not defined")
-                else
-                    call error_message(file_name, line_number, buffer, &
-                                  "interaction law is not defined")
-                end if
-
+                read(words(2),'(A)') current_species_name
+                current_species_id = get_index(current_species_name, c_pars%ads_names)
+                if (current_species_id == 0) call error_message(file_name, line_number, buffer, &
+                                                                "unknown species in hopping section definition")
               else
-                ! set rct_law_id and rcic_law_id to 0  
-                ! to indicate no law on this line found yet
-                rct_law_id  = 0
-                rcic_law_id = 0
+                call error_message(file_name, line_number, buffer, &
+                          "hopping key must have 1 parameter -- species")
+              end if !nwords == 2
 
-                do i=3,nwords
-                  ! check  for rct law on this line
-                  if (get_index(words(i), rct_law_names) /= 0) then
-                    rct_law_id = get_index(words(i), rct_law_names)
-                    select case (rct_law_id)
-                      case (Arrhenius_id)
-                        do j=1,2
-                          if ( .not. read_num(words(i+j),rct_pars(j)) )&
-                            call error_message(file_name, line_number, buffer,&
-                                                    "Arrhenius must have 2 numerical parameters")
-                        end do
-                      case (extArrhenius_id)
-                        do j=1,3
-                          if ( .not. read_num(words(i+j),rct_pars(j)) )&
-                            call error_message(file_name, line_number, buffer,&
-                                                    "extArrhenius must have 3 numerical parameters")
-                        end do
-                      case default
-                        call error_message(file_name, line_number, buffer, "This should not happen! Check the code!")
-                    end select
+            end if ! words(1)
 
-                  end if
+          case(parse_state_hopping)
+            ! process:
+            !    temperature law records,
+            !    interaction law records,
+            !    to-from records,
+            !    hopping direction records:
+            !      - 0 1
+            !      - 0 1 Arrhenius 1.0E13 0.5
+            !      - 0 1 linear 0.5 0.5
+            !      - 0 1 Arrhenius 1.0E13 0.5 linear 0.5 0.5
+            !    section end
 
-                  ! check if we have an rcic law on this line
-                  if (get_index(words(i), rcic_law_names) /= 0) then
-                    rcic_law_id = get_index(words(i), rcic_law_names)
-                    select case (rcic_law_id)
-                      case (rcic_linear_id)
-                        do j=1,2
-                          if ( .not. read_num(words(i+j),rcic_pars(j)) )&
-                            call error_message(file_name, line_number, buffer,&
-                                                    "linear interaction must have 2 numerical parameters")
-                        end do
-                      case default
-                        call error_message(file_name, line_number, buffer, "This should not happen! Check the code!")
-                    end select
-                  end if
 
-                end do ! i=3,nwords
+            if (words(1) == section_end) then
+              parse_state = parse_state_default
 
-                ! if rct_law  or rcic_law are not defined on this line, 
-                ! set to global defaults
-                if (rct_law_id == 0) then
-                  rct_law_id = rct_law_id_glob
-                  rct_pars   = rct_pars_glob
-                end if
-                if (rcic_law_id == 0) then
-                  rcic_law_id = rcic_law_id_glob
-                  rcic_pars   = rcic_pars_glob
-                end if
-
-                ! check for valid temperature and interaction laws
-                if (rct_law_id == 0) &
-                  call error_message(file_name, line_number, buffer, &
-                                    "no temperature law is specified")
-                if (rcic_law_id == 0) &
-                  call error_message(file_name, line_number, buffer, &
-                                    "no interaction law is specified")
-
-              end if ! (nwords==2)
-
-              ! Check if rct and rcic laws are properly set
-              if (rct_law_id == 0) &
-                call error_message(file_name, line_number, buffer, "invalid temperature law")
-              if (rcic_law_id == 0) &
-                call error_message(file_name, line_number, buffer, "invalid interaction law")
-
-              ! Set rate constants and rcic for hopping channels
-              if (is_same_lst) then
-                hopping_init%process_intra(current_species_id,i1,i2,i4 ) = &
-                            rct_law(rct_law_id, c_pars%temperature, rct_pars)
-                hopping_init%rate_corr_pars_intra(current_species_id,i1,i2,i4)%id = rcic_law_id
-                hopping_init%rate_corr_pars_intra(current_species_id,i1,i2,i4)%pars = rcic_pars
-                ! symmetrize
-                hopping_init%process_intra(current_species_id,i1,i4,i2 ) = &
-                hopping_init%process_intra(current_species_id,i1,i2,i4 )
-                hopping_init%rate_corr_pars_intra(current_species_id,i1,i4,i2)%id = rcic_law_id
-                hopping_init%rate_corr_pars_intra(current_species_id,i1,i4,i2)%pars = rcic_pars
+            elseif (words(1) =='temperature_law') then
+              rct_law_id_glob = get_index(words(2), rct_law_names)
+              if (rct_law_id_glob == 0) then
+                call error_message(file_name, line_number, buffer,&
+                                  "invalid temperature law statement")
               else
-                hopping_init%process(current_species_id,i1,i2,i3,i4 ) = &
-                            rct_law(rct_law_id, c_pars%temperature, rct_pars)
-                hopping_init%rate_corr_pars(current_species_id,i1,i2,i3,i4)%id = rcic_law_id
-                hopping_init%rate_corr_pars(current_species_id,i1,i2,i3,i4)%pars = rcic_pars
-                ! symmetrize
-                hopping_init%process(current_species_id,i3,i4,i1,i2 ) = &
-                hopping_init%process(current_species_id,i1,i2,i3,i4 )
-                hopping_init%rate_corr_pars(current_species_id,i3,i4,i1,i2)%id = rcic_law_id
-                hopping_init%rate_corr_pars(current_species_id,i3,i4,i1,i2)%pars = rcic_pars
-              end if
+                rct_law_defined = .true.
+                select case (rct_law_id_glob)
+                  case (Arrhenius_id)
+                    if (nwords/=4) call error_message(file_name, line_number, buffer,&
+                                                      "Arrhenius must have 2 parameters")
+                    read(words(3),*) rct_pars_glob(1)
+                    read(words(4),*) rct_pars_glob(2)
+                  case (extArrhenius_id)
+                    if (nwords/=5) call error_message(file_name, line_number, buffer,&
+                                                      "extArrhenius must have 3 parameters")
+                    read(words(3),*) rct_pars_glob(1)
+                    read(words(4),*) rct_pars_glob(2)
+                    read(words(5),*) rct_pars_glob(3)
+                end select
+              endif
 
+            elseif (words(1) =='interaction_law') then
+              rcic_law_id_glob = get_index(words(2), rcic_law_names)
+              if (rcic_law_id_glob == 0) then
+                call error_message(file_name, line_number, buffer,&
+                                  "invalid interaction law statement")
+              else
+                rcic_law_defined = .true.
+                select case (rcic_law_id_glob)
+                  case (rcic_linear_id)
+                    if (nwords/=4) call error_message(file_name, line_number, buffer,&
+                                                      "linear interaction law must have 2 parameters")
+                    read(words(3),*) rcic_pars_glob(1)
+                    read(words(4),*) rcic_pars_glob(2)
+                end select
+              endif
 
-
-            ! check if we have an invalid record
-            else if (nwords /= 4)
-              call error_message(file_name, line_number, buffer, &
-                                 "invalid to-from rate record in the hopping section")
-
-            ! check if we have a valid from-to rate record
             else
+              ! check if we have a hopping direction record
+              if (read_int(words(1), n1) .and.&
+                              nwords > 1 .and.& 
+                  read_int(words(2), n2))  then
 
-              i1 = get_index(words(1),lat_site_names)
-              i2 = get_index(words(2),ads_site_names)
-              i3 = get_index(words(3),lat_site_names)
-              i4 = get_index(words(4),ads_site_names)
-              is_same_lst = (words(3) == same_lst_mark)
-              if (is_same_lst) i3 = i1
+                ! we have a valid hopping direction record. Process it
 
-              ! check for invalid site name (invalid lst or ast in either from or to site)
-              if ( i1==0 .or. i2==0 .or. i3==0 .or. i4==0) then
-                print *, 'parse state: ', parse_state
+                ! increment counter of directions
+                dcounter = dcounter + 1
+                if (dcounter > max_n_directions) max_n_directions = dcounter
+
+                !   if record only has hopping direction information, 
+                !      set the law ids and pars to global default values
+                if (nwords == 2) then
+                  if (rct_law_defined .and. rcic_law_defined) then
+                    rct_law_id  = rct_law_id_glob
+                    rct_pars    = rct_pars_glob
+                    rcic_law_id = rcic_law_id_glob
+                    rcic_pars   = rcic_pars_glob
+                  elseif ( .not. rct_law_defined .and. .not. rcic_law_defined ) then
+                      call error_message(file_name, line_number, buffer, &
+                                    "temperature and interaction laws are not defined")
+                  elseif (.not. rct_law_defined) then
+                      call error_message(file_name, line_number, buffer, &
+                                    "temperature law is not defined")
+                  else
+                      call error_message(file_name, line_number, buffer, &
+                                    "interaction law is not defined")
+                  end if
+
+                else
+                  ! set rct_law_id and rcic_law_id to 0  
+                  ! to indicate no law on this line found yet
+                  rct_law_id  = 0
+                  rcic_law_id = 0
+
+                  do i=3,nwords
+                    ! check  for rct law on this line
+                    if (get_index(words(i), rct_law_names) /= 0) then
+                      rct_law_id = get_index(words(i), rct_law_names)
+                      select case (rct_law_id)
+                        case (Arrhenius_id)
+                          do j=1,2
+                            if ( .not. read_num(words(i+j),rct_pars(j)) )&
+                              call error_message(file_name, line_number, buffer,&
+                                                      "Arrhenius must have 2 numerical parameters")
+                          end do
+                        case (extArrhenius_id)
+                          do j=1,3
+                            if ( .not. read_num(words(i+j),rct_pars(j)) )&
+                              call error_message(file_name, line_number, buffer,&
+                                                      "extArrhenius must have 3 numerical parameters")
+                          end do
+                        case default
+                          call error_message(file_name, line_number, buffer, "This should not happen! Check the code!")
+                      end select
+
+                    end if
+
+                    ! check if we have an rcic law on this line
+                    if (get_index(words(i), rcic_law_names) /= 0) then
+                      rcic_law_id = get_index(words(i), rcic_law_names)
+                      select case (rcic_law_id)
+                        case (rcic_linear_id)
+                          do j=1,2
+                            if ( .not. read_num(words(i+j),rcic_pars(j)) )&
+                              call error_message(file_name, line_number, buffer,&
+                                                      "linear interaction must have 2 numerical parameters")
+                          end do
+                        case default
+                          call error_message(file_name, line_number, buffer, "This should not happen! Check the code!")
+                      end select
+                    end if
+
+                  end do ! i=3,nwords
+
+                  ! if rct_law  or rcic_law are not defined on this line, 
+                  ! set to global defaults
+                  if (rct_law_id == 0) then
+                    rct_law_id = rct_law_id_glob
+                    rct_pars   = rct_pars_glob
+                  end if
+                  if (rcic_law_id == 0) then
+                    rcic_law_id = rcic_law_id_glob
+                    rcic_pars   = rcic_pars_glob
+                  end if
+
+                  ! check for valid temperature and interaction laws
+                  if (rct_law_id == 0) &
+                    call error_message(file_name, line_number, buffer, &
+                                      "no temperature law is specified")
+                  if (rcic_law_id == 0) &
+                    call error_message(file_name, line_number, buffer, &
+                                      "no interaction law is specified")
+
+                end if ! (nwords==2)
+
+                ! Check if rct and rcic laws are properly set
+                if (rct_law_id == 0) &
+                  call error_message(file_name, line_number, buffer, "invalid temperature law")
+                if (rcic_law_id == 0) &
+                  call error_message(file_name, line_number, buffer, "invalid interaction law")
+
+                if (pass == 2) then
+
+                  ! Set rate constants, directions, and rcic for hopping channels
+                  hopping_init%directions(current_species_id,i1,i2,i3,i4,dcounter,1) = n1
+                  hopping_init%directions(current_species_id,i1,i2,i3,i4,dcounter,2) = n2
+                  hopping_init%process(current_species_id,i1,i2,i3,i4,dcounter) = &
+                              rct_law(rct_law_id, c_pars%temperature, rct_pars)
+                  hopping_init%rate_corr_pars(current_species_id,i1,i2,i3,i4,dcounter)%id &
+                                                                              = rcic_law_id
+                  hopping_init%rate_corr_pars(current_species_id,i1,i2,i3,i4,dcounter)%pars &
+                                                                              = rcic_pars
+                  ! symmetrize
+                  hopping_init%directions(current_species_id,i3,i4,i1,i2,dcounter,1) = -n1
+                  hopping_init%directions(current_species_id,i3,i4,i1,i2,dcounter,2) = -n2
+
+                  
+                  hopping_init%process(current_species_id,i3,i4,i1,i2 ) = &
+                  hopping_init%process(current_species_id,i1,i2,i3,i4 )
+                  hopping_init%rate_corr_pars(current_species_id,i3,i4,i1,i2)%id = rcic_law_id
+                  hopping_init%rate_corr_pars(current_species_id,i3,i4,i1,i2)%pars = rcic_pars
+
+                end if ! (pass==2)
+
+              ! check if we have an invalid record
+              elseif (nwords /= 4)
                 call error_message(file_name, line_number, buffer, &
-                                  "wrong site name in the hopping section")
-              end if
+                                  "invalid to-from rate record in the hopping section")
 
-              ! ---------------------------------------------------------
-              ! check for duplicate entry
-              ! ---------------------------------------------------------
-              if (is_same_lst) then
-                if (hopping_init%process_intra(current_species_id,i1,i2,i4 ) /= default_rate)&
-                  call error_message(file_name, line_number, buffer, "duplicated entry (check symmetry duplicates)")
+              ! check if we have a valid from-to rate record
               else
-                if (hopping_init%process(current_species_id,i1,i2,i3,i4 ) /= default_rate)&
-                call error_message(file_name, line_number, buffer, "duplicated entry (check symmetry duplicates)")
-              end if
 
-              ! check energy is defined for initial and final site_type and ads_site
-              if( e_pars%ads_energy(current_species_id, i1, i2) == e_pars%undefined_energy .or. &
-                  e_pars%ads_energy(current_species_id, i3, i4) == e_pars%undefined_energy ) then
-                call error_message(file_name, line_number, buffer, &
-                                "rate defined for a site with undefined adsorption energy", &
-                                stop=.false., warning=.false.)
+                if (pass == 1) then
+                  ! reset direction counter in the first pass
+                  dcounter = 0
+                end if
 
-                undefined_energy = .true.
-              end if
+                i1 = get_index(words(1),lat_site_names)
+                i2 = get_index(words(2),ads_site_names)
+                i3 = get_index(words(3),lat_site_names)
+                i4 = get_index(words(4),ads_site_names)
 
+                ! check for invalid site name (invalid lst or ast in either from or to site)
+                if ( i1==0 .or. i2==0 .or. i3==0 .or. i4==0) then
+                  print *, 'parse state: ', parse_state
+                  call error_message(file_name, line_number, buffer, &
+                                    "wrong site name in the hopping section")
+                end if
 
-            end if
-          endif ! words(1) == section_end
+                ! ---------------------------------------------------------
+                ! check for duplicate entry
+                ! ---------------------------------------------------------
+                if (pass==2) then
 
-      end select
-    end do ! while ios=0
+                  if (hopping_init%process(current_species_id,i1,i2,i3,i4 ) /= default_rate)&
+                  call error_message(file_name, line_number, buffer, "duplicated entry (check symmetry duplicates)")
 
-    close(inp_unit)
+                  ! check energy is defined for initial and final site_type and ads_site
+                  if( e_pars%ads_energy(current_species_id, i1, i2) == e_pars%undefined_energy .or. &
+                      e_pars%ads_energy(current_species_id, i3, i4) == e_pars%undefined_energy ) then
+                    call error_message(file_name, line_number, buffer, &
+                                    "rate defined for a site with undefined adsorption energy", &
+                                    stop=.false., warning=.false.)
 
-    if (parse_state /= parse_state_default) then
-      !write(*, '(A)') ' hopping: error, incomplete hopping section'
-      print *, 'parse state: ', parse_state
-      !stop 996
-      call error_message(file_name, line_number, buffer, &
-           'hopping: error, incomplete hopping section')
-    endif
+                    undefined_energy = .true.
+                  end if
 
-    if (undefined_energy) then
-      write(*, '(A)') ' hopping: error, rates defined for sites with undefined energies'
-      stop 997
+                end if ! (pass==2)    
 
-    else
-      if (hopping_init%is_defined) then
-        write(*, '(A)') ' hopping: passed check that energies are defined for all rates'
+              end if ! valid from-to record
+
+            endif ! words(1) == section_end
+
+          end select ! parse_state
+      end do ! while ios=0
+
+      close(inp_unit)
+
+      if (parse_state /= parse_state_default) then
+        !write(*, '(A)') ' hopping: error, incomplete hopping section'
+        print *, 'parse state: ', parse_state
+        !stop 996
+        call error_message(file_name, line_number, buffer, &
+            'hopping: error, incomplete hopping section')
+      endif
+
+      if (undefined_energy) then
+        write(*, '(A)') ' hopping: error, rates defined for sites with undefined energies'
+        stop 997
+
       else
-        write(*, '(A)') ' no hopping'
+        if (hopping_init%is_defined) then
+          write(*, '(A)') ' hopping: passed check that energies are defined for all rates'
+        else
+          write(*, '(A)') ' no hopping'
+        end if
+
       end if
 
-    end if
-
+    end do ! pass = 1,2
   ! ----------------------------------------------------------------------------
   ! Hopping rates report
   ! ----------------------------------------------------------------------------
