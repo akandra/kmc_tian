@@ -1,5 +1,9 @@
 do not forget to correct pptx diagrams for barrier corrections!
 
+2025-09-29 :
+
+    replace plain text input files with json's.
+
 2025-09-04 :
 
     consider put together neighbors with the same interaction into a line like

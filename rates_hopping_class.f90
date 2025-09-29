@@ -26,7 +26,7 @@ module rates_hopping_class
     !                          n_adsorbate              -> which particle
     !                          .  n_direction           -> which direction
     !                          .  .
-    type(v_list_dp), dimension(:, :), allocatable :: rates
+    real(dp), dimension(:, :), allocatable :: rates
 
           !                    (   n_species                       -> which species
           !                        .  n_site_type                  -> where from
@@ -41,7 +41,11 @@ module rates_hopping_class
     type(int_law_pars),  dimension(:, :, :, :, :, :), allocatable :: rate_corr_pars
           !                        .  .  .  .  .  .  1=row, 2=col 
           !                        .  .  .  .  .  .  .
-    integer,             dimension(:, :, :, :, :, :, :), allocatable :: direction
+    integer,             dimension(:, :, :, :, :, :, :), allocatable :: directions
+          !                        .  .  .  which direction
+          !                        .  .  .  .  1=row, 2=col, 3=ast
+          !                        .  .  .  .  . 
+    integer,             dimension(:, :, :, :, :), allocatable :: direction_list
   
   contains
     procedure :: construct
@@ -88,7 +92,7 @@ contains
     integer,  parameter   :: default_int = 0
     real(dp), parameter   :: default_rate  = -1.0_dp
 
-    integer :: max_avail_ads_sites, pass, dcounter, max_n_directions
+    integer :: max_avail_ads_sites, pass, dcounter, max_n_directions, max_n_directions
     real(dp) :: delta_eps
 
     character(len=2) :: check_str
@@ -133,21 +137,27 @@ contains
 
         allocate(hopping_init%process(  c_pars%n_species,&
                                         n_max_lat_site_types, n_max_ads_sites,&
-                                        n_max_lat_site_types, n_max_ads_sites,
+                                        n_max_lat_site_types, n_max_ads_sites,&
                                         max_n_directions) )
         hopping_init%process = default_rate
 
         allocate(hopping_init%rate_corr_pars( c_pars%n_species,&
                                         n_max_lat_site_types, n_max_ads_sites,&
-                                        n_max_lat_site_types, n_max_ads_sites,
+                                        n_max_lat_site_types, n_max_ads_sites,&
                                         max_n_directions) )
         hopping_init%rate_corr_pars = int_law_pars(default_int,default_rate)
 
         allocate(hopping_init%directions( c_pars%n_species,&
                                         n_max_lat_site_types, n_max_ads_sites,&
-                                        n_max_lat_site_types, n_max_ads_sites,
+                                        n_max_lat_site_types, n_max_ads_sites,&
                                         max_n_directions,2) )
         hopping_init%directions = 0
+
+        ! Reorganize directions to a form more suitable for looping over possible hopping channels
+        allocate(hopping_init%direction_list( c_pars%n_species,&
+                                        n_max_lat_site_types, n_max_ads_sites,&
+                                        max_n_directions,3) )
+        hopping_init%direction_list = 0
 
       endif
 
@@ -378,9 +388,17 @@ contains
                   hopping_init%directions(current_species_id,i1,i2,i3,i4,nd_1,1) = n1
                   hopping_init%directions(current_species_id,i1,i2,i3,i4,nd_1,2) = n2
 
+                  hopping_init%direction_list(current_species_id, i1, i2, nd_1, 1) = n1
+                  hopping_init%direction_list(current_species_id, i1, i2, nd_1, 2) = n2
+                  hopping_init%direction_list(current_species_id, i1, i2, nd_1, 3) = i4
+
                   ! Symmetrize directions
                   hopping_init%directions(current_species_id,i3,i4,i1,i2,nd_2,1) = -n1
                   hopping_init%directions(current_species_id,i3,i4,i1,i2,nd_2,2) = -n2
+
+                  hopping_init%direction_list(current_species_id, i3, i4, nd_2, 1) =-n1
+                  hopping_init%direction_list(current_species_id, i3, i4, nd_2, 2) =-n2
+                  hopping_init%direction_list(current_species_id, i3, i4, nd_2, 3) = i2
 
                   ! Set rate constant
                   hopping_init%process(current_species_id,i1,i2,i3,i4,nd_1) = &
@@ -423,15 +441,15 @@ contains
 
                   ! check for duplicate entry
                   do d1=1,n_d1-1
-                    if (all(hopping_init%direction(current_species_id, i1, i2, i3, i4,   d1 ,:) == &
-                            hopping_init%direction(current_species_id, i1, i2, i3, i4, nd_1 ,:))) &
+                    if (all(hopping_init%directions(current_species_id, i1, i2, i3, i4,   d1 ,:) == &
+                            hopping_init%directions(current_species_id, i1, i2, i3, i4, nd_1 ,:))) &
                       call error_message(file_name, line_number, buffer, &
                                             "duplicated entry (check symmetry duplicates)")
                   end do
 
                   do d2=1,n_d2
-                    if (all(hopping_init%direction(current_species_id, i1, i2, i3, i4, nd_1 ,:) == &
-                           -hopping_init%direction(current_species_id, i3, i4, i1, i2,  d_2 ,:))) &
+                    if (all(hopping_init%directions(current_species_id, i1, i2, i3, i4, nd_1 ,:) == &
+                           -hopping_init%directions(current_species_id, i3, i4, i1, i2,  d_2 ,:))) &
                       call error_message(file_name, line_number, buffer, &
                                             "duplicated entry (check symmetry duplicates)")
                   end do
@@ -601,7 +619,7 @@ contains
     class(energy_parameters), intent(in) :: e_pars
     real(dp), intent(in) :: beta
 
-    integer :: id, m, iads
+    integer :: species, m, iads
     integer :: row_old, col_old, lst_old, ast_old
     integer :: row_new, col_new, lst_new, ast_new
     real(dp) :: energy_old, energy_new, int_energy_old, int_energy_new, int_energy_ts, delta_eps
@@ -613,9 +631,7 @@ contains
     col_old = lat%ads_list(ads)%col
     lst_old = lat%lst(row_old,col_old)
     ast_old = lat%ads_list(ads)%ast
-    id      = lat%ads_list(ads)%id
-
-WE ARE HERE
+    species = lat%ads_list(ads)%id
 
     ! Construct rates for hops to neighbors
 
@@ -624,10 +640,14 @@ WE ARE HERE
     lat%occupations(row_old,col_old) = 0
 
     ! Loop over possible new positions of particle ads
-    do m=1,lat%n_nn(lst_old, 1)
+    print*, size(this%direction_list(species,lst_old,ast_old,:)), ' should be equal to ', &
+            size(this%direction_list(species,lst_old,ast_old), 1), ' and to ', &
+            size(this%direction_list, 4)
+
+    do m=1,size(this%direction_list(species,lst_old,ast_old,:))
 
       ! Get position and site type of neighbour m
-      call lat%neighbor(ads, m, row_new, col_new)
+      call lat%neighbor2(ads, this%direction_list(species,lst_old,ast_old,m,1:2), row_new, col_new)
       lst_new  = lat%lst(row_new, col_new)
 
       ! Check if the cell is free
@@ -641,57 +661,50 @@ WE ARE HERE
         lat%ads_list(ads)%row = row_new
         lat%ads_list(ads)%col = col_new
         lat%occupations(row_new,col_new) = ads
+        ast_new = this%direction_list(species,lst_old,ast_old,m,3)
+        lat%ads_list(ads)%ast = ast_new
 
-        ! Loop over adsorption sites
-        do iads = 1, size(lat%avail_ads_sites(id,lst_new)%list)
+        ! Calculate energy of ads in new position
+        energy_new = energy(ads, lat, c_pars, e_pars)
 
-          ! Move particle ads to adsorption site list(iads)
-          ast_new = lat%avail_ads_sites(id,lst_new)%list(iads)
-          lat%ads_list(ads)%ast = ast_new
+        if (debug(10)) then
+          write(*,*) ''
+          write(*,'(A,I5,A,I5)') "ads_id", id, " ads_no", iads
+          write(*,'(A,A4,A4,A,A4,A4)') "from ", lat_site_names(lst_old), ads_site_names(ast_old), &
+                                        " to ", lat_site_names(lst_new), ads_site_names(ast_new)
+          write(*,'(A,F8.3,A,F8.3)') "E0_i=", e_pars%ads_energy(id, lst_old, ast_old),&
+                                      " E0_f=", e_pars%ads_energy(id, lst_new, ast_new)
+          write(*,'(A,F8.3,A,F8.3)') "E_i =", energy_old, " E_f =", energy_new
+        end if
 
-          ! Calculate energy of ads in new position
-          energy_new = energy(ads, lat, c_pars, e_pars)
+        ! Calculate interaction correction
+        int_energy_old = energy_old - e_pars%ads_energy(id, lst_old, ast_old)
+        int_energy_new = energy_new - e_pars%ads_energy(id, lst_new, ast_new)
+        int_energy_ts  = rcic_law(this%rate_corr_pars(id, lst_old, ast_old, lst_new, ast_new), &
+                                  int_energy_old, int_energy_new)
 
-          if (debug(10)) then
-            write(*,*) ''
-            write(*,'(A,I5,A,I5)') "ads_id", id, " ads_no", iads
-            write(*,'(A,A4,A4,A,A4,A4)') "from ", lat_site_names(lst_old), ads_site_names(ast_old), &
-                                          " to ", lat_site_names(lst_new), ads_site_names(ast_new)
-            write(*,'(A,F8.3,A,F8.3)') "E0_i=", e_pars%ads_energy(id, lst_old, ast_old),&
-                                       " E0_f=", e_pars%ads_energy(id, lst_new, ast_new)
-            write(*,'(A,F8.3,A,F8.3)') "E_i =", energy_old, " E_f =", energy_new
-          end if
+        ! Barrier correction due to the perturbation
+        delta_eps = int_energy_ts - int_energy_old
 
-          ! Calculate interaction correction
-          int_energy_old = energy_old - e_pars%ads_energy(id, lst_old, ast_old)
-          int_energy_new = energy_new - e_pars%ads_energy(id, lst_new, ast_new)
-          int_energy_ts  = rcic_law(this%rate_corr_pars(id, lst_old, ast_old, lst_new, ast_new), &
-                                    int_energy_old, int_energy_new)
+        ! Add barrier correction if the unperturbed process is uphill
+        if ( e_pars%ads_energy(id, lst_new, ast_new) > e_pars%ads_energy(id, lst_old, ast_old) )&
+          delta_eps = delta_eps + &
+              e_pars%ads_energy(id, lst_new, ast_new) - e_pars%ads_energy(id, lst_old, ast_old)
 
-          ! Barrier correction due to the perturbation
-          delta_eps = int_energy_ts - int_energy_old
+        this%rates(ads,m)%list(iads) = &
+          this%process(id, lst_old, ast_old, lst_new, ast_new)*exp( -beta*delta_eps )
 
-          ! Add barrier correction if the unperturbed process is uphill
-          if ( e_pars%ads_energy(id, lst_new, ast_new) > e_pars%ads_energy(id, lst_old, ast_old) )&
-            delta_eps = delta_eps + &
-                e_pars%ads_energy(id, lst_new, ast_new) - e_pars%ads_energy(id, lst_old, ast_old)
-
-          this%rates(ads,m)%list(iads) = &
-            this%process(id, lst_old, ast_old, lst_new, ast_new)*exp( -beta*delta_eps )
-
-          if (debug(10) .and. ads == 1) then
-            write(*,'(A,F8.3)') "delta_eps =", delta_eps
-            write(*,'(A,ES10.3)') "uncorrected rate =", this%process(id, lst_old, ast_old, lst_new, ast_new)
-            write(*,'(A,F8.3)') "correction energy =",&
-            -log(this%rates(ads,m)%list(iads)/this%process(id, lst_old, ast_old, lst_new, ast_new))/beta
-            write(*,'(A,F6.3,A,F6.3,A,F6.3,A,F6.3)') "rcic law:", &
-                      this%rate_corr_pars(id, lst_old, ast_old, lst_new, ast_new)%pars(1),&
-                      ' *', int_energy_old, ' + ', this%rate_corr_pars(id, lst_old, ast_old, lst_new, ast_new)%pars(2),&
-                      ' *', int_energy_new
-            write(*,'(A,F8.3)') "V_TS=", int_energy_ts
-          end if
-
-        end do ! iads
+        if (debug(10) .and. ads == 1) then
+          write(*,'(A,F8.3)') "delta_eps =", delta_eps
+          write(*,'(A,ES10.3)') "uncorrected rate =", this%process(id, lst_old, ast_old, lst_new, ast_new)
+          write(*,'(A,F8.3)') "correction energy =",&
+          -log(this%rates(ads,m)%list(iads)/this%process(id, lst_old, ast_old, lst_new, ast_new))/beta
+          write(*,'(A,F6.3,A,F6.3,A,F6.3,A,F6.3)') "rcic law:", &
+                    this%rate_corr_pars(id, lst_old, ast_old, lst_new, ast_new)%pars(1),&
+                    ' *', int_energy_old, ' + ', this%rate_corr_pars(id, lst_old, ast_old, lst_new, ast_new)%pars(2),&
+                    ' *', int_energy_new
+          write(*,'(A,F8.3)') "V_TS=", int_energy_ts
+        end if
 
         ! Return particle ads to the old position
         lat%ads_list(ads)%row = row_old
