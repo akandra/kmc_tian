@@ -1,19 +1,20 @@
+# 1 "/home/akandra/git/kmc_tian/rates_association_class.f90"
 module rates_association_class
 
-  !---------------------------------------------------------------------------
-  !  Module for binary association reaction  r1 + r2 --> p1
-  !---------------------------------------------------------------------------
-  !  * controlled by the association keyword section of the .rates file
-  !  * p1 is assumed to be at the same lattice site as r1 with its adsorption
-  !    site type (ast) chosen from those specified in the .reaction file
-  !  * if there exists information that p1 is exclusively formed at one of the
-  !    reactant sites, this reactant should be listed as r1; if there are two different
-  !    rates, they should be listed separately in the input file
-  !  * the symmetric case (like O+O -> O2) is tricky.  THINK MORE ABOUT THIS
-  !  *
-  !  * THINK AND THEN ACT, NOT OTHER WAY AROUND
-  !  *
-  !---------------------------------------------------------------------------
+!---------------------------------------------------------------------------
+!  Module for binary association reaction  r1 + r2 --> p1
+!---------------------------------------------------------------------------
+!  * controlled by the association keyword section of the .rates file
+!  * p1 is assumed to be at the same lattice site as r1 with its adsorption
+!    site type (ast) chosen from those specified in the .reaction file
+!  * if there exists information that p1 is exclusively formed at one of the
+!    reactant sites, this reactant should be listed as r1; if there are two different
+!    rates, they should be listed separately in the input file
+!  * the symmetric case (like O+O -> O2) is tricky.  THINK MORE ABOUT THIS
+!  *
+!  * THINK AND THEN ACT, NOT OTHER WAY AROUND
+!  *
+!---------------------------------------------------------------------------
 
   use constants
   use control_parameters_class
@@ -64,29 +65,29 @@ module rates_association_class
     logical :: is_defined = .false.
 
 
-    !---------------------------------------------------------------------------
-    ! Reaction channels structure
-    !---------------------------------------------------------------------------
-    ! Gives the rate of reaction for each set of reactant and product lattice
-    ! and adsorption site types given in the association section of the
-    ! .reaction input file
-    !---------------------------------------------------------------------------
+!---------------------------------------------------------------------------
+! Reaction channels structure
+!---------------------------------------------------------------------------
+! Gives the rate of reaction for each set of reactant and product lattice
+! and adsorption site types given in the association section of the
+! .reaction input file
+!---------------------------------------------------------------------------
     type(association_def), dimension(:), allocatable :: channels
 
-    !---------------------------------------------------------------------------
-    ! Reaction rate information structure
-    !---------------------------------------------------------------------------
-    ! Gives a list of reaction information for a given adsorbate
-    !   * list elements give the reaction channel which specifies the rate,
-    !     latice site type, and adsorption site type (ast) of reactants and
-    !     products
-    !---------------------------------------------------------------------------
-    !
-    !                                 adsorbate      -> which particle
-    !                                 .
+!---------------------------------------------------------------------------
+! Reaction rate information structure
+!---------------------------------------------------------------------------
+! Gives a list of reaction information for a given adsorbate
+!   * list elements give the reaction channel which specifies the rate,
+!     latice site type, and adsorption site type (ast) of reactants and
+!     products
+!---------------------------------------------------------------------------
+!
+!                                 adsorbate      -> which particle
+!                                 .
     type(v_list_rate_info), dimension(:), allocatable :: rate_info
 
-    ! Number of association channels
+! Number of association channels
     integer :: n_processes
 
   contains
@@ -142,7 +143,7 @@ contains
     logical :: duplicate_error = .false.
     logical ::      r1p1_error = .false.
 
-    ! maximal number of available ads. sites
+! maximal number of available ads. sites
     max_avail_ads_sites = 1
     do i=1,c_pars%n_species
     do m=1,size(lat%avail_ads_sites(i,:))
@@ -151,19 +152,19 @@ contains
     end do
     end do
 
-    !---------------------------------------------------------------------------
-    !  Allocate and Intialize rate_info structure
-    !---------------------------------------------------------------------------
+!---------------------------------------------------------------------------
+!  Allocate and Intialize rate_info structure
+!---------------------------------------------------------------------------
     allocate( association_init%rate_info(lat%n_rows*lat%n_cols) )
 
     do i=1,lat%n_rows*lat%n_cols
-      ! come back
+! come back
       allocate( association_init%rate_info(i)%list( lat%n_max_nn * &
                                                      max_avail_ads_sites  ) )
       association_init%rate_info(i)%list = rate_info_association( default_int, default_int, default_rate )
     end do
 
-    !  read rate definitions from the input file
+!  read rate definitions from the input file
     file_name = c_pars%rate_file_name
     call open_for_read(inp_unit, file_name )
 
@@ -181,23 +182,23 @@ contains
 
       read(inp_unit, '(A)', iostat=ios) buffer
       line_number = line_number + 1
-        ! ios < 0: end of record or endfile condition detected
-        ! ios > 0: an error is detected
-        ! ios = 0  otherwise
+! ios < 0: end of record or endfile condition detected
+! ios > 0: an error is detected
+! ios = 0  otherwise
 
-        ! Split an input string
+! Split an input string
         words = ''
         call split_string(buffer, words, nwords)
 
-      ! skip comments
+! skip comments
       if (nwords == 0) cycle
 
       select case (parse_state)
 
         case(parse_state_default)
-          ! in parse state default:
-          !    word 'association' to mark beginning of a association section
-          !    ignore anything else until association section begins
+! in parse state default:
+!    word 'association' to mark beginning of a association section
+!    ignore anything else until association section begins
 
           if (words(1) == reaction_names(association_id)) then
 
@@ -209,7 +210,7 @@ contains
 
           if (words(1) == section_end) then
             parse_state = parse_state_default
-          ! don't count lines defining rct and rcic
+! don't count lines defining rct and rcic
           elseif (words(1) =='temperature_law' .or. &
                   words(1) =='interaction_law') then
             cycle
@@ -244,29 +245,29 @@ contains
 
       read(inp_unit, '(A)', iostat=ios) buffer
       line_number = line_number + 1
-        ! ios < 0: end of record or endfile
-        ! ios > 0: an error is detected
-        ! ios = 0  otherwise
+! ios < 0: end of record or endfile
+! ios > 0: an error is detected
+! ios = 0  otherwise
 
-        ! Split an input string
+! Split an input string
         words = ''
         call split_string(buffer, words, nwords)
 
-      ! skip comments
+! skip comments
       if (nwords == 0) cycle
 
       select case (parse_state)
 
         case(parse_state_default)
-          ! in parse state default:
-          !    word 'association' to mark beginning of a association section
-          !    ignore anything else until association section begins
+! in parse state default:
+!    word 'association' to mark beginning of a association section
+!    ignore anything else until association section begins
 
           if (words(1) == reaction_names(association_id)) then
 
             parse_state = parse_state_association
             association_init%is_defined = .true.
-            ! reset necessary to allow multiple associaton sections
+! reset necessary to allow multiple associaton sections
             rct_law_defined  = .false.
             rcic_law_defined = .false.
             rct_law_id_glob  = 0
@@ -295,11 +296,11 @@ contains
           end if  ! words(1)
 
         case(parse_state_association)
-          ! process:
-          !    temperature law records,
-          !    interaction law records,
-          !    'from-from-to' records,
-          !    section end
+! process:
+!    temperature law records,
+!    interaction law records,
+!    'from-from-to' records,
+!    section end
 
 
           if (words(1) == section_end) then
@@ -344,9 +345,9 @@ contains
             endif
 
           else
-            ! ---------------------------------------------------------
-            ! check if we have a valid from-from-to rate record
-            ! ---------------------------------------------------------
+! ---------------------------------------------------------
+! check if we have a valid from-from-to rate record
+! ---------------------------------------------------------
             if (nwords < 2*n_association_species) &
               call error_message(file_name, line_number, buffer, &
                                  "invalid 'from' rate record in the association section")
@@ -387,7 +388,7 @@ contains
               r1p1_error = .true.
             end if
 
-            ! check if energy is defined for reactant's and for products' lat_site_type and ads_site
+! check if energy is defined for reactant's and for products' lat_site_type and ads_site
             if( e_pars%ads_energy(r1_id, lst(1), ast(1)) == e_pars%undefined_energy .or. &
                 e_pars%ads_energy(r2_id, lst(2), ast(2)) == e_pars%undefined_energy .or. &
                 e_pars%ads_energy(p1_id, lst(3), ast(3)) == e_pars%undefined_energy ) then
@@ -398,10 +399,10 @@ contains
                 undefined_energy = .true.
             end if
 
-            ! ---------------------------------------------------------
-            ! we have a valid rate record. Process it
-            ! ---------------------------------------------------------
-            ! if record only has 'from-from-to' site information then set the law ids and pars to global default values
+! ---------------------------------------------------------
+! we have a valid rate record. Process it
+! ---------------------------------------------------------
+! if record only has 'from-from-to' site information then set the law ids and pars to global default values
             if (nwords == 2*n_association_species) then
               if (rct_law_defined .and. rcic_law_defined) then
                 rct_law_id  = rct_law_id_glob
@@ -420,12 +421,12 @@ contains
               end if
 
             else
-              ! set rct_law_id and rcic_law_id to 0 to indicate no law on this line found yet
+! set rct_law_id and rcic_law_id to 0 to indicate no law on this line found yet
               rct_law_id  = 0
               rcic_law_id = 0
 
               do i=2*n_association_species+1,nwords
-                ! check  for rct law on this line
+! check  for rct law on this line
                 if (get_index(words(i), rct_law_names) /= 0) then
                   rct_law_id = get_index(words(i), rct_law_names)
                   select case (rct_law_id)
@@ -447,7 +448,7 @@ contains
 
                 end if
 
-                ! check if we have an rcic law on this line
+! check if we have an rcic law on this line
                 if (get_index(words(i), rcic_law_names) /= 0) then
                   rcic_law_id = get_index(words(i), rcic_law_names)
                   select case (rcic_law_id)
@@ -464,7 +465,7 @@ contains
 
               end do ! i=2*n_association_species+1,nwords
 
-              ! if rct_law  or rcic_law are not defined on this line, set to global defaults
+! if rct_law  or rcic_law are not defined on this line, set to global defaults
               if (rct_law_id == 0) then
                 rct_law_id = rct_law_id_glob
                 rct_pars   = rct_pars_glob
@@ -474,7 +475,7 @@ contains
                 rcic_pars   = rcic_pars_glob
               end if
 
-              ! check for valid temperature and interaction laws
+! check for valid temperature and interaction laws
               if (rct_law_id == 0) &
                 call error_message(file_name, line_number, buffer, &
                                   "no temperature law is specified")
@@ -484,13 +485,13 @@ contains
 
             end if ! (nwords==2*n_association_species)
 
-            ! Check if rct and rcic laws are properly set
+! Check if rct and rcic laws are properly set
             if (rct_law_id == 0) &
               call error_message(file_name, line_number, buffer, "invalid temperature law")
             if (rcic_law_id == 0) &
               call error_message(file_name, line_number, buffer, "invalid interaction law")
 
-            ! Set rate constants and rcic for dissociation channels
+! Set rate constants and rcic for dissociation channels
             association_init%channels(association_counter)%r1      = r1_id
             association_init%channels(association_counter)%r1_lst  = lst(1)
             association_init%channels(association_counter)%r1_ast  = ast(1)
@@ -552,26 +553,26 @@ contains
     integer :: channel
     real(dp):: int_energy, int_energy_ts, delta_eps
 
-    ! Consider ads as reactant 1
+! Consider ads as reactant 1
     row_r1 = lat%ads_list(ads)%row
     col_r1 = lat%ads_list(ads)%col
     lst_r1 = lat%lst(row_r1,col_r1)
     ast_r1 = lat%ads_list(ads)%ast
     id_r1  = lat%ads_list(ads)%id
 
-    ! Loop over possible positions for reactant 2
+! Loop over possible positions for reactant 2
     channel = 0
     do m=1,lat%n_nn(lst_r1,1)
 
-      ! Get position and site type of neighbour m
+! Get position and site type of neighbour m
       call lat%neighbor(ads, m, row_r2, col_r2)
 
-      ! Check if the cell is occupied
+! Check if the cell is occupied
       ads_r2 = lat%occupations(row_r2, col_r2)
 
       if (ads_r2/=0) then
 
-        ! Consider neighbour m as a possible reactant 2
+! Consider neighbour m as a possible reactant 2
         lst_r2 = lat%lst(row_r2,col_r2)
         ast_r2 = lat%ads_list(ads_r2)%ast
         id_r2  = lat%ads_list(ads_r2)%id
@@ -588,13 +589,13 @@ contains
 
             channel = channel + 1
 
-            ! Calculate interaction correction
-            ! WARNING! here we assume that the correction does not depend on products
-            !          consider to introduce it later
+! Calculate interaction correction
+! WARNING! here we assume that the correction does not depend on products
+!          consider to introduce it later
             int_energy    = energy(ads,lat,c_pars,e_pars)    - e_pars%ads_energy(id_r1, lst_r1, ast_r1)&
                           + energy(ads_r2,lat,c_pars,e_pars) - e_pars%ads_energy(id_r2, lst_r2, ast_r2)
             int_energy_ts = rcic_law(this%channels(iprocs)%rcic, int_energy, 0.0_dp)
-            ! Barrier correction due to the perturbation
+! Barrier correction due to the perturbation
             delta_eps = int_energy_ts - int_energy
 
 !            ! Get the information on product 1
@@ -604,7 +605,7 @@ contains
 
             this%rate_info(ads)%list(channel)%proc   = iprocs
             this%rate_info(ads)%list(channel)%m      = m
-            ! WARNING: Decide later if we need the rate field
+! WARNING: Decide later if we need the rate field
             this%rate_info(ads)%list(channel)%rate  = this%channels(iprocs)%rate&
                                                     *exp( -beta*delta_eps)
 
@@ -616,7 +617,7 @@ contains
 
     end do ! m
 
-    ! save the number of channels in the rate_info structure
+! save the number of channels in the rate_info structure
     this%rate_info(ads)%n_channels = channel
 
 end subroutine construct

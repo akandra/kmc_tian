@@ -1,13 +1,14 @@
+# 1 "/home/akandra/git/kmc_tian/rates_hopping_class.f90"
 module rates_hopping_class
 
-  !---------------------------------------------------------------------------
-  !  Module for hopping  r --> p
-  !---------------------------------------------------------------------------
-  !  * controlled by the hopping keyword section of the .rates file
-  !  * r and p are the same species, since it is a hop
-  !  * direction of hop is described by a vector (drow, dcol) and 
-  !    in general is not restricted
-  !---------------------------------------------------------------------------
+!---------------------------------------------------------------------------
+!  Module for hopping  r --> p
+!---------------------------------------------------------------------------
+!  * controlled by the hopping keyword section of the .rates file
+!  * r and p are the same species, since it is a hop
+!  * direction of hop is described by a vector (drow, dcol) and
+!    in general is not restricted
+!---------------------------------------------------------------------------
 
   use constants
   use control_parameters_class
@@ -51,28 +52,28 @@ module rates_hopping_class
     logical :: is_defined = .false.
 
 
-    !---------------------------------------------------------------------------
-    ! Hopping paths structure
-    !---------------------------------------------------------------------------
-    ! Gives the rate of hopping for each set of where-from (lst,ast)
-    ! and where-to (direction, ast) given in the hopping section of the
-    ! .rates input file
-    !---------------------------------------------------------------------------
+!---------------------------------------------------------------------------
+! Hopping paths structure
+!---------------------------------------------------------------------------
+! Gives the rate of hopping for each set of where-from (lst,ast)
+! and where-to (direction, ast) given in the hopping section of the
+! .rates input file
+!---------------------------------------------------------------------------
     type(hopping_def), dimension(:), allocatable :: paths
 
-    !---------------------------------------------------------------------------
-    ! Hopping channel structure
-    !---------------------------------------------------------------------------
-    ! Gives a list of hopping information for a given adsorbate
-    !   * list elements give the hopping channel which specifies the rate,
-    !     where-from lst and ast and the where-to vector and ast
-    !---------------------------------------------------------------------------
-    !
-    !                                 adsorbate      -> which particle
-    !                                 .
+!---------------------------------------------------------------------------
+! Hopping channel structure
+!---------------------------------------------------------------------------
+! Gives a list of hopping information for a given adsorbate
+!   * list elements give the hopping channel which specifies the rate,
+!     where-from lst and ast and the where-to vector and ast
+!---------------------------------------------------------------------------
+!
+!                                 adsorbate      -> which particle
+!                                 .
     type(v_list_rate_info), dimension(:), allocatable :: rate_info
 
-    ! Number of hopping channels
+! Number of hopping channels
     integer :: n_processes
 
   contains
@@ -89,23 +90,23 @@ module rates_hopping_class
 
     logical :: is_defined           = .false.
 
-    ! Hopping Rates
-    !                   adsorbate                -> which particle
-    !                   .  channel               -> which row, col, and ast
-    !                   .  .
+! Hopping Rates
+!                   adsorbate                -> which particle
+!                   .  channel               -> which row, col, and ast
+!                   .  .
     real(dp), dimension(:, :), allocatable :: rates
 
-          !                    (   species                         -> which species
-          !                        .  lst                          -> where from
-          !                        .  .  ast
-          !                        .  .  . 
+!                    (   species                         -> which species
+!                        .  lst                          -> where from
+!                        .  .  ast
+!                        .  .  .
     integer,             dimension(:, :, :), allocatable :: n_channels
-          !                        .  .  .  channel
-          !                        .  .  .  . 
+!                        .  .  .  channel
+!                        .  .  .  .
     real(dp),            dimension(:, :, :, :), allocatable :: process
     type(int_law_pars),  dimension(:, :, :, :), allocatable :: rate_corr_pars
-          !                        .  .  .  .  1=row, 2=col, 3=ast
-          !                        .  .  .  .  . 
+!                        .  .  .  .  1=row, 2=col, 3=ast
+!                        .  .  .  .  .
     integer,             dimension(:, :, :, :, :), allocatable :: channels
 
 
@@ -114,20 +115,20 @@ module rates_hopping_class
 
 
 
-          !                        .  .  .  n_site_type            -> where to
-          !                        .  .  .  .  n_adsorption_sites 
-          !                        .  .  .  .  . 
+!                        .  .  .  n_site_type            -> where to
+!                        .  .  .  .  n_adsorption_sites
+!                        .  .  .  .  .
     integer,             dimension(:, :, :, :, :), allocatable :: n_channels
-          !                        .  .  .  .  .  which channel
-          !                        .  .  .  .  .  . 
+!                        .  .  .  .  .  which channel
+!                        .  .  .  .  .  .
     real(dp),            dimension(:, :, :, :, :, :), allocatable :: process
     type(int_law_pars),  dimension(:, :, :, :, :, :), allocatable :: rate_corr_pars
-          !                        .  .  .  .  .  .  1=row, 2=col 
-          !                        .  .  .  .  .  .  .
+!                        .  .  .  .  .  .  1=row, 2=col
+!                        .  .  .  .  .  .  .
     integer,             dimension(:, :, :, :, :, :, :), allocatable :: directions
-          !                        .  .  .  which direction
-          !                        .  .  .  .  1=row, 2=col, 3=ast
-          !                        .  .  .  .  . 
+!                        .  .  .  which direction
+!                        .  .  .  .  1=row, 2=col, 3=ast
+!                        .  .  .  .  .
     integer,             dimension(:, :, :, :, :), allocatable :: direction_list
   
   contains
@@ -181,7 +182,7 @@ contains
     character(len=2) :: check_str
     character(len=max_string_length) :: stemp
 
-    ! determine maximum number of available ads. sites
+! determine maximum number of available ads. sites
     max_avail_ads_sites = 1
 
     do i=1,c_pars%n_species
@@ -199,15 +200,15 @@ contains
     hopping_init%ndir = 0
     max_n_directions = 0
 
-    !  read rate definitions from the input file
+!  read rate definitions from the input file
     file_name = c_pars%rate_file_name
 
     do pass = 1,2
 
-      ! Allocate and initialize rates array before the second pass
+! Allocate and initialize rates array before the second pass
       if (pass == 2) then
 
-        ! Increase max_n_directions to account for reverse hops
+! Increase max_n_directions to account for reverse hops
         max_n_directions = 2*max_n_directions
 
         allocate( hopping_init%rates(lat%n_rows*lat%n_cols, max_n_directions) )
@@ -236,7 +237,7 @@ contains
                                         max_n_directions,2) )
         hopping_init%directions = 0
 
-        ! Reorganize directions to a form more suitable for looping over possible hopping channels
+! Reorganize directions to a form more suitable for looping over possible hopping channels
         allocate(hopping_init%direction_list( c_pars%n_species,&
                                         n_max_lat_site_types, n_max_ads_sites,&
                                         max_n_directions,3) )
@@ -251,39 +252,39 @@ contains
       line_number = 0
       undefined_energy = .false.
 
-      !---------------------------------------------------------------------------
-      ! loop over all lines of rate input file
-      !---------------------------------------------------------------------------
+!---------------------------------------------------------------------------
+! loop over all lines of rate input file
+!---------------------------------------------------------------------------
 
       do while (ios == 0)
 
         read(inp_unit, '(A)', iostat=ios) buffer
 
         line_number = line_number + 1
-        ! ios = 0: valid record read
-        ! ios < 0: end of record condition encountered or end of file condition detected
-        ! ios > 0: an error is detected
-        !if (ios < 0) buffer = section_end  ! treat end of file as the section end
+! ios = 0: valid record read
+! ios < 0: end of record condition encountered or end of file condition detected
+! ios > 0: an error is detected
+!if (ios < 0) buffer = section_end  ! treat end of file as the section end
 
-        ! Split an input string
+! Split an input string
         tokens = ''
         call split_string(buffer, tokens, ntokens)
 
-        ! skip comments
+! skip comments
         if (ntokens == 0) cycle
 
         select case (parse_state)
 
           case(parse_state_default)
-            ! in parse state default:
-            !    word 'hopping' to mark beginning of a hopping section
-            !    ignore anything else until hopping section begins
+! in parse state default:
+!    word 'hopping' to mark beginning of a hopping section
+!    ignore anything else until hopping section begins
 
             if (tokens(1) == reaction_names(hopping_id)) then
 
               hopping_init%is_defined = .true.
               parse_state = parse_state_hopping
-              ! reset necessary to allow multiple hopping sections
+! reset necessary to allow multiple hopping sections
               rct_law_defined  = .false.
               rcic_law_defined = .false.
               rct_law_id_glob  = 0
@@ -302,16 +303,16 @@ contains
             end if ! tokens(1)
 
           case(parse_state_hopping)
-            ! process:
-            !    temperature law records,
-            !    interaction law records,
-            !    to-from records,
-            !    hopping direction records:
-            !      - 0 1
-            !      - 0 1 Arrhenius 1.0E13 0.5
-            !      - 0 1 linear 0.5 0.5
-            !      - 0 1 Arrhenius 1.0E13 0.5 linear 0.5 0.5
-            !    section end
+! process:
+!    temperature law records,
+!    interaction law records,
+!    to-from records,
+!    hopping direction records:
+!      - 0 1
+!      - 0 1 Arrhenius 1.0E13 0.5
+!      - 0 1 linear 0.5 0.5
+!      - 0 1 Arrhenius 1.0E13 0.5 linear 0.5 0.5
+!    section end
 
 
             if (tokens(1) == section_end) then
@@ -356,19 +357,19 @@ contains
               endif
 
             else
-              ! check if we have a hopping direction record
+! check if we have a hopping direction record
               if (read_int(tokens(1), n1) .and.&
                               ntokens > 1 .and.& 
                   read_int(tokens(2), n2))  then
 
-                ! we have a valid hopping direction record. Process it
+! we have a valid hopping direction record. Process it
 
-                ! increment counter of directions
+! increment counter of directions
                 dcounter = dcounter + 1
                 if (dcounter > max_n_directions) max_n_directions = dcounter
 
-                !   if record only has hopping direction information, 
-                !      set the law ids and pars to global default values
+!   if record only has hopping direction information,
+!      set the law ids and pars to global default values
                 if (ntokens == 2) then
                   if (rct_law_defined .and. rcic_law_defined) then
                     rct_law_id  = rct_law_id_glob
@@ -387,13 +388,13 @@ contains
                   end if
 
                 else
-                  ! set rct_law_id and rcic_law_id to 0  
-                  ! to indicate no law on this line found yet
+! set rct_law_id and rcic_law_id to 0
+! to indicate no law on this line found yet
                   rct_law_id  = 0
                   rcic_law_id = 0
 
                   do i=3,ntokens
-                    ! check  for rct law on this line
+! check  for rct law on this line
                     if (get_index(tokens(i), rct_law_names) /= 0) then
                       rct_law_id = get_index(tokens(i), rct_law_names)
                       select case (rct_law_id)
@@ -415,7 +416,7 @@ contains
 
                     end if
 
-                    ! check if we have an rcic law on this line
+! check if we have an rcic law on this line
                     if (get_index(tokens(i), rcic_law_names) /= 0) then
                       rcic_law_id = get_index(tokens(i), rcic_law_names)
                       select case (rcic_law_id)
@@ -432,8 +433,8 @@ contains
 
                   end do ! i=3,ntokens
 
-                  ! if rct_law  or rcic_law are not defined on this line, 
-                  ! set to global defaults
+! if rct_law  or rcic_law are not defined on this line,
+! set to global defaults
                   if (rct_law_id == 0) then
                     rct_law_id = rct_law_id_glob
                     rct_pars   = rct_pars_glob
@@ -443,7 +444,7 @@ contains
                     rcic_pars   = rcic_pars_glob
                   end if
 
-                  ! check for valid temperature and interaction laws
+! check for valid temperature and interaction laws
                   if (rct_law_id == 0) &
                     call error_message(file_name, line_number, buffer, &
                                       "no temperature law is specified")
@@ -453,7 +454,7 @@ contains
 
                 end if ! (ntokens==2)
 
-                ! Check if rct and rcic laws are properly set
+! Check if rct and rcic laws are properly set
                 if (rct_law_id == 0) &
                   call error_message(file_name, line_number, buffer, "invalid temperature law")
                 if (rcic_law_id == 0) &
@@ -461,13 +462,13 @@ contains
 
                 if (pass == 2) then
 
-                  ! increment number of directions for this from-to pair and its reverse
+! increment number of directions for this from-to pair and its reverse
                   n_d1 = hopping_init%ndirs(current_species_id, i1, i2, i3, i4) + 1
                   n_d2 = hopping_init%ndirs(current_species_id, i3, i4, i1, i2) + 1
                   hopping_init%ndirs(current_species_id, i1, i2, i3, i4) = n_d1
                   hopping_init%ndirs(current_species_id, i3, i4, i1, i2) = n_d2
                  
-                  ! Set directions
+! Set directions
                   hopping_init%directions(current_species_id,i1,i2,i3,i4,nd_1,1) = n1
                   hopping_init%directions(current_species_id,i1,i2,i3,i4,nd_1,2) = n2
 
@@ -475,7 +476,7 @@ contains
                   hopping_init%direction_list(current_species_id, i1, i2, nd_1, 2) = n2
                   hopping_init%direction_list(current_species_id, i1, i2, nd_1, 3) = i4
 
-                  ! Symmetrize directions
+! Symmetrize directions
                   hopping_init%directions(current_species_id,i3,i4,i1,i2,nd_2,1) = -n1
                   hopping_init%directions(current_species_id,i3,i4,i1,i2,nd_2,2) = -n2
 
@@ -483,13 +484,13 @@ contains
                   hopping_init%direction_list(current_species_id, i3, i4, nd_2, 2) =-n2
                   hopping_init%direction_list(current_species_id, i3, i4, nd_2, 3) = i2
 
-                  ! Set rate constant
+! Set rate constant
                   hopping_init%process(current_species_id,i1,i2,i3,i4,nd_1) = &
                               rct_law(rct_law_id, c_pars%temperature, rct_pars)
 
-                  ! Symmetrize rate constant
+! Symmetrize rate constant
 
-                  ! check energy is defined for initial and final lst and ast
+! check energy is defined for initial and final lst and ast
                   if( e_pars%ads_energy(current_species_id, i1, i2) == e_pars%undefined_energy .or. &
                       e_pars%ads_energy(current_species_id, i3, i4) == e_pars%undefined_energy ) then
                     call error_message(file_name, line_number, buffer, &
@@ -499,19 +500,19 @@ contains
                     undefined_energy = .true.
                   end if
 
-                  ! State "to" energy minus state "from" energy
+! State "to" energy minus state "from" energy
                   delta_eps = e_pars%ads_energy(current_species_id, i3, i4) - &
                               e_pars%ads_energy(current_species_id, i1, i2)
-                  ! detailed balance
+! detailed balance
                   hopping_init%process(current_species_id,i3,i4,i1,i2,nd_2) = &
                               hopping_init%process(current_species_id,i1,i2,i3,i4,nd_1) &
                               *exp(c_pars%beta*delta_eps)
 
-                  ! Set interaction correction
+! Set interaction correction
                   hopping_init%rate_corr_pars(current_species_id,i1,i2,i3,i4,nd_1)%id = rcic_law_id
                   hopping_init%rate_corr_pars(current_species_id,i3,i4,i1,i2,nd_2)%id = rcic_law_id
 
-                  ! Symmetrize
+! Symmetrize
                   hopping_init%rate_corr_pars(current_species_id,i1,i2,i3,i4,nd_1)%pars = rcic_pars
                   if (rcic_law_id == rcic_linear_id) then
                     hopping_init%rate_corr_pars(current_species_id,i3,i4,i1,i2,nd_2)%pars(1) = rcic_pars(2)
@@ -522,7 +523,7 @@ contains
                     call error_message(file_name, line_number, buffer, stemp)
                   end if
 
-                  ! check for duplicate entry
+! check for duplicate entry
                   do d1=1,n_d1-1
                     if (all(hopping_init%directions(current_species_id, i1, i2, i3, i4,   d1 ,:) == &
                             hopping_init%directions(current_species_id, i1, i2, i3, i4, nd_1 ,:))) &
@@ -539,13 +540,13 @@ contains
 
                 end if ! (pass==2)
 
-              ! we do not have a valid hopping direction record
-              ! check if we have an invalid record
+! we do not have a valid hopping direction record
+! check if we have an invalid record
               elseif (ntokens /= 4)
                 call error_message(file_name, line_number, buffer, &
                                   "invalid to-from rate record in the hopping section")
 
-              ! check if we have a valid from-to rate record
+! check if we have a valid from-to rate record
               else
 
                 i1 = get_index(tokens(1),lat_site_names)
@@ -553,7 +554,7 @@ contains
                 i3 = get_index(tokens(3),lat_site_names)
                 i4 = get_index(tokens(4),ads_site_names)
 
-                ! check for invalid site name (invalid lst or ast in either from or to site)
+! check for invalid site name (invalid lst or ast in either from or to site)
                 if ( i1==0 .or. i2==0 .or. i3==0 .or. i4==0) then
                   print *, 'parse state: ', parse_state
                   call error_message(file_name, line_number, buffer, &
@@ -561,7 +562,7 @@ contains
                 end if
 
                 if (pass == 1) then
-                  ! save n of directions and reset the counter in the first pass
+! save n of directions and reset the counter in the first pass
                   dcounter = 0
                 end if
 
@@ -575,9 +576,9 @@ contains
       close(inp_unit)
 
       if (parse_state /= parse_state_default) then
-        !write(*, '(A)') ' hopping: error, incomplete hopping section'
+!write(*, '(A)') ' hopping: error, incomplete hopping section'
         print *, 'parse state: ', parse_state
-        !stop 996
+!stop 996
         call error_message(file_name, line_number, buffer, &
             'hopping: error, incomplete hopping section')
       endif
@@ -596,9 +597,9 @@ contains
       end if
 
     end do ! pass = 1,2
-  ! ----------------------------------------------------------------------------
-  ! Hopping rates report
-  ! ----------------------------------------------------------------------------
+! ----------------------------------------------------------------------------
+! Hopping rates report
+! ----------------------------------------------------------------------------
 
   if  (hopping_init%is_defined) then
 
@@ -615,7 +616,7 @@ contains
 
             write(*,'(2X,A11,A11,A4)') c_pars%ads_names(species),lat_site_names(st1),ads_site_names(ast1)
 
-            ! Intra-site hops
+! Intra-site hops
             do i2=1,size(lat%avail_ads_sites(species,st1)%list)
               ast2 = lat%avail_ads_sites(species,st1)%list(i2)
               if (ast2 /= ast1) then
@@ -634,7 +635,7 @@ contains
 
             end do
 
-            ! Inter-site hops
+! Inter-site hops
             do m = -1,1
 
               st2 = lat%lst(1, modulo(col_st1(1) + m - 1, lat%n_cols) + 1)
@@ -664,7 +665,7 @@ contains
     end do
     end do
 
-  ! Replace default rates with zeros to escape negative rates
+! Replace default rates with zeros to escape negative rates
 
     do species=1,c_pars%n_species
     do st1=1,size(lat%avail_ads_sites(species,:))
@@ -707,47 +708,47 @@ contains
     integer :: row_new, col_new, lst_new, ast_new
     real(dp) :: energy_old, energy_new, int_energy_old, int_energy_new, int_energy_ts, delta_eps
 
-    ! energy for particle ads in its old position
+! energy for particle ads in its old position
     energy_old = energy(ads, lat, c_pars, e_pars)
-    ! Save the old configuration
+! Save the old configuration
     row_old = lat%ads_list(ads)%row
     col_old = lat%ads_list(ads)%col
     lst_old = lat%lst(row_old,col_old)
     ast_old = lat%ads_list(ads)%ast
     species = lat%ads_list(ads)%id
 
-    ! Construct rates for hops to neighbors
+! Construct rates for hops to neighbors
 
-    ! Delete particle ads from the old position
-    ! we do it here since we never work with occupations inside the following loop
+! Delete particle ads from the old position
+! we do it here since we never work with occupations inside the following loop
     lat%occupations(row_old,col_old) = 0
 
-    ! Loop over possible new positions of particle ads
+! Loop over possible new positions of particle ads
     print*, size(this%direction_list(species,lst_old,ast_old,:)), ' should be equal to ', &
             size(this%direction_list(species,lst_old,ast_old), 1), ' and to ', &
             size(this%direction_list, 4)
 
     do m=1,size(this%direction_list(species,lst_old,ast_old,:))
 
-      ! Get position and site type of neighbour m
+! Get position and site type of neighbour m
       call lat%neighbor2(ads, this%direction_list(species,lst_old,ast_old,m,1:2), row_new, col_new)
       lst_new  = lat%lst(row_new, col_new)
 
-      ! Check if the cell is free
+! Check if the cell is free
       if (lat%occupations(row_new, col_new) > 0) then
 
         this%rates(ads,m)%list = 0.0d0
 
       else
 
-        ! Put particle ads to site m
+! Put particle ads to site m
         lat%ads_list(ads)%row = row_new
         lat%ads_list(ads)%col = col_new
         lat%occupations(row_new,col_new) = ads
         ast_new = this%direction_list(species,lst_old,ast_old,m,3)
         lat%ads_list(ads)%ast = ast_new
 
-        ! Calculate energy of ads in new position
+! Calculate energy of ads in new position
         energy_new = energy(ads, lat, c_pars, e_pars)
 
         if (debug(10)) then
@@ -760,16 +761,16 @@ contains
           write(*,'(A,F8.3,A,F8.3)') "E_i =", energy_old, " E_f =", energy_new
         end if
 
-        ! Calculate interaction correction
+! Calculate interaction correction
         int_energy_old = energy_old - e_pars%ads_energy(id, lst_old, ast_old)
         int_energy_new = energy_new - e_pars%ads_energy(id, lst_new, ast_new)
         int_energy_ts  = rcic_law(this%rate_corr_pars(id, lst_old, ast_old, lst_new, ast_new), &
                                   int_energy_old, int_energy_new)
 
-        ! Barrier correction due to the perturbation
+! Barrier correction due to the perturbation
         delta_eps = int_energy_ts - int_energy_old
 
-        ! Add barrier correction if the unperturbed process is uphill
+! Add barrier correction if the unperturbed process is uphill
         if ( e_pars%ads_energy(id, lst_new, ast_new) > e_pars%ads_energy(id, lst_old, ast_old) )&
           delta_eps = delta_eps + &
               e_pars%ads_energy(id, lst_new, ast_new) - e_pars%ads_energy(id, lst_old, ast_old)
@@ -789,7 +790,7 @@ contains
           write(*,'(A,F8.3)') "V_TS=", int_energy_ts
         end if
 
-        ! Return particle ads to the old position
+! Return particle ads to the old position
         lat%ads_list(ads)%row = row_old
         lat%ads_list(ads)%col = col_old
         lat%ads_list(ads)%ast = ast_old
@@ -802,11 +803,11 @@ contains
     lat%occupations(row_old,col_old) = ads
 
 
-    ! Construct rates for intra-site hops
+! Construct rates for intra-site hops
 
     m = lat%n_nn(lst_old, 1) + 1
 
-    ! Loop over adsorption site types
+! Loop over adsorption site types
     do iads = 1, size(lat%avail_ads_sites(id,lst_old)%list)
 
       ast_new = lat%avail_ads_sites(id,lst_old)%list(iads)
@@ -817,10 +818,10 @@ contains
 
       else
 
-        ! Move particle ads to adsorption site list(iads)
+! Move particle ads to adsorption site list(iads)
         lat%ads_list(ads)%ast = ast_new
 
-        ! Calculate energy of ads in new position
+! Calculate energy of ads in new position
         energy_new = energy(ads, lat, c_pars, e_pars)
 
 !        if (debug(2)) then
@@ -830,8 +831,8 @@ contains
 !          print *, 'ads ', ads, 'm ', m,  'E_old = ', energy_old, 'E_new = ', energy_new
 !        end if
 
-        ! Apply detailed balance when
-        ! energy in the old position < energy in the new position
+! Apply detailed balance when
+! energy in the old position < energy in the new position
         if (energy_old < energy_new) then
             this%rates(ads,m)%list(iads) = this%process_intra(id, lst_old, ast_old, ast_new)&
                 *exp( -beta*(energy_new - energy_old) )
@@ -843,7 +844,7 @@ contains
 
     end do ! iads
 
-    ! Return particle ads to the old position
+! Return particle ads to the old position
     lat%ads_list(ads)%ast = ast_old
 
 

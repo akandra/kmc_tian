@@ -1,14 +1,15 @@
+# 1 "/home/akandra/git/kmc_tian/rates_dissociation_class.f90"
 module rates_dissociation_class
 
-  !---------------------------------------------------------------------------
-  !  Module for binary dissociation reaction  r --> p1 + p2
-  !---------------------------------------------------------------------------
-  !  * controlled by the dissociation keyword section of the .rates file
-  !  * p1 is assumed to be at the same lattice site as r with its adsorption
-  !    site type (ast) choosen from those specified in the .reaction file
-  !  * p2 lattice site is taken as a nearest neighbor of r with its ast
-  !    taken from those specified in the .reaction file
-  !---------------------------------------------------------------------------
+!---------------------------------------------------------------------------
+!  Module for binary dissociation reaction  r --> p1 + p2
+!---------------------------------------------------------------------------
+!  * controlled by the dissociation keyword section of the .rates file
+!  * p1 is assumed to be at the same lattice site as r with its adsorption
+!    site type (ast) choosen from those specified in the .reaction file
+!  * p2 lattice site is taken as a nearest neighbor of r with its ast
+!    taken from those specified in the .reaction file
+!---------------------------------------------------------------------------
 
   use constants
   use control_parameters_class
@@ -59,31 +60,31 @@ module rates_dissociation_class
     logical :: is_defined = .false.
 
 
-    !---------------------------------------------------------------------------
-    ! Reaction channels structure
-    !---------------------------------------------------------------------------
-    ! Gives the rate of reaction for each set of reactant and product lattice
-    ! and adsorption site types given in the dissociation section of the
-    ! .reaction input file
-    !---------------------------------------------------------------------------
+!---------------------------------------------------------------------------
+! Reaction channels structure
+!---------------------------------------------------------------------------
+! Gives the rate of reaction for each set of reactant and product lattice
+! and adsorption site types given in the dissociation section of the
+! .reaction input file
+!---------------------------------------------------------------------------
     type(dissociation_def), dimension(:), allocatable :: channels
 
-    !---------------------------------------------------------------------------
-    ! Reaction rate information structure
-    !---------------------------------------------------------------------------
-    ! Gives a list of reaction information for a given adsorbate
-    !   * list elements give the reaction channel which specifies the rate,
-    !     lattice site type, and adsorption site type (ast) of reactants and
-    !     products
-    !   * the structure also gives the direction of the site for product 2
-    !     relative to that of the reactant
-    !---------------------------------------------------------------------------
-    !
-    !                                 adsorbate      -> which particle
-    !                                 .
+!---------------------------------------------------------------------------
+! Reaction rate information structure
+!---------------------------------------------------------------------------
+! Gives a list of reaction information for a given adsorbate
+!   * list elements give the reaction channel which specifies the rate,
+!     lattice site type, and adsorption site type (ast) of reactants and
+!     products
+!   * the structure also gives the direction of the site for product 2
+!     relative to that of the reactant
+!---------------------------------------------------------------------------
+!
+!                                 adsorbate      -> which particle
+!                                 .
     type(v_list_rate_info), dimension(:), allocatable :: rate_info
 
-    ! Number of dissociation channels
+! Number of dissociation channels
     integer :: n_processes
 
   contains
@@ -136,7 +137,7 @@ contains
 
     logical :: duplicate_error = .false.
 
-    ! maximal number of available ads. sites
+! maximal number of available ads. sites
     max_avail_ads_sites = 1
     do i=1,c_pars%n_species
     do m=1,size(lat%avail_ads_sites(i,:))
@@ -145,9 +146,9 @@ contains
     end do
     end do
 
-    !---------------------------------------------------------------------------
-    !  Allocate and Intialize rate_info structure
-    !---------------------------------------------------------------------------
+!---------------------------------------------------------------------------
+!  Allocate and Intialize rate_info structure
+!---------------------------------------------------------------------------
     allocate( dissociation_init%rate_info(lat%n_rows*lat%n_cols) )
 
     do i=1,lat%n_rows*lat%n_cols
@@ -157,7 +158,7 @@ contains
       dissociation_init%rate_info(i)%list = rate_info_dissociation( default_int, default_int, default_rate )
     end do
 
-    !  read rate definitions from the input file
+!  read rate definitions from the input file
     file_name = c_pars%rate_file_name
     call open_for_read(inp_unit, file_name )
 
@@ -174,25 +175,25 @@ contains
 
       read(inp_unit, '(A)', iostat=ios) buffer
       line_number = line_number + 1
-        ! ios < 0: end of record or endfile condition detected
-        ! ios > 0: an error is detected
-        ! ios = 0  otherwise
+! ios < 0: end of record or endfile condition detected
+! ios > 0: an error is detected
+! ios = 0  otherwise
 
       if (ios /= 0) exit
 
-      ! Split an input string
+! Split an input string
       words = ''
       call split_string(buffer, words, nwords)
 
-      ! skip comments
+! skip comments
       if (nwords == 0) cycle
 
       select case (parse_state)
 
         case(parse_state_default)
-          ! in parse state default:
-          !    word 'dissociation' to mark beginning of a dissociation section
-          !    ignore anything else until dissociation section begins
+! in parse state default:
+!    word 'dissociation' to mark beginning of a dissociation section
+!    ignore anything else until dissociation section begins
 
           if (words(1) == reaction_names(dissociation_id)) then
 
@@ -204,7 +205,7 @@ contains
 
           if (words(1) == section_end) then
             parse_state = parse_state_default
-          ! don't count lines defining rct and rcic
+! don't count lines defining rct and rcic
           elseif (words(1) =='temperature_law' .or. &
                   words(1) =='interaction_law') then
             cycle
@@ -239,29 +240,29 @@ contains
 
       read(inp_unit, '(A)', iostat=ios) buffer
       line_number = line_number + 1
-        ! ios < 0: end of record or endfile
-        ! ios > 0: an error is detected
-        ! ios = 0  otherwise
+! ios < 0: end of record or endfile
+! ios > 0: an error is detected
+! ios = 0  otherwise
 
-      ! Split an input string
+! Split an input string
       words = ''
       call split_string(buffer, words, nwords)
 
-      ! skip comments
+! skip comments
       if (nwords == 0) cycle
 
       select case (parse_state)
 
         case(parse_state_default)
-          ! in parse state default:
-          !    word 'dissociation' to mark beginning of a dissociation section
-          !    ignore anything else until dissociation section begins
+! in parse state default:
+!    word 'dissociation' to mark beginning of a dissociation section
+!    ignore anything else until dissociation section begins
 
           if (words(1) == reaction_names(dissociation_id)) then
 
             parse_state = parse_state_dissociation
             dissociation_init%is_defined = .true.
-            ! reset necessary to allow multiple dissociaton sections
+! reset necessary to allow multiple dissociaton sections
             rct_law_defined  = .false.
             rcic_law_defined = .false.
             rct_law_id_glob  = 0
@@ -290,11 +291,11 @@ contains
           end if  ! words(1)
 
         case(parse_state_dissociation)
-          ! process:
-          !    temperature law records,
-          !    interaction law records,
-          !    'from-to-to' records,
-          !    section end
+! process:
+!    temperature law records,
+!    interaction law records,
+!    'from-to-to' records,
+!    section end
 
 
           if (words(1) == section_end) then
@@ -339,9 +340,9 @@ contains
             endif
 
           else
-            ! ---------------------------------------------------------
-            ! check if we have a valid from-to-to rate record
-            ! ---------------------------------------------------------
+! ---------------------------------------------------------
+! check if we have a valid from-to-to rate record
+! ---------------------------------------------------------
             if (nwords < 2*n_dissociation_species) &
               call error_message(file_name, line_number, buffer, &
                                  "invalid 'from' rate record in the dissociation section")
@@ -352,14 +353,14 @@ contains
             i5 = get_index(words(5),lat_site_names)
             i6 = get_index(words(6),ads_site_names)
 
-            ! check for invalid site name (invalid lst or ast in either from or to site)
+! check for invalid site name (invalid lst or ast in either from or to site)
             if ( i1==0 .or. i2==0 .or. i3==0 .or. i4==0 .or. i5==0 .or. i6==0) &
               call error_message(file_name, line_number, buffer, &
                          "wrong site name in the dissociation section")
 
-            ! ---------------------------------------------------------
-            ! check for duplicate entry
-            ! ---------------------------------------------------------
+! ---------------------------------------------------------
+! check for duplicate entry
+! ---------------------------------------------------------
             dissociation_counter = dissociation_counter + 1
 
             do i=1,dissociation_counter - 1
@@ -377,7 +378,7 @@ contains
               end if
             end do
 
-            ! check if energy is defined for reactant's and for products' site_type and ads_site
+! check if energy is defined for reactant's and for products' site_type and ads_site
             if( e_pars%ads_energy(current_reactant_id, i1, i2) == e_pars%undefined_energy .or. &
                 e_pars%ads_energy(current_product1_id, i3, i4) == e_pars%undefined_energy .or. &
                 e_pars%ads_energy(current_product2_id, i5, i6) == e_pars%undefined_energy ) then
@@ -389,10 +390,10 @@ contains
                 undefined_energy = .true.
             end if
 
-            ! ---------------------------------------------------------
-            ! we have a valid rate record. Process it
-            ! ---------------------------------------------------------
-            ! if record only has 'from-to-to' site information then set the law ids and pars to global default values
+! ---------------------------------------------------------
+! we have a valid rate record. Process it
+! ---------------------------------------------------------
+! if record only has 'from-to-to' site information then set the law ids and pars to global default values
             if (nwords == 2*n_dissociation_species) then
               if (rct_law_defined .and. rcic_law_defined) then
                 rct_law_id  = rct_law_id_glob
@@ -411,12 +412,12 @@ contains
               end if
 
             else
-              ! set rct_law_id and rcic_law_id to 0 to indicate no law on this line found yet
+! set rct_law_id and rcic_law_id to 0 to indicate no law on this line found yet
               rct_law_id  = 0
               rcic_law_id = 0
 
               do i=2*n_dissociation_species+1,nwords
-                ! check  for rct law on this line
+! check  for rct law on this line
                 if (get_index(words(i), rct_law_names) /= 0) then
                   rct_law_id = get_index(words(i), rct_law_names)
                   select case (rct_law_id)
@@ -438,7 +439,7 @@ contains
 
                 end if
 
-                ! check if we have an rcic law on this line
+! check if we have an rcic law on this line
                 if (get_index(words(i), rcic_law_names) /= 0) then
                   rcic_law_id = get_index(words(i), rcic_law_names)
                   select case (rcic_law_id)
@@ -455,7 +456,7 @@ contains
 
               end do ! i=2*n_dissociation_species+1,nwords
 
-              ! if rct_law  or rcic_law are not defined on this line, set to global defaults
+! if rct_law  or rcic_law are not defined on this line, set to global defaults
               if (rct_law_id == 0) then
                 rct_law_id = rct_law_id_glob
                 rct_pars   = rct_pars_glob
@@ -465,7 +466,7 @@ contains
                 rcic_pars   = rcic_pars_glob
               end if
 
-              ! check for valid temperature and interaction laws
+! check for valid temperature and interaction laws
               if (rct_law_id == 0) &
                 call error_message(file_name, line_number, buffer, &
                                   "no temperature law is specified")
@@ -475,13 +476,13 @@ contains
 
             end if ! (nwords==2*n_dissociation_species)
 
-            ! Check if rct and rcic laws are properly set
+! Check if rct and rcic laws are properly set
             if (rct_law_id == 0) &
               call error_message(file_name, line_number, buffer, "invalid temperature law")
             if (rcic_law_id == 0) &
               call error_message(file_name, line_number, buffer, "invalid interaction law")
 
-            ! Set rate constants and rcic for dissociation channels
+! Set rate constants and rcic for dissociation channels
             dissociation_init%channels(dissociation_counter)%r      = current_reactant_id
             dissociation_init%channels(dissociation_counter)%r_lst  = i1
             dissociation_init%channels(dissociation_counter)%r_ast  = i2
@@ -556,24 +557,24 @@ contains
 !
 !end if
 
-    ! Get the reactant information
+! Get the reactant information
     row  = lat%ads_list(ads)%row
     col  = lat%ads_list(ads)%col
     lst  = lat%lst(row,col)
     ast  = lat%ads_list(ads)%ast
     id_r = lat%ads_list(ads)%id
 
-    ! Loop over possible positions for product 2
+! Loop over possible positions for product 2
     n_channels=0
     do m=1,lat%n_nn(lst,1)
 
-      ! Get position and site type of neighbour m
+! Get position and site type of neighbour m
       call lat%neighbor(ads, m, row_2, col_2)
 
-      ! Check if the cell is free
+! Check if the cell is free
       if (lat%occupations(row_2, col_2) == 0) then
 
-        ! Get the lattice site type for product 2
+! Get the lattice site type for product 2
         lst_2 = lat%lst(row_2, col_2)
 
         do iprocs=1, this%n_processes
@@ -586,17 +587,17 @@ contains
             id_p1   = this%channels(iprocs)%p1
             id_p2   = this%channels(iprocs)%p2
 
-            ! Calculate interaction correction
-            ! WARNING! here we assume that the correction does not depend on products
-            !          consider to introduce it later
+! Calculate interaction correction
+! WARNING! here we assume that the correction does not depend on products
+!          consider to introduce it later
             int_energy    = energy(ads,lat,c_pars,e_pars) - e_pars%ads_energy(id_r, lst, ast)
             int_energy_ts = rcic_law(this%channels(iprocs)%rcic, int_energy, 0.0_dp)
-            ! Barrier correction due to the perturbation
+! Barrier correction due to the perturbation
             delta_eps = int_energy_ts - int_energy
 
-            ! Determine all the values of the adsorption sites for products p1 and p2
-            ! that match an entry in the process structure.
-            ! If the rate for this entry is >0, add channel to the list
+! Determine all the values of the adsorption sites for products p1 and p2
+! that match an entry in the process structure.
+! If the rate for this entry is >0, add channel to the list
             do i_ast_p1=1, size(lat%avail_ads_sites(id_p1, lst  )%list)
             do i_ast_p2=1, size(lat%avail_ads_sites(id_p2, lst_2)%list)
               if ( this%channels(iprocs)%p1_ast == lat%avail_ads_sites(id_p1, lst  )%list(i_ast_p1) .and. &
@@ -636,7 +637,7 @@ contains
 
     end do ! m
 
-    ! save the number of channels in the rate_info structure
+! save the number of channels in the rate_info structure
     this%rate_info(ads)%n_channels = n_channels
 
  end subroutine construct

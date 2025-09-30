@@ -1,5 +1,9 @@
 do not forget to correct pptx diagrams for barrier corrections!
 
+2025-09-30 :
+
+    consider to replace integer(1) with integer in type declarations
+
 2025-09-29 :
 
     replace plain text input files with json's.
