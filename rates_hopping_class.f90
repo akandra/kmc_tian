@@ -38,8 +38,9 @@ module rates_hopping_class
     integer  :: r         ! reactant's id
     integer  :: r_lst     ! reactant's lst (lattice site type)
     integer  :: r_ast     ! reactant's ast (adsorption site type)
-    integer  :: p_vec     ! hop vector
+    integer  :: p_lst     ! lst after hop
     integer  :: p_ast     ! ast after hop
+    integer  :: p_vec(2)  ! hop vector
     real(dp) :: rate      ! hopping rate
     type(int_law_pars) :: rcic
   end type
@@ -55,7 +56,7 @@ module rates_hopping_class
     ! Hopping paths structure
     !---------------------------------------------------------------------------
     ! Gives the rate of hopping for each set of where-from (lst,ast)
-    ! and where-to (direction, ast) given in the hopping section of the
+    ! and where-to (vector, ast) given in the hopping section of the
     ! .rates input file
     !---------------------------------------------------------------------------
     type(hopping_def), dimension(:), allocatable :: paths
@@ -72,8 +73,8 @@ module rates_hopping_class
     !                                 .
     type(v_list_rate_info), dimension(:), allocatable :: rate_info
 
-    ! Number of hopping channels
-    integer :: n_processes
+    ! Number of hopping paths
+    integer :: n_paths
 
   contains
     procedure :: construct
@@ -81,60 +82,6 @@ module rates_hopping_class
 
   end type
 
-
-
-
-
-  type :: hopping_type
-
-    logical :: is_defined           = .false.
-
-    ! Hopping Rates
-    !                   adsorbate                -> which particle
-    !                   .  channel               -> which row, col, and ast
-    !                   .  .
-    real(dp), dimension(:, :), allocatable :: rates
-
-          !                    (   species                         -> which species
-          !                        .  lst                          -> where from
-          !                        .  .  ast
-          !                        .  .  . 
-    integer,             dimension(:, :, :), allocatable :: n_channels
-          !                        .  .  .  channel
-          !                        .  .  .  . 
-    real(dp),            dimension(:, :, :, :), allocatable :: process
-    type(int_law_pars),  dimension(:, :, :, :), allocatable :: rate_corr_pars
-          !                        .  .  .  .  1=row, 2=col, 3=ast
-          !                        .  .  .  .  . 
-    integer,             dimension(:, :, :, :, :), allocatable :: channels
-
-
-
-
-
-
-
-          !                        .  .  .  n_site_type            -> where to
-          !                        .  .  .  .  n_adsorption_sites 
-          !                        .  .  .  .  . 
-    integer,             dimension(:, :, :, :, :), allocatable :: n_channels
-          !                        .  .  .  .  .  which channel
-          !                        .  .  .  .  .  . 
-    real(dp),            dimension(:, :, :, :, :, :), allocatable :: process
-    type(int_law_pars),  dimension(:, :, :, :, :, :), allocatable :: rate_corr_pars
-          !                        .  .  .  .  .  .  1=row, 2=col 
-          !                        .  .  .  .  .  .  .
-    integer,             dimension(:, :, :, :, :, :, :), allocatable :: directions
-          !                        .  .  .  which direction
-          !                        .  .  .  .  1=row, 2=col, 3=ast
-          !                        .  .  .  .  . 
-    integer,             dimension(:, :, :, :, :), allocatable :: direction_list
-  
-  contains
-    procedure :: construct
-    procedure :: print
-
-  end type
 
 contains
 !------------------------------------------------------------------------------
@@ -168,6 +115,7 @@ contains
 
     logical :: rct_law_defined  = .false.
     logical :: rcic_law_defined = .false.
+    logical :: duplicate_error  = .false.
 
     real(dp), dimension(n_max_rct_pars )::  rct_pars,  rct_pars_glob
     real(dp), dimension(n_max_rcic_pars):: rcic_pars, rcic_pars_glob
@@ -175,7 +123,8 @@ contains
     integer,  parameter   :: default_int = 0
     real(dp), parameter   :: default_rate  = -1.0_dp
 
-    integer :: max_avail_ads_sites, pass, dcounter, max_n_directions, max_n_directions
+    integer :: max_avail_ads_sites, pass
+    integer :: n_hopping_paths
     real(dp) :: delta_eps
 
     character(len=2) :: check_str
@@ -193,55 +142,38 @@ contains
     end do
     end do
 
-    allocate(hopping_init%ndir( c_pars%n_species,&
-                                n_max_lat_site_types, n_max_ads_sites,&
-                                n_max_lat_site_types, n_max_ads_sites) )
-    hopping_init%ndir = 0
-    max_n_directions = 0
+    !---------------------------------------------------------------------------
+    !  Allocate and Intialize rate_info structure
+    !---------------------------------------------------------------------------
+    allocate( hopping_init%rate_info(lat%n_rows*lat%n_cols) )
 
-    !  read rate definitions from the input file
+INTENDED FOR PASS 2 ----------------
+    do i=1,lat%n_rows*lat%n_cols
+      allocate( hopping_init%rate_info(i)%list( max_avail_ads_sites * &
+                                                     max_avail_ads_sites * &
+                                                     lat%n_max_nn) )
+      hopping_init%rate_info(i)%list = rate_info_hopping( default_int, default_int, default_rate )
+    end do
+-------------------------------------------------
+
+
+    ! read rate definitions from the input file
     file_name = c_pars%rate_file_name
 
     do pass = 1,2
+      ! reset counter of hopping paths
+      n_hopping_paths = 0
 
       ! Allocate and initialize rates array before the second pass
       if (pass == 2) then
 
-        ! Increase max_n_directions to account for reverse hops
-        max_n_directions = 2*max_n_directions
-
-        allocate( hopping_init%rates(lat%n_rows*lat%n_cols, max_n_directions) )
-        do i=1,lat%n_rows*lat%n_cols
-        do m=1,max_n_directions
-          allocate( hopping_init%rates(i,m)%list(max_avail_ads_sites) )
-          hopping_init%rates(i,m)%list = 0.0_dp
-        end do
-        end do
-
-        allocate(hopping_init%process(  c_pars%n_species,&
-                                        n_max_lat_site_types, n_max_ads_sites,&
-                                        n_max_lat_site_types, n_max_ads_sites,&
-                                        max_n_directions) )
-        hopping_init%process = default_rate
-
-        allocate(hopping_init%rate_corr_pars( c_pars%n_species,&
-                                        n_max_lat_site_types, n_max_ads_sites,&
-                                        n_max_lat_site_types, n_max_ads_sites,&
-                                        max_n_directions) )
-        hopping_init%rate_corr_pars = int_law_pars(default_int,default_rate)
-
-        allocate(hopping_init%directions( c_pars%n_species,&
-                                        n_max_lat_site_types, n_max_ads_sites,&
-                                        n_max_lat_site_types, n_max_ads_sites,&
-                                        max_n_directions,2) )
-        hopping_init%directions = 0
-
-        ! Reorganize directions to a form more suitable for looping over possible hopping channels
-        allocate(hopping_init%direction_list( c_pars%n_species,&
-                                        n_max_lat_site_types, n_max_ads_sites,&
-                                        max_n_directions,3) )
-        hopping_init%direction_list = 0
-
+        allocate( hopping_init%paths(n_hopping_paths) )
+        hopping_init%n_paths = n_hopping_paths
+        hopping_init%paths = hopping_def( default_int, default_int, default_int, &
+                                          default_int, default_int, &
+                                          [default_int, default_int], &
+                                          default_rate, &
+                                          int_law_pars( default_int, [0.0_dp, 0.0_dp] ) )
       endif
 
       call open_for_read(inp_unit, file_name )
@@ -283,7 +215,7 @@ contains
 
               hopping_init%is_defined = .true.
               parse_state = parse_state_hopping
-              ! reset necessary to allow multiple hopping sections
+              ! reset necessary variables to allow multiple hopping sections
               rct_law_defined  = .false.
               rcic_law_defined = .false.
               rct_law_id_glob  = 0
@@ -305,14 +237,13 @@ contains
             ! process:
             !    temperature law records,
             !    interaction law records,
-            !    to-from records,
-            !    hopping direction records:
+            !    from-to records,
+            !    hopping vector records:
             !      - 0 1
             !      - 0 1 Arrhenius 1.0E13 0.5
             !      - 0 1 linear 0.5 0.5
             !      - 0 1 Arrhenius 1.0E13 0.5 linear 0.5 0.5
             !    section end
-
 
             if (tokens(1) == section_end) then
               parse_state = parse_state_default
@@ -356,18 +287,61 @@ contains
               endif
 
             else
-              ! check if we have a hopping direction record
-              if (read_int(tokens(1), n1) .and.&
-                              ntokens > 1 .and.& 
-                  read_int(tokens(2), n2))  then
 
-                ! we have a valid hopping direction record. Process it
+              ! check if we have a valid from-to record
+              if (ntokens == 4) then
+                i1 = get_index(tokens(1),lat_site_names)
+                i2 = get_index(tokens(2),ads_site_names)
+                i3 = get_index(tokens(3),lat_site_names)
+                i4 = get_index(tokens(4),ads_site_names)
 
-                ! increment counter of directions
-                dcounter = dcounter + 1
-                if (dcounter > max_n_directions) max_n_directions = dcounter
+                ! check for invalid lst or ast
+                if ( i1==0 .or. i2==0 .or. i3==0 .or. i4==0) then
+                  print *, 'parse state: ', parse_state
+                  call error_message(file_name, line_number, buffer, &
+                                    "wrong site name in the hopping section")
+                end if
 
-                !   if record only has hopping direction information, 
+              ! check if we have a valid hopping vector and to-ast record
+              elseif (ntokens > 1             .and. &
+                      read_int(tokens(1), n1) .and. &
+                      read_int(tokens(2), n2)         )  then
+
+                ! we have a valid hopping vector record. Process it
+
+                ! increment counter of hopping paths
+                n_hopping_paths = n_hopping_paths + 1
+
+                if (pass == 2) then
+
+                  ! check for duplicate entry
+                  do i=1,n_hopping_paths - 1
+                    if ( hopping_init%channels(i)%r     == current_species_id .and. &
+                         hopping_init%channels(i)%r_lst == i1                 .and. &
+                         hopping_init%channels(i)%r_ast == i2                 .and. &
+                         hopping_init%channels(i)%p_lst == i3                 .and. &
+                         hopping_init%channels(i)%p_ast == i4                 .and. &
+                         hopping_init%channels(i)%p_vec == [n1, n2] ) then
+                      call error_message(file_name, line_number, buffer, &
+                                          "duplicated entry", stop = .false.)
+                      duplicate_error = .true.
+                    end if
+                  end do
+
+                  ! check if energy is defined for all sites involved in the hop
+                  if( e_pars%ads_energy(current_species_id, i1, i2) == e_pars%undefined_energy .or. &
+                      e_pars%ads_energy(current_species_id, i3, i4) == e_pars%undefined_energy ) then
+
+                      call error_message(file_name, line_number, buffer, &
+                                        "rate defined for site with undefined adsorption energy", &
+                                        stop=.false., warning=.false.)
+
+                      undefined_energy = .true.
+                  end if
+
+                end if
+
+                !   if record has hopping vector information only, 
                 !      set the law ids and pars to global default values
                 if (ntokens == 2) then
                   if (rct_law_defined .and. rcic_law_defined) then
@@ -461,44 +435,21 @@ contains
 
                 if (pass == 2) then
 
-                  ! increment number of directions for this from-to pair and its reverse
-                  n_d1 = hopping_init%ndirs(current_species_id, i1, i2, i3, i4) + 1
-                  n_d2 = hopping_init%ndirs(current_species_id, i3, i4, i1, i2) + 1
-                  hopping_init%ndirs(current_species_id, i1, i2, i3, i4) = n_d1
-                  hopping_init%ndirs(current_species_id, i3, i4, i1, i2) = n_d2
-                 
-                  ! Set directions
-                  hopping_init%directions(current_species_id,i1,i2,i3,i4,nd_1,1) = n1
-                  hopping_init%directions(current_species_id,i1,i2,i3,i4,nd_1,2) = n2
+                  ! Set rate constants and rcic for hopping paths
+                  hopping_init%paths(n_hopping_paths)%r      = current_species_id
+                  hopping_init%paths(n_hopping_paths)%r_lst  = i1
+                  hopping_init%paths(n_hopping_paths)%r_ast  = i2
+                  hopping_init%paths(n_hopping_paths)%p_lst  = i3
+                  hopping_init%paths(n_hopping_paths)%p_ast  = i4
+                  hopping_init%paths(n_hopping_paths)%p_vec  = [n1, n2]
 
-                  hopping_init%direction_list(current_species_id, i1, i2, nd_1, 1) = n1
-                  hopping_init%direction_list(current_species_id, i1, i2, nd_1, 2) = n2
-                  hopping_init%direction_list(current_species_id, i1, i2, nd_1, 3) = i4
+                  hopping_init%paths(n_hopping_paths)%rate  = 
+                                rct_law(rct_law_id, c_pars%temperature, rct_pars)
 
-                  ! Symmetrize directions
-                  hopping_init%directions(current_species_id,i3,i4,i1,i2,nd_2,1) = -n1
-                  hopping_init%directions(current_species_id,i3,i4,i1,i2,nd_2,2) = -n2
+                  hopping_init%paths(n_hopping_paths)%rcic%id   = rcic_law_id
+                  hopping_init%paths(n_hopping_paths)%rcic%pars = rcic_pars
 
-                  hopping_init%direction_list(current_species_id, i3, i4, nd_2, 1) =-n1
-                  hopping_init%direction_list(current_species_id, i3, i4, nd_2, 2) =-n2
-                  hopping_init%direction_list(current_species_id, i3, i4, nd_2, 3) = i2
-
-                  ! Set rate constant
-                  hopping_init%process(current_species_id,i1,i2,i3,i4,nd_1) = &
-                              rct_law(rct_law_id, c_pars%temperature, rct_pars)
-
-                  ! Symmetrize rate constant
-
-                  ! check energy is defined for initial and final lst and ast
-                  if( e_pars%ads_energy(current_species_id, i1, i2) == e_pars%undefined_energy .or. &
-                      e_pars%ads_energy(current_species_id, i3, i4) == e_pars%undefined_energy ) then
-                    call error_message(file_name, line_number, buffer, &
-                                    "rate defined for a site with undefined adsorption energy", &
-                                    stop=.false., warning=.false.)
-
-                    undefined_energy = .true.
-                  end if
-
+WE ARE HERE
                   ! State "to" energy minus state "from" energy
                   delta_eps = e_pars%ads_energy(current_species_id, i3, i4) - &
                               e_pars%ads_energy(current_species_id, i1, i2)
@@ -539,31 +490,11 @@ contains
 
                 end if ! (pass==2)
 
-              ! we do not have a valid hopping direction record
-              ! check if we have an invalid record
-              elseif (ntokens /= 4)
-                call error_message(file_name, line_number, buffer, &
-                                  "invalid to-from rate record in the hopping section")
-
-              ! check if we have a valid from-to rate record
+              ! we have an invalid record
               else
+                call error_message(file_name, line_number, buffer, &
+                                  "invalid from-to record in the hopping section")
 
-                i1 = get_index(tokens(1),lat_site_names)
-                i2 = get_index(tokens(2),ads_site_names)
-                i3 = get_index(tokens(3),lat_site_names)
-                i4 = get_index(tokens(4),ads_site_names)
-
-                ! check for invalid site name (invalid lst or ast in either from or to site)
-                if ( i1==0 .or. i2==0 .or. i3==0 .or. i4==0) then
-                  print *, 'parse state: ', parse_state
-                  call error_message(file_name, line_number, buffer, &
-                                    "wrong site name in the hopping section")
-                end if
-
-                if (pass == 1) then
-                  ! save n of directions and reset the counter in the first pass
-                  dcounter = 0
-                end if
 
               end if ! valid from-to record
 
