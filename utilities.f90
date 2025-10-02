@@ -415,6 +415,18 @@ contains
 
   end function get_indices
 
+! Prints a formatted error message containing the provided string.
+!
+! file_name is  a character string containing the name of the file where the error occurred;
+! line_number is an integer representing the line number in the file where the error occurred;
+!              if line_number is <= 0, it will be ignored in the output.
+! line is a character string containing the specific line of code that caused the error.
+!              if line_number is <= 0, line will be ignored in the output.
+! message is a character string containing the error message to be displayed.
+! warning is an optional logical flag indicating whether the message is a warning (true) or an error (false). 
+!         Default is false.
+! stop is an optional logical flag indicating whether to stop execution after displaying the message. 
+!         Default is true.
 !------------------------------------------------------------------------------
   subroutine error_message(file_name, line_number, line, message, warning, stop)
 !------------------------------------------------------------------------------
@@ -482,5 +494,19 @@ contains
     end if
 
   end subroutine
+
+  ! Subroutine to reverse a 1D array in place
+  subroutine reverse_array_inplace(arr)
+    real(dp), intent(inout) :: arr(:)
+    real(dp) :: temp
+    integer :: i, n
+    
+    n = size(arr)
+    do i = 1, n/2
+        temp = arr(i)
+        arr(i) = arr(n-i+1)
+        arr(n-i+1) = temp
+    end do
+end subroutine
 
 end module utilities

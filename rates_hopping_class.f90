@@ -161,8 +161,6 @@ INTENDED FOR PASS 2 ----------------
     file_name = c_pars%rate_file_name
 
     do pass = 1,2
-      ! reset counter of hopping paths
-      n_hopping_paths = 0
 
       ! Allocate and initialize rates array before the second pass
       if (pass == 2) then
@@ -175,6 +173,9 @@ INTENDED FOR PASS 2 ----------------
                                           default_rate, &
                                           int_law_pars( default_int, [0.0_dp, 0.0_dp] ) )
       endif
+
+      ! reset counter of hopping paths
+      n_hopping_paths = 0
 
       call open_for_read(inp_unit, file_name )
 
@@ -309,19 +310,24 @@ INTENDED FOR PASS 2 ----------------
 
                 ! we have a valid hopping vector record. Process it
 
-                ! increment counter of hopping paths
-                n_hopping_paths = n_hopping_paths + 1
+                ! increment counter of hopping paths with account for reversibility
+                n_hopping_paths = n_hopping_paths + 2
 
                 if (pass == 2) then
 
                   ! check for duplicate entry
-                  do i=1,n_hopping_paths - 1
-                    if ( hopping_init%channels(i)%r     == current_species_id .and. &
-                         hopping_init%channels(i)%r_lst == i1                 .and. &
-                         hopping_init%channels(i)%r_ast == i2                 .and. &
-                         hopping_init%channels(i)%p_lst == i3                 .and. &
-                         hopping_init%channels(i)%p_ast == i4                 .and. &
-                         hopping_init%channels(i)%p_vec == [n1, n2] ) then
+                  do i=1,n_hopping_paths - 2
+                    if ( hopping_init%paths(i)%r     == current_species_id .and. &
+                         hopping_init%paths(i)%r_lst == i1                 .and. &
+                         hopping_init%paths(i)%r_ast == i2                 .and. &
+                         hopping_init%paths(i)%p_lst == i3                 .and. &
+                         hopping_init%paths(i)%p_ast == i4                 .and. &
+                         hopping_init%paths(i)%p_vec == [n1, n2]           .and. &
+                         hopping_init%paths(i)%r_lst == i3                 .and. &
+                         hopping_init%paths(i)%r_ast == i4                 .and. &
+                         hopping_init%paths(i)%p_lst == i1                 .and. &
+                         hopping_init%paths(i)%p_ast == i2                 .and. &
+                         hopping_init%paths(i)%p_vec == [-n1, -n2] ) then
                       call error_message(file_name, line_number, buffer, &
                                           "duplicated entry", stop = .false.)
                       duplicate_error = .true.
@@ -436,57 +442,42 @@ INTENDED FOR PASS 2 ----------------
                 if (pass == 2) then
 
                   ! Set rate constants and rcic for hopping paths
-                  hopping_init%paths(n_hopping_paths)%r      = current_species_id
-                  hopping_init%paths(n_hopping_paths)%r_lst  = i1
-                  hopping_init%paths(n_hopping_paths)%r_ast  = i2
-                  hopping_init%paths(n_hopping_paths)%p_lst  = i3
-                  hopping_init%paths(n_hopping_paths)%p_ast  = i4
-                  hopping_init%paths(n_hopping_paths)%p_vec  = [n1, n2]
+                  hopping_init%paths(n_hopping_paths-1)%r      = current_species_id
+                  hopping_init%paths(n_hopping_paths-1)%r_lst  = i1
+                  hopping_init%paths(n_hopping_paths-1)%r_ast  = i2
+                  hopping_init%paths(n_hopping_paths-1)%p_lst  = i3
+                  hopping_init%paths(n_hopping_paths-1)%p_ast  = i4
+                  hopping_init%paths(n_hopping_paths-1)%p_vec  = [n1, n2]
 
-                  hopping_init%paths(n_hopping_paths)%rate  = 
+                  hopping_init%paths(n_hopping_paths-1)%rcic%id   = rcic_law_id
+                  hopping_init%paths(n_hopping_paths-1)%rcic%pars = rcic_pars
+
+                  hopping_init%paths(n_hopping_paths-1)%rate  = 
                                 rct_law(rct_law_id, c_pars%temperature, rct_pars)
 
-                  hopping_init%paths(n_hopping_paths)%rcic%id   = rcic_law_id
-                  hopping_init%paths(n_hopping_paths)%rcic%pars = rcic_pars
+                  ! Reverse process
 
-WE ARE HERE
+                  hopping_init%paths(n_hopping_paths)%r      = current_species_id
+                  hopping_init%paths(n_hopping_paths)%r_lst  = i3
+                  hopping_init%paths(n_hopping_paths)%r_ast  = i4
+                  hopping_init%paths(n_hopping_paths)%p_lst  = i1
+                  hopping_init%paths(n_hopping_paths)%p_ast  = i2
+                  hopping_init%paths(n_hopping_paths)%p_vec  = [-n1, -n2]
+
+                  hopping_init%paths(n_hopping_paths)%rcic%id   = rcic_law_id
+                  ! Reverse rcic parameters array
+                  do i=1,size(rcic_pars)
+                    hopping_init%paths(n_hopping_paths)%rcic%pars(i) = &
+                                                            rcic_pars(size(rcic_pars)-i+1)
+                  end do
+
                   ! State "to" energy minus state "from" energy
                   delta_eps = e_pars%ads_energy(current_species_id, i3, i4) - &
                               e_pars%ads_energy(current_species_id, i1, i2)
-                  ! detailed balance
-                  hopping_init%process(current_species_id,i3,i4,i1,i2,nd_2) = &
-                              hopping_init%process(current_species_id,i1,i2,i3,i4,nd_1) &
-                              *exp(c_pars%beta*delta_eps)
-
-                  ! Set interaction correction
-                  hopping_init%rate_corr_pars(current_species_id,i1,i2,i3,i4,nd_1)%id = rcic_law_id
-                  hopping_init%rate_corr_pars(current_species_id,i3,i4,i1,i2,nd_2)%id = rcic_law_id
-
-                  ! Symmetrize
-                  hopping_init%rate_corr_pars(current_species_id,i1,i2,i3,i4,nd_1)%pars = rcic_pars
-                  if (rcic_law_id == rcic_linear_id) then
-                    hopping_init%rate_corr_pars(current_species_id,i3,i4,i1,i2,nd_2)%pars(1) = rcic_pars(2)
-                    hopping_init%rate_corr_pars(current_species_id,i3,i4,i1,i2,nd_2)%pars(2) = rcic_pars(1)
-                  else
-                    stemp = "This should not happen! Interaction law" // rcic_law_names(rcic_law_id) // &
-                            "is not symmetrized!"
-                    call error_message(file_name, line_number, buffer, stemp)
-                  end if
-
-                  ! check for duplicate entry
-                  do d1=1,n_d1-1
-                    if (all(hopping_init%directions(current_species_id, i1, i2, i3, i4,   d1 ,:) == &
-                            hopping_init%directions(current_species_id, i1, i2, i3, i4, nd_1 ,:))) &
-                      call error_message(file_name, line_number, buffer, &
-                                            "duplicated entry (check symmetry duplicates)")
-                  end do
-
-                  do d2=1,n_d2
-                    if (all(hopping_init%directions(current_species_id, i1, i2, i3, i4, nd_1 ,:) == &
-                           -hopping_init%directions(current_species_id, i3, i4, i1, i2,  d_2 ,:))) &
-                      call error_message(file_name, line_number, buffer, &
-                                            "duplicated entry (check symmetry duplicates)")
-                  end do
+                  ! detailed balance                              
+                  hopping_init%paths(n_hopping_paths)%rate  = 
+                                hopping_init%paths(n_hopping_paths-1)%rate&
+                                *exp(c_pars%beta*delta_eps)
 
                 end if ! (pass==2)
 
@@ -506,123 +497,57 @@ WE ARE HERE
       close(inp_unit)
 
       if (parse_state /= parse_state_default) then
-        !write(*, '(A)') ' hopping: error, incomplete hopping section'
-        print *, 'parse state: ', parse_state
-        !stop 996
+        write(stemp,'(A,I2)') 'parse state: ', parse_state
         call error_message(file_name, line_number, buffer, &
-            'hopping: error, incomplete hopping section')
+            'hopping: incomplete hopping section. ' // trim(stemp))
       endif
 
-      if (undefined_energy) then
-        write(*, '(A)') ' hopping: error, rates defined for sites with undefined energies'
-        stop 997
+    end do ! pass = 1,2
 
+    if (duplicate_error) &
+      call error_message(file_name, 0, '', &
+            '  hopping: duplicated hopping entries found')
+
+    if (undefined_energy) then
+      call error_message(file_name, 0, '', &
+            '  hopping: rates defined for sites with undefined energies')
+    else
+      if (hopping_init%is_defined) then
+        write(*, '(A)') ' hopping: passed check that energies are defined for all rates'
       else
-        if (hopping_init%is_defined) then
-          write(*, '(A)') ' hopping: passed check that energies are defined for all rates'
-        else
-          write(*, '(A)') ' no hopping'
-        end if
-
+        write(*, '(A)') ' no hopping'
       end if
 
-    end do ! pass = 1,2
-  ! ----------------------------------------------------------------------------
+    end if
+
+
+    ! ----------------------------------------------------------------------------
   ! Hopping rates report
   ! ----------------------------------------------------------------------------
 
-  if  (hopping_init%is_defined) then
+  if  (hopping_init%is_defined .and. debug(6)) then
 
     write(*,'(A)') '  Hopping Rates Report.'
     write(*,'(A)') '  --------------------------'
+    write(*,*)
 
-    do species = 1,c_pars%n_species
-    do st1 = 1,size(lat%avail_ads_sites(species,:))
-      col_st1 = get_indices(st1,lat%lst(1,:))
-      if (col_st1(1) > 0) then
-
-        do i1=1,size(lat%avail_ads_sites(species,st1)%list)
-          ast1 = lat%avail_ads_sites(species,st1)%list(i1)
-
-            write(*,'(2X,A11,A11,A4)') c_pars%ads_names(species),lat_site_names(st1),ads_site_names(ast1)
-
-            ! Intra-site hops
-            do i2=1,size(lat%avail_ads_sites(species,st1)%list)
-              ast2 = lat%avail_ads_sites(species,st1)%list(i2)
-              if (ast2 /= ast1) then
-                check_str = '  '
-                if (hopping_init%process_intra(species,st1,ast1,ast2) /= default_rate) check_str = check_mark
-                write(*,'(5X,A2,1X,A11,A11,A4)',advance='NO') &
-                  check_str, c_pars%ads_names(species), same_lst_mark, ads_site_names(ast2)
-                if (debug(1)) then
-                  write(*,'(3X,E10.3,2X,A,5F10.3)') hopping_init%process_intra(species,st1,ast1,ast2),&
-                                     rcic_law_names(hopping_init%rate_corr_pars_intra(species,st1,ast1,ast2)%id),&
-                                                    hopping_init%rate_corr_pars_intra(species,st1,ast1,ast2)%pars
-                else
-                  write(*,*) ''
-                end if
-              end if
-
-            end do
-
-            ! Inter-site hops
-            do m = -1,1
-
-              st2 = lat%lst(1, modulo(col_st1(1) + m - 1, lat%n_cols) + 1)
-
-              do i2=1,size(lat%avail_ads_sites(species,st2)%list)
-                ast2 = lat%avail_ads_sites(species,st2)%list(i2)
-                check_str = '  '
-                if (hopping_init%process(species,st1,ast1,st2,ast2) /= default_rate) check_str = check_mark
-                write(*,'(5X,A2,1X,A11,A11,A4)',advance='NO') &
-                  check_str, c_pars%ads_names(species), lat_site_names(st2), ads_site_names(ast2)
-                if (debug(1)) then
-                  write(*,'(3X,E10.3,2X,A,5F10.3)') hopping_init%process(species,st1,ast1,st2,ast2),&
-                                     rcic_law_names(hopping_init%rate_corr_pars(species,st1,ast1,st2,ast2)%id),&
-                                                    hopping_init%rate_corr_pars(species,st1,ast1,st2,ast2)%pars
-                else
-                  write(*,*) ''
-                end if
-              end do
-
-            end do
-            write(*,*) ''
-
-        end do
-
-      end if
-
-    end do
-    end do
-
-  ! Replace default rates with zeros to escape negative rates
-
-    do species=1,c_pars%n_species
-    do st1=1,size(lat%avail_ads_sites(species,:))
-    do st2=1,size(lat%avail_ads_sites(species,:))
-    do i1=1,size(lat%avail_ads_sites(species,st1)%list)
-    do i2=1,size(lat%avail_ads_sites(species,st2)%list)
-
-      ast1 = lat%avail_ads_sites(species,st1)%list(i1)
-      ast2 = lat%avail_ads_sites(species,st2)%list(i2)
-
-      if (hopping_init%process(species,st1,ast1,st2,ast2) == default_rate)&
-        hopping_init%process(species,st1,ast1,st2,ast2) = 0.0_dp
-
-      if (hopping_init%process_intra(species,st1,ast1,ast2) == default_rate)&
-        hopping_init%process_intra(species,st1,ast1,ast2) = 0.0_dp
-
-    end do
-    end do
-    end do
-    end do
+    do i=1, hopping_init%n_paths
+      write(*,'(5X, A4, A, A11, A11, A, A11, A11, A, F10.3, A, 10F10.3)' &
+        c_pars%ads_names(hopping_init%paths(i)%r), ' hops from ',&
+        lat_site_names(hopping_init%paths(i)%r_lst), &
+        ads_site_names(hopping_init%paths(i)%r_ast), ' to ', &
+        lat_site_names(hopping_init%paths(i)%p_lst), &
+        ads_site_names(hopping_init%paths(i)%p_ast), ' with rate ', &
+        hopping_init%paths(i)%rate , ' and rcic ' &
+        trim(rcic_law_names(hopping_init%paths(i)%rcic%id)), &
+         hopping_init%paths(i)%rcic%pars )
     end do
 
   end if
 
-
   end function hopping_init
 
+  
 !-----------------------------------------------------------------------------
   subroutine construct(this, ads, lat, c_pars, e_pars, beta)
 !-----------------------------------------------------------------------------
